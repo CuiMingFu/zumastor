@@ -9,6 +9,7 @@
 #include <string.h>
 //#include <libdlm.h>
 #include <popt.h>
+#include <signal.h>
 #include "dm-ddsnap.h" // message codes
 #include "ddsnap.h" // outbead
 #include "ddsnap.agent.h"
@@ -208,13 +209,15 @@ int monitor_setup(char const *sockname, int *listenfd)
 	return 0;
 }
 
-int monitor(int listenfd, struct context *context)
+int monitor(int listenfd, struct context *context, const char *logfile, int getsigfd)
 {
-	unsigned maxclients = 100, clients = 0, others = 1;
+	unsigned maxclients = 100, clients = 0, others = 2;
 	struct pollfd pollvec[others+maxclients];
 	struct client *clientvec[maxclients];
 
 	pollvec[0] = (struct pollfd){ .fd = listenfd, .events = (POLLIN | POLLHUP | POLLERR) };
+        pollvec[1] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
+
 	assert(pollvec[0].fd > 0);
 
 	while (1) {
@@ -237,6 +240,20 @@ int monitor(int listenfd, struct context *context)
 			// will eventually come free again.  Yes this sucks.
 			continue;
 		}
+
+                if (pollvec[1].revents) {
+                        u8 sig = 0;
+                        /* it's stupid but this read also gets interrupted, so... */
+                        do { } while (read(getsigfd, &sig, 1) == -1 && errno == EINTR);              
+                        trace_on(warn("Caught signal %i", sig););
+                        switch (sig) {
+                                case SIGHUP:
+                                        fflush(stderr);
+                                        fflush(stdout);
+                                        re_open_logfile(logfile);
+                                        break;
+                        }
+                }
 
 		/* New connection? */
 		if (pollvec[0].revents) {

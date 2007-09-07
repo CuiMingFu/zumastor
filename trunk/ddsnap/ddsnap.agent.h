@@ -8,4 +8,4 @@ struct context {
 };
 
 int monitor_setup(char const *sockname, int *listenfd);
-int monitor(int listenfd, struct context *context);
+int monitor(int listenfd, struct context *context, const char *logfile, int getsigfd);

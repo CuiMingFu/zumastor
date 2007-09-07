@@ -20,6 +20,7 @@
 #include <sys/ioctl.h>
 #include <sys/un.h>
 #include <linux/fs.h> // for BLKGETSIZE
+#include <poll.h>
 #include "buffer.h"
 #include "daemonize.h"
 #include "ddsnap.h"
@@ -1580,12 +1581,29 @@ static int usecount(int sock, u32 snaptag, int32_t usecnt_dev)
 	return 0; // should we return usecount here too?
 }
 
-static int ddsnap_delta_server(int lsock, char const *devstem, const char *progress_file)
+static int ddsnap_delta_server(int lsock, char const *devstem, const char *progress_file, char const *logfile, int getsigfd)
 {
 	char const *origindev = devstem;
+        struct pollfd pollvec[1];
+
+        pollvec[0] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
 
 	for (;;) {
 		int csock;
+
+                if (pollvec[0].revents) {
+                        u8 sig = 0;
+                        /* it's stupid but this read also gets interrupted, so... */
+                        do { } while (read(getsigfd, &sig, 1) == -1 && errno == EINTR);
+                        trace_on(warn("Caught signal %i", sig););
+                        switch (sig) {
+                                case SIGHUP:
+                                        fflush(stderr);
+                                        fflush(stdout);
+                                        re_open_logfile(logfile);
+                                        break;
+                        }
+                }
 
 		if ((csock = accept_socket(lsock)) < 0) {
 			warn("unable to accept connection: %s", strerror(-csock));
@@ -2283,12 +2301,14 @@ int main(int argc, char *argv[])
 		if (monitor_setup(sockname, &listenfd) < 0)
 			error("Could not setup ddsnap agent server\n");
 
+		int getsigfd;
 		if (!nobg) {
 			pid_t pid;
 
 			if (!logfile)
 				logfile = "/var/log/ddsnap.agent.log";
-			pid = daemonize(logfile, pidfile);
+
+			pid = daemonize(logfile, pidfile, &getsigfd);
 			if (pid == -1)
 				error("Could not daemonize\n");
 			if (pid != 0) {
@@ -2297,7 +2317,8 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if (monitor(listenfd, &(struct context){ .polldelay = -1 }) < 0)
+		if (monitor(listenfd, &(struct context){ .polldelay = -1 },
+		    logfile, getsigfd) < 0)
 			error("Could not start ddsnap agent server\n");
 
 		return 0; /* not reached */
@@ -2951,12 +2972,14 @@ int main(int argc, char *argv[])
 			}
 			free(hostname);
 
+			int getsigfd;
 			if (!nobg) {
 				pid_t pid;
 
 				if (!logfile)
 					logfile = "/var/log/ddsnap.delta.log";
-				pid = daemonize(logfile, pidfile);
+
+				pid = daemonize(logfile, pidfile, &getsigfd);
 				if (pid == -1)
 					error("Error: could not daemonize\n");
 				if (pid != 0) {
@@ -2965,7 +2988,8 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			return ddsnap_delta_server(sock, devstem, progress_file);
+			return ddsnap_delta_server(sock, devstem, progress_file,
+				logfile, getsigfd);
 		}
 
 		fprintf(stderr, "%s %s: unrecognized delta subcommand: %s.\n", argv[0], command, subcommand);
