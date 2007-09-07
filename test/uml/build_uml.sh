@@ -8,7 +8,7 @@
 
 dpkg -s uml-utilities >& $LOG || apt-get -y install uml-utilities || exit $?
 
-[[ ! -e $ZUMA_REPOSITORY/build ]] || mkdir $ZUMA_REPOSITORY/build
+[[ -e $ZUMA_REPOSITORY/build ]] || mkdir $ZUMA_REPOSITORY/build
 
 echo -n Getting kernel sources from kernel.org ...
 pushd $ZUMA_REPOSITORY/build
