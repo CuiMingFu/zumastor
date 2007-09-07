@@ -15,7 +15,19 @@
 #include "trace.h"
 #include "daemonize.h"
 
+#define trace trace_off
+
 #define BUFSIZE 512
+
+/* Avoid signal races by delivering over a pipe */
+
+static int sigpipe;
+
+static void sighandler(int signum)
+{
+        trace(printf("caught signal %i\n", signum););
+        write(sigpipe, (char[]){signum}, 1);
+}
 
 int set_flags(int fd, long args) {
 	int mode = fcntl(fd, F_GETFL);
@@ -28,22 +40,96 @@ int set_flags(int fd, long args) {
 	return 0;
 }
 
-/* FIXME: handle log file rotations on SIGHUP */
-
-pid_t daemonize(char const *logfile, char const *pidfile)
+/*
+ * Re-open logfiles on HUP for log rotation
+ */
+void re_open_logfile(const char *logfile)
 {
-	struct sigaction ign_sa;
+	if (freopen(logfile, "a", stderr) == NULL)
+		error("could not reopen stderr\n");
+
+	dup2(fileno(stderr), fileno(stdout));
+
+	/* O_SYNC is important to avoid deadlock */
+	if (set_flags(fileno(stdout), O_SYNC)
+			|| set_flags(fileno(stderr), O_SYNC))
+		error("unable to set stdout and stderr flags to O_SYNC: %s"
+				, strerror(errno));
+}
+
+void open_logfile(const char *logfile)
+{
+	int err;
+	char *buffer_stdout, *buffer_stderr;
+
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+
+	if (freopen(logfile, "a", stderr) == NULL)
+		error("could not reopen stderr\n");
+
+	dup2(fileno(stderr), fileno(stdout));
+
+	/*
+	 * FIXME: Why are we allocating our own buffers? The OS will
+	 *        do this for us. Apparently this was done to troubleshoot
+	 *        an issue, but is not needed. We should remove it.
+	 *
+	 *        Once the buffers go away, we can combine re_open and open
+	 *        into one function.
+	 */
+	if ((err = posix_memalign((void **)&buffer_stdout, BUFSIZE, BUFSIZE)))
+  		error("unable to allocate buffer for stdout: %s", strerror(err));
+	if ((err = posix_memalign((void **)&buffer_stderr, BUFSIZE, BUFSIZE)))
+  		error("unable to allocate buffer for stderr: %s", strerror(err));
+	setvbuf(stdout, buffer_stdout, _IOLBF, BUFSIZE);
+	setvbuf(stderr, buffer_stderr, _IOLBF, BUFSIZE);
+
+	/* O_SYNC is important to avoid deadlock */
+	if (set_flags(fileno(stdout), O_SYNC)
+			|| set_flags(fileno(stderr), O_SYNC))
+		error("unable to set stdout and stderr flags to O_SYNC: %s"
+				, strerror(errno));
+}
+
+void write_pidfile(char const *pidfile, pid_t pid)
+{
+	FILE *fp;
+
+	if (!(fp = fopen(pidfile, "w"))) {
+		warn("could not open pid file \"%s\" for writing: %s", pidfile,
+			strerror(errno));
+	} else {
+		if (fprintf(fp, "%lu\n", (unsigned long)pid) < 0)
+			warn("could not write pid file \"%s\": %s", pidfile,
+				strerror(errno));
+		if (fclose(fp) < 0)
+			warn("error while closing pid file \"%s\" after writing: %s",
+				pidfile, strerror(errno));
+	}
+}
+
+pid_t daemonize(char const *logfile, char const *pidfile, int *getsigfd)
+{
 	pid_t pid;
+	int pipevec[2];
 
-	ign_sa.sa_handler = SIG_IGN;
-	sigemptyset(&ign_sa.sa_mask);
-	ign_sa.sa_flags = 0;
+	/*
+	 * Create a pipe for signal handling, to avoid race-conditions
+	 */
+	if (pipe(pipevec) == -1)
+		error("Can't create pipe: %s", strerror(errno));
+	sigpipe = pipevec[1];
+	*getsigfd = pipevec[0];
 
-	if (sigaction(SIGCHLD, &ign_sa, NULL) == -1)
-		warn("could not disable SIGCHLD: %s", strerror(errno));
-
-	if (sigaction(SIGPIPE, &ign_sa, NULL) == -1)
-		warn("could not disable SIGPIPE: %s", strerror(errno));
+	/*
+	 * define the signals we care about as a daemon, ignore the rest.
+	 */
+	signal(SIGCHLD, SIG_IGN);
+	signal(SIGPIPE, SIG_IGN);
+	signal(SIGHUP, sighandler);
+	signal(SIGINT, sighandler);
+	signal(SIGTERM, sighandler);
 
 	fflush(stdout);
 
@@ -56,37 +142,20 @@ pid_t daemonize(char const *logfile, char const *pidfile)
 		 * three standard descriptors should be the only ones
 		 * open at this point and they are replaced by freopen */
 
+		chdir("/");
+
 		if (!logfile)
 			logfile = "/dev/null";
 
-		setvbuf(stdout, NULL, _IONBF, 0);
-		setvbuf(stderr, NULL, _IONBF, 0);
-
 		if (freopen("/dev/null", "r", stdin) == NULL)
 			error("could not reopen stdin\n");
-		if (freopen(logfile, "a", stderr) == NULL)
-			error("could not reopen stderr\n");
 
-		dup2(fileno(stderr), fileno(stdout));
-	
-		int err;
-		char *buffer_stdout, *buffer_stderr;
-		if ((err = posix_memalign((void **)&buffer_stdout, BUFSIZE, BUFSIZE)))
-	  		error("unable to allocate buffer for stdout: %s", strerror(err));
-		if ((err = posix_memalign((void **)&buffer_stderr, BUFSIZE, BUFSIZE)))
-	  		error("unable to allocate buffer for stderr: %s", strerror(err));
-		setvbuf(stdout, buffer_stdout, _IOLBF, BUFSIZE);
-		setvbuf(stderr, buffer_stderr, _IOLBF, BUFSIZE);
-
-		if (set_flags(fileno(stdout), O_SYNC)
-				|| set_flags(fileno(stderr), O_SYNC))
-			error("unable to set stdout and stderr flags to O_SYNC: %s"
-					, strerror(errno));
-
-		/* FIXME: technically we should chdir to the fs root
-		 * to avoid making random filesystems busy, but some
-		 * pathnames may be relative and we open them later,
-		 * so we don't do that for now */
+		/*
+		 * The following opens both stdout and stderr, so we're
+		 * being a good daemon and close/reopening stdin, stdout, and
+		 * stderr.
+		 */
+		open_logfile(logfile);
 
 		if (logfile)
 		{
@@ -111,18 +180,8 @@ pid_t daemonize(char const *logfile, char const *pidfile)
 		return -err;
 	}
 
-	if (pidfile) {
-		FILE *fp;
-
-		if (!(fp = fopen(pidfile, "w"))) {
-			warn("could not open pid file \"%s\" for writing: %s", pidfile, strerror(errno));
-		} else {
-			if (fprintf(fp, "%lu\n", (unsigned long)pid) < 0)
-				warn("could not write pid file \"%s\": %s", pidfile, strerror(errno));
-			if (fclose(fp) < 0)
-				warn("error while closing pid file \"%s\" after writing: %s", pidfile, strerror(errno));
-		}
-	}
+	if (pidfile)
+		write_pidfile(pidfile, pid);
 
 	return pid;
 }

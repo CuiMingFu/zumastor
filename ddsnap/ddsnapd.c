@@ -3362,16 +3362,6 @@ static int incoming(struct superblock *sb, struct client *client)
 	return -1; /* we quietly drop the client if the connect breaks */
 }
 
-/* Avoid signal races by delivering over a pipe */
-
-static int sigpipe;
-
-static void sighandler(int signum)
-{
-	trace(printf("caught signal %i\n", signum););
-	write(sigpipe, (char[]){signum}, 1);
-}
-
 static int cleanup(struct superblock *sb)
 {
 	warn("cleaning up");
@@ -3381,16 +3371,10 @@ static int cleanup(struct superblock *sb)
 	return 0;
 }
 
-int snap_server_setup(const char *agent_sockname, const char *server_sockname, int *listenfd, int *getsigfd, int *agentfd)
+int snap_server_setup(const char *agent_sockname, const char *server_sockname, int *listenfd, int *agentfd)
 {
 	struct sockaddr_un server_addr = { .sun_family = AF_UNIX };
 	int server_addr_len = sizeof(server_addr) - sizeof(server_addr.sun_path) + strlen(server_sockname);
-	int pipevec[2];
-
-	if (pipe(pipevec) == -1)
-		error("Can't create pipe: %s", strerror(errno));
-	sigpipe = pipevec[1];
-	*getsigfd = pipevec[0];
 
 	if (strlen(server_sockname) > sizeof(server_addr.sun_path) - 1)
 		error("server socket name too long, %s", server_sockname);
@@ -3430,7 +3414,7 @@ int snap_server_setup(const char *agent_sockname, const char *server_sockname, i
 	return 0;
 }
 
-int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd)
+int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, const char *logfile)
 {
 	unsigned maxclients = 100, clients = 0, others = 3;
 	struct client *clientvec[maxclients];
@@ -3440,10 +3424,6 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd)
 	pollvec[0] = (struct pollfd){ .fd = listenfd, .events = POLLIN };
 	pollvec[1] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
 	pollvec[2] = (struct pollfd){ .fd = agentfd, .events = POLLIN };
-
-	signal(SIGINT, sighandler);
-	signal(SIGTERM, sighandler);
-	signal(SIGPIPE, SIG_IGN);
 
 	if ((err = prctl(PR_SET_LESS_THROTTLE, 0, 0, 0, 0)))
 		warn("can not set process to throttle less (error %i, %s)", errno, strerror(errno));
@@ -3491,16 +3471,24 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd)
 			u8 sig = 0;
 			/* it's stupid but this read also gets interrupted, so... */
 			do { } while (read(getsigfd, &sig, 1) == -1 && errno == EINTR);
-			trace_on(warn("Cleaning up before server dies. Caught signal %i", sig););
-			cleanup(sb); // !!! don't do it on segfault
-			if (sig == SIGINT || sig == SIGTERM) {
-				(void)flush_buffers();
-				evict_buffers();
-				signal(SIGINT, SIG_DFL);
-				kill(getpid(), sig); /* commit harikiri */ /* FIXME: use raise()? */
+			trace_on(warn("Caught signal %i", sig););
+			switch (sig) {
+				case SIGINT:
+				case SIGTERM:
+					cleanup(sb); // !!! don't do it on segfault
+					(void)flush_buffers();
+					evict_buffers();
+					signal(SIGINT, SIG_DFL);
+					kill(getpid(), sig); /* commit harikiri */ /* FIXME: use raise()? */
+					err = DDSNAPD_CAUGHT_SIGNAL;
+					goto done;
+					break;
+				case SIGHUP:
+					fflush(stderr);
+					fflush(stdout);
+					re_open_logfile(logfile);
+					break;
 			}
-			err = DDSNAPD_CAUGHT_SIGNAL;
-			goto done;
 		}
 
 		/* Agent message? */
@@ -3622,7 +3610,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;	
 	init_buffers(bufsize, (1 << 27)); /* preallocate 128Mb of buffers */
 	
-	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &getsigfd, &agentfd) < 0)
+	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &agentfd) < 0)
 		error("Could not setup snapshot server\n");
 
 	if (!nobg) {
@@ -3630,7 +3618,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 		
 		if (!logfile)
 			logfile = "/var/log/ddsnap.server.log";
-		pid = daemonize(logfile, pidfile);
+		pid = daemonize(logfile, pidfile, &getsigfd);
 		if (pid == -1)
 			error("Could not daemonize\n");
 		if (pid != 0) {
@@ -3640,7 +3628,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	}
 
 	/* should only return on an error */
-	if ((ret = snap_server(sb, listenfd, getsigfd, agentfd)) < 0)
+	if ((ret = snap_server(sb, listenfd, getsigfd, agentfd, logfile)) < 0)
 		warn("server exited with error %i", ret);
 
 	return 0;
