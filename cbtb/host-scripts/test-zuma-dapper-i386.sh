@@ -108,7 +108,7 @@ then
   ${CMDTIMEOUT} ${SCP} ${execfiles} root@${IPADDR}: </dev/null || true
   for f in ${execfiles}
   do
-    timelimit=`awk -F = '/^TIMEOUT=[0-9]+$/' ./${f} | tail -1`
+    timelimit=`awk -F = '/^TIMEOUT=[0-9]+$/ { print $2; }' ./${f} | tail -1`
     if [ "x$timelimit" = "x" ] ; then
       timeout=""
     else
