@@ -96,7 +96,7 @@ function stop_zumastor {
 		[ -x $VOLUMES/$vol/master ] && zumastor stop master $vol
 		[ -x $VOLUMES/$vol/source ] && zumastor stop source $vol
 
-		stop_volume $vol
+		stop_volume $vol || { rm $LOCKFILE; exit 1; }
 	done
 
 	rm $RUNFILE 2>/dev/null

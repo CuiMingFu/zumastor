@@ -174,13 +174,10 @@ function stop_volume {
 	local -r serverlog=${LOGS}/${vol}/server.log
 	local -r list=$(ddsnap status $server --list)
 
-	# remove any snapshots devices first, then the origin
 	for id in $list; do
-		umount_device $vol $id 2> /dev/null
-		remove_device $vol $id 2> /dev/null
+		umount_remove_device $vol $id || return 1
 	done
-	umount_device $vol -1 2> /dev/null
-	remove_device $vol -1 2> /dev/null
+	umount_remove_device $vol -1 || return 1
 
 	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
 	[[ -h $mdev ]] && mdev="$mdev " || mdev=""
@@ -188,16 +185,7 @@ function stop_volume {
 	pkill -f "ddsnap server -p ${RUNPATH}/${vol}-server.pid -l $serverlog $sdev $odev ${mdev}$agent $server$"
 	pkill -f "ddsnap agent -l $agentlog $agent$"
 	rm $agent $server
-
-	# check again to remove any leftover, invalidate devices
-	if [[ -e /dev/mapper/$vol ]]; then
-		remove_invalid_device $vol -1
-	fi
-	for id in $list; do
-		if [[ -e /dev/mapper/$vol\($id\) ]]; then
-			remove_invalid_device $vol $id
-		fi
-	done
+	return 0
 }
 
 # create_device <vol> <id>
@@ -293,21 +281,22 @@ function remove_device {
 	dmsetup remove $name || return 1
 }
 
-function remove_invalid_device {
-	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+function umount_remove_device {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r id=$2
 	local -r name=$(volume_name $vol $id)
 	
+	[[ -e /dev/mapper/$name ]] || return 0
 	umount_device $vol $id 2> /dev/null
-	if [[ $? -ne 0 ]]; then
-		echo "device $name still in use, check with lsof"
-		lsof /dev/mapper/$name
-		echo "Please shut down or kill each process listed above, then run 'dmsetup remove $name'"
-		echo "Lazy umount device $name" 
-		umount_device $vol $id -l
-	fi
+	# continue if this is not a real device
+	dmsetup info $name >& /dev/null || return 0
 	remove_device $vol $id 2> /dev/null
+	if [[ $? -ne 0 ]]; then
+		echo "Device '$name' still in use"
+		echo "Please shut down or kill any process accessing it, then run this command again" 
+		return 1
+	fi
 }
 
 # get_manged_snapshots <volume name>
