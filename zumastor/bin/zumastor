@@ -510,7 +510,7 @@ function forget_volume {
 
 	forget_master $vol
 
-	stop_volume $vol
+	stop_volume $vol || return 1
 
 	rmdir $path/targets
 	rm -rf $path/device
