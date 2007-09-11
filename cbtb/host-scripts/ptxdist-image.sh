@@ -94,8 +94,22 @@ sed -i '/ramfs/d' root/etc/fstab
 # Make getty use the serial console
 sed -i 's/tty1/ttyS0/' root/etc/inittab
 
-# Copy a test script into the image
-cp ${SRC}/cbtb/tests/1/snapshot-test.sh root/home
+# Configure eth0 to use DHCP
+install ${SRC}/cbtb/ptxdist/files/interfaces root/etc/network/interfaces
+
+# Set up sysvg volume and chmod /home on first boot
+install ${SRC}/cbtb/ptxdist/files/1st_boot.sh root/home/1st_boot.sh
+cat >> root/etc/init.d/rcS <<EOF
+[ -x /home/1st_boot.sh ] && /home/1st_boot.sh
+EOF
+
+# Set up image-specific ssh user keys
+pushd root/home
+mkdir .ssh
+cat ~/.ssh/*.pub > .ssh/authorized_keys
+ssh-keygen -q -P '' -t dsa -f .ssh/id_dsa
+cat .ssh/id_dsa.pub >> .ssh/authorized_keys
+popd
 
 # Build the qemu-bootable system image
 ptxdist images
