@@ -125,10 +125,10 @@ then
 fi
 
 
-${CMDTIMEOUT} ${SSH} root@${IPADDR} halt
+${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
 if [ "x$IPADDR2" != "x" ] ; then
-  ${CMDTIMEOUT} ${SSH} root@${IPADDR2} halt
+  ${CMDTIMEOUT} ${SSH} root@${IPADDR2} poweroff
 fi
 
 
