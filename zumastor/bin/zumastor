@@ -848,7 +848,7 @@ define)
 		exit $? ;;
 	target)
 		declare name="$0 $1 $2"
-		declare usage="usage: $name vol> host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
+		declare usage="usage: $name <vol> <host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
 		declare test_fullvolume=0
 		declare period
 

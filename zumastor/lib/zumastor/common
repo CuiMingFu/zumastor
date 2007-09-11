@@ -173,6 +173,7 @@ function stop_volume {
 	local -r agentlog=${LOGS}/${vol}/agent.log
 	local -r serverlog=${LOGS}/${vol}/server.log
 	local -r list=$(ddsnap status $server --list)
+	local -r pidfile=${RUNPATH}/${vol}-server.pid
 
 	for id in $list; do
 		umount_remove_device $vol $id || return 1
@@ -182,9 +183,9 @@ function stop_volume {
 	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
 	[[ -h $mdev ]] && mdev="$mdev " || mdev=""
 
-	pkill -f "ddsnap server -p ${RUNPATH}/${vol}-server.pid -l $serverlog $sdev $odev ${mdev}$agent $server$"
+	pkill -f "ddsnap server -p $pidfile -l $serverlog $sdev $odev ${mdev}$agent $server$"
 	pkill -f "ddsnap agent -l $agentlog $agent$"
-	rm $agent $server
+	rm $agent $server $pidfile
 	return 0
 }
 
