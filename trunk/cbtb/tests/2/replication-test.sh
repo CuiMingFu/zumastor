@@ -42,13 +42,13 @@ zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 zumastor status --usage
-ssh-keyscan -t rsa slave >>/root/.ssh/known_hosts
-ssh-keyscan -t rsa master >>/root/.ssh/known_hosts
+ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
+ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
 echo ok 1 - master testvol set up
 
 echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
-${SCP} /root/.ssh/known_hosts root@${slave}:/root/.ssh/known_hosts
+${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} lvcreate --size 4m -n test sysvg
 ${SSH} root@${slave} lvcreate --size 8m -n test_snap sysvg
