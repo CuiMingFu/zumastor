@@ -41,8 +41,8 @@ fi
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='time timeout -14 1800 scp -o StrictHostKeyChecking=no'
 CMDTIMEOUT='time timeout -14 120'
-BUILDTIMEOUT='time timeout -14 10800'
-SETUPTIMEOUT='time timeout -14 1800'
+BUILDTIMEOUT='time timeout -14 36000'
+SETUPTIMEOUT='time timeout -14 3600'
 WGETTIMEOUT='time timeout -14 3600'
 
 

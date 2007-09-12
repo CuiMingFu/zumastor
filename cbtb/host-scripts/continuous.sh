@@ -42,7 +42,7 @@ buildret=-1
 installret=-1
 testret=-1
 
-time ${TUNBR} timeout -14 14400 ${top}/dapper-build.sh >${buildlog} 2>&1
+time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh >${buildlog} 2>&1
 buildret=$?
 
 if [ $buildret -eq 0 ] ; then
