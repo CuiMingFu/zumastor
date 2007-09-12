@@ -1039,11 +1039,12 @@ start)
 		declare vol=$3
 		declare holdfile=$VOLUMES/$vol/source/hold
 		declare log=${LOGS}/$vol/source.log
-		declare snap=$(($(cat $holdfile 2>/dev/null) + 1))
+		declare snap=$(cat $holdfile 2>/dev/null)
 
 		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 
 		if [[ ! -z $snap ]]; then
+			let snap++ # we mount snap + 1
 			log "mounting $vol($snap) on source start" $log
 			mount_device $vol $snap unqualified >> $log 2>&1
 		fi
