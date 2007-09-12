@@ -13,7 +13,8 @@ set -e
 
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='scp -o StrictHostKeyChecking=no'
-CMDTIMEOUT='timeout -14 120'
+# CMDTIMEOUT='timeout -14 120'
+CMDTIMEOUT=''
 
 retval=0
 
@@ -114,6 +115,7 @@ then
     else
       timeout="timeout -14 $timelimit"
     fi
+    timeout=""
     if ${timeout} ${SSH} root@${IPADDR} ${params} ./${f}
     then
       echo ${f} ok
