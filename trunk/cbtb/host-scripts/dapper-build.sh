@@ -39,7 +39,7 @@ if [ "x$MACFILE" = "x" -o "x$MACADDR" = "x" -o "x$IFACE" = "x" ] ; then
 fi
 
 SSH='ssh -o StrictHostKeyChecking=no'
-SCP='time timeout -14 1800 scp -o StrictHostKeyChecking=no'
+SCP='time timeout -14 3600 scp -o StrictHostKeyChecking=no'
 CMDTIMEOUT='time timeout -14 120'
 BUILDTIMEOUT='time timeout -14 36000'
 SETUPTIMEOUT='time timeout -14 3600'
@@ -115,8 +115,7 @@ EOF
 
 tar cf - --exclude build * | \
   ${SETUPTIMEOUT} ${SSH} build@${IPADDR} tar xf - -C zumastor
-${SETUPTIMEOUT} \
-  ${SCP} build/linux-${KERNEL_VERSION}.tar.bz2 build@${IPADDR}:zumastor/build/
+${SCP} build/linux-${KERNEL_VERSION}.tar.bz2 build@${IPADDR}:zumastor/build/
 
 ${SETUPTIMEOUT} ${SSH} root@${IPADDR} <<EOF 
 cd ~build/zumastor
@@ -165,14 +164,14 @@ for f in \
     ${BUILDSRC}/kernel-headers-${KVERS}_${ARCH}.deb \
     ${BUILDSRC}/kernel-image-${KVERS}_${ARCH}.deb
 do
-  time ${SETUPTIMEOUT} ${SCP} $f build/ || rc=$?
+  time ${SCP} $f build/ || rc=$?
 done
 
-# ${CMDTIMEOUT} ${SSH} root@${IPADDR} halt
+${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
-socat STDIN UNIX-CONNECT:${MONITOR} <<EOF
-quit
-EOF
+#socat STDIN UNIX-CONNECT:${MONITOR} <<EOF
+#quit
+#EOF
 
 time wait $qemu || rc=$?
 kill -0 $qemu && kill -9 $qemu
