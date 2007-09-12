@@ -431,6 +431,12 @@ found:
 		}
 
 		++p;
+		/*
+		 * If we're only doing I/O to the snapshot we don't need to
+		 * lock the chunk.  If it's shared with the origin (and we're
+		 * reading), lock the chunk and give a callback routine that
+		 * will release it (and kick ddsnapd) when the I/O completes.
+		 */
 		if (snap) {
 			chunk_t *p2 = (chunk_t *)p;
 			for (j = 0; j < chunks; j++) {
