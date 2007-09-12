@@ -91,6 +91,9 @@ ln -s mke2fs root/sbin/mkfs.ext3
 # Disable ramfs mounts in fstab
 sed -i '/ramfs/d' root/etc/fstab
 
+# Mount debugfs for blktrace
+echo none /sys/kernel/debug debugfs defaults 0 0 >> root/etc/fstab
+
 # Make getty use the serial console
 sed -i 's/tty1/ttyS0/' root/etc/inittab
 
