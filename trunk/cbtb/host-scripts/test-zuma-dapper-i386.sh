@@ -147,6 +147,6 @@ if [ "x$qemu2_pid" != "x" ] ; then
   kill -0 ${qemu2_pid} && kill -9 ${qemu2_pid}
 fi
 
-rm -rf %{tmpdir}
+rm -rf ${tmpdir}
 
 exit ${retval}
