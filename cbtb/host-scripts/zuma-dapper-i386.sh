@@ -28,9 +28,12 @@ KVERS="${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0"
 
 SSH='time ssh -o StrictHostKeyChecking=no'
 SCP='time timeout -14 1200 scp -o StrictHostKeyChecking=no'
-CMDTIMEOUT='time timeout -14 120'
-KINSTTIMEOUT='time timeout -14 1200'
-SHUTDOWNTIMEOUT='time timeout -14 300'
+# CMDTIMEOUT='time timeout -14 120'
+# KINSTTIMEOUT='time timeout -14 1200'
+# SHUTDOWNTIMEOUT='time timeout -14 300'
+CMDTIMEOUT=''
+KINSTTIMEOUT=''
+SHUTDOWNTIMEOUT=''
 
 retval=0
 
