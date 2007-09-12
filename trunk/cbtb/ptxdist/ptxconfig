@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # PTXdist version: 1.0.0
-# Tue Sep 11 11:15:42 2007
+# Wed Sep 12 13:55:27 2007
 #
 PTXCONF_MODULES=y
 PTXCONF_PTXCONF=y
@@ -1303,6 +1303,8 @@ PTXCONF_IPKG=y
 PTXCONF_FIGLET=y
 # PTXCONF_MEMEDIT is not set
 # PTXCONF_MEMSTAT is not set
+PTXCONF_TCT=y
+PTXCONF_TCT_TIMEOUT=y
 
 #
 # Editors                       
