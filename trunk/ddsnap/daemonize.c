@@ -25,6 +25,7 @@ static int sigpipe;
 
 static void sighandler(int signum)
 {
+	signal(signum, sighandler);
         trace(printf("caught signal %i\n", signum););
         write(sigpipe, (char[]){signum}, 1);
 }
