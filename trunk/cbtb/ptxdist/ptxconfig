@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # PTXdist version: 1.0.0
-# Wed Sep 12 13:55:27 2007
+# Wed Sep 12 15:21:59 2007
 #
 PTXCONF_MODULES=y
 PTXCONF_PTXCONF=y
@@ -180,6 +180,7 @@ PTXCONF_HOST_PKG_CONFIG=y
 PTXCONF_STRACE=y
 PTXCONF_STRACE_SHARED=y
 # PTXCONF_VALGRIND is not set
+PTXCONF_BLKTRACE=y
 
 #
 # ------------------------------------
