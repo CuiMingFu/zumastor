@@ -1,7 +1,8 @@
 # -*-makefile-*-
 # $Id: template 6655 2007-01-02 12:55:21Z rsc $
 #
-# Copyright (C) 2007 by Chuan-kai Lin <cklin@google.com>
+# Copyright 2007 Google Inc.
+# Author: cklin@google.com (Chuan-kai Lin)
 #
 # See CREDITS for details about who has contributed to this project.
 #
@@ -113,7 +114,7 @@ $(STATEDIR)/device-mapper.targetinstall: $(device-mapper_targetinstall_deps_defa
 	@$(call install_fixup, device-mapper,PRIORITY,optional)
 	@$(call install_fixup, device-mapper,VERSION,$(DEVICE_MAPPER_VERSION))
 	@$(call install_fixup, device-mapper,SECTION,base)
-	@$(call install_fixup, device-mapper,AUTHOR,"Robert Schwebel <r.schwebel\@pengutronix.de>")
+	@$(call install_fixup, device-mapper,AUTHOR,"Chuan-kai Lin <cklin\@google.com>")
 	@$(call install_fixup, device-mapper,DEPENDS,)
 	@$(call install_fixup, device-mapper,DESCRIPTION,missing)
 

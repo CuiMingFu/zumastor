@@ -1,7 +1,8 @@
 # -*-makefile-*-
 # $Id: template 6655 2007-01-02 12:55:21Z rsc $
 #
-# Copyright (C) 2007 by Chuan-kai Lin <cklin@google.com>
+# Copyright 2007 Google Inc.
+# Author: cklin@google.com (Chuan-kai Lin)
 #
 # See CREDITS for details about who has contributed to this project.
 #
@@ -105,7 +106,7 @@ $(STATEDIR)/tree.targetinstall: $(tree_targetinstall_deps_default)
 	@$(call install_fixup, tree,PRIORITY,optional)
 	@$(call install_fixup, tree,VERSION,$(TREE_VERSION))
 	@$(call install_fixup, tree,SECTION,base)
-	@$(call install_fixup, tree,AUTHOR,"Robert Schwebel <r.schwebel\@pengutronix.de>")
+	@$(call install_fixup, tree,AUTHOR,"Chuan-kai Lin <cklin\@google.com>")
 	@$(call install_fixup, tree,DEPENDS,)
 	@$(call install_fixup, tree,DESCRIPTION,missing)
 
