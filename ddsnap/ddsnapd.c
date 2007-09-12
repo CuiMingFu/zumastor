@@ -3478,15 +3478,18 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 					cleanup(sb); // !!! don't do it on segfault
 					(void)flush_buffers();
 					evict_buffers();
-					signal(SIGINT, SIG_DFL);
-					kill(getpid(), sig); /* commit harikiri */ /* FIXME: use raise()? */
-					err = DDSNAPD_CAUGHT_SIGNAL;
+					signal(sig, SIG_DFL); /* this should happen automatically */
+					raise(sig); /* commit harikiri */
+					err = DDSNAPD_CAUGHT_SIGNAL; /* FIXME we never get here */
 					goto done;
 					break;
 				case SIGHUP:
 					fflush(stderr);
 					fflush(stdout);
 					re_open_logfile(logfile);
+					break;
+				default:
+					warn("I don't handle signal %i", sig);
 					break;
 			}
 		}

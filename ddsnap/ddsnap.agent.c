@@ -252,6 +252,12 @@ int monitor(int listenfd, struct context *context, const char *logfile, int gets
                                         fflush(stdout);
                                         re_open_logfile(logfile);
                                         break;
+				case SIGTERM:
+				case SIGINT:
+					exit(0); /* FIXME any cleanup to do here? */
+				default:
+					warn("I don't handle signal %i", sig);
+					break;
                         }
                 }
 
