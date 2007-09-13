@@ -24,11 +24,12 @@ pushd cbtb/tests/1
 for f in *-test.sh
 do
   # timeout any test that runs for more than an hour
-  if time ${TUNBR} timeout -14 3600 ../../../../test-zuma-dapper-i386.sh $f
+  if ${TUNBR} timeout -14 3600 ../../../../test-zuma-dapper-i386.sh $f
   then
     echo PASS $f
   else
     retval=$?
+    echo runtests $f retval=${retval}
     echo FAIL $f
   fi
 done
@@ -42,10 +43,11 @@ do
     echo PASS $f
   else
     retval=$?
+    echo runtests $f retval=${retval}
     echo FAIL $f
   fi
 done
 popd
 
-echo ${retval}
+echo runtests retval=${retval}
 exit ${retval}
