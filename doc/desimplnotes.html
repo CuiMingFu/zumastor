@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=iso-8859-1">
+	<TITLE></TITLE>
+	<META NAME="GENERATOR" CONTENT="OpenOffice.org 2.0  (Linux)">
+	<META NAME="AUTHOR" CONTENT="Frank Mayhar">
+	<META NAME="CREATED" CONTENT="20070913;13250800">
+	<META NAME="CHANGEDBY" CONTENT="Frank Mayhar">
+	<META NAME="CHANGED" CONTENT="20070914;10333800">
+	<STYLE TYPE="text/css">
+	<!--
+		H1 { margin-top: 0.17in; margin-bottom: 0.1in; text-align: center }
+		H1.western { font-family: "Verdana", sans-serif; font-size: 16pt }
+		P { margin-bottom: 0.1in }
+		P.western { font-family: "Verdana", sans-serif }
+		H3 { margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H3.western { font-family: "Verdana", sans-serif; font-size: 13pt }
+		H2 { margin-top: 0.2in; margin-bottom: 0.1in; text-align: left }
+		H2.western { font-family: "Verdana", sans-serif; font-size: 14pt }
+		H4 { margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
+		H4.western { font-family: "Verdana", sans-serif }
+		DD.western { font-family: "Verdana", sans-serif }
+	-->
+	</STYLE>
+</HEAD>
+<BODY LANG="en-US" DIR="LTR">
+<H1 CLASS="western">Zumastor design and implementation notes</H1>
+<H3 CLASS="western">Snapshots versus the origin.</H3>
+<P CLASS="western">When a snapshot is taken, it is empty; all reads
+and writes get passed through to the origin.  When an origin write
+happens, the affected chunk or chunks must be copied to any extant
+snapshots.  (This chunk is referred to as an &quot;exception&quot; to
+the rule that all chunks belong to the origin.)  The make_unique()
+function checks whether the chunk needs to be copied out, does so if
+necessary, and returns an indication of whether that happened.</P>
+<H3 CLASS="western">Path of a bio request through dm-ddsnap and
+ddsnapd.</H3>
+<H4 CLASS="western">The path a bio request takes as a result of a
+read from the device.  Snapshot origin reads only.</H4>
+<UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD>
+	<UL><LI><DD CLASS="western">
+		Generic device handling (or in this case the device mapper) calls
+		ddsnap_map() with the initial bio.  ddsnap_map() queues the bio on
+		the &quot;queries&quot; queue of the dm_target private (devinfo)
+		structure.</DD><LI><DD CLASS="western">
+		worker() finds the bio on the &quot;queries&quot; queue.  It
+		dequeues it from &quot;queries&quot; and queues it on the &quot;pending&quot;
+		queue, then sends a QUERY_SNAPSHOT_READ message to ddsnapd.</DD></UL>
+	<LI><DD CLASS="western"><B>Process space (ddsnapd):</B></DD>
+	<UL><LI><DD CLASS="western">
+		incoming() gets QUERY_SNAPSHOT_READ, vets it, performs
+		readlock_chunk() (to assert a snaplock) for each chunk shared with
+		origin, sends SNAPSHOT_READ_ORIGIN_OK message to kernel.</DD></UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD></UL>
+<UL>
+	<UL>
+		<LI><DD CLASS="western">incoming() gets SNAPSHOT_READ_ORIGIN_OK,
+		calls replied_rw().</DD><LI><DD CLASS="western">
+		replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		dequeues it.  For a read from the origin (per
+		SNAPSHOT_READ_ORIGIN_OK), sets the bi_end_io callback to
+		snapshot_read_end_io() and queues the bio in the &quot;locked&quot;
+		queue.  It then passes the request to lower layers via
+		generic_make_request().</DD><LI><DD CLASS="western">
+		When the request has completed, the lower level calls
+		snapshot_read_end_io(), which moves the bio from the &quot;locked&quot;
+		queue to the &quot;releases&quot; queue (and pings the worker that
+		there's more work).  It also calls any chained end_io routine.</DD><LI><DD CLASS="western">
+		worker() finds the bio on the &quot;releases&quot; queue.  It
+		dequeues it from &quot;releases&quot; and sends a
+		FINISH_SNAPSHOT_READ message to ddsnapd.</DD></UL>
+</UL>
+<UL>
+	<LI><DD CLASS="western"><B>Process space (ddsnapd):</B></DD>
+	<UL><LI><DD CLASS="western">
+		incoming() gets FINISH_SNAPSHOT_READ and calls release_chunk() for
+		each chunk, which in turn calls release_lock() which releases and
+		destroys all requests on the &ldquo;pending&rdquo; queue as well as
+		the lock itself.</DD></UL>
+</UL>
+<H4 CLASS="western">This is the path a bio request takes as a result
+of a write to the device.  Origin writes only.</H4>
+<UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD></UL>
+<UL>
+	<UL>
+		<LI><DD CLASS="western">Generic device handling (or in this case
+		the device mapper) calls ddsnap_map() with the initial bio. 
+		ddsnap_map() queues the bio on the &quot;queries&quot; queue of the
+		dm_target private (devinfo) structure.</DD></UL>
+</UL>
+<UL>
+	<UL>
+		<LI><DD CLASS="western">worker() finds the bio on the &quot;queries&quot;
+		queue.  It dequeues it from &quot;queries&quot; and queues it on
+		the &quot;pending&quot; queue, then sends a QUERY_WRITE message to
+		ddsnapd.</DD></UL>
+</UL>
+<UL>
+	<LI><DD CLASS="western"><B>Process space (ddsnapd):</B></DD>
+	<UL><LI><DD CLASS="western">
+		incoming() gets QUERY_WRITE for the origin (snaptag of -1).</DD><LI><DD CLASS="western">
+		Calls make_unique() to copy each chunk out to snapshot(s) if
+		necessary.</DD><LI><DD CLASS="western">
+		If chunk was copied out, calls waitfor_chunk(), which finds any
+		snaplock outstanding for the chunk. If one is found, it adds the
+		request to the lock &ldquo;pending&rdquo; queue.</DD><LI><DD CLASS="western">
+		If no chunk was queued &ldquo;pending,&rdquo; it sends an
+		ORIGIN_WRITE_OK message to the kernel.  Otherwise it copies that
+		message to the message buffer at the head of the &ldquo;pending&rdquo;
+		queue and finishes.</DD></UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD>
+	<UL><LI><DD CLASS="western" STYLE="font-weight: medium">
+		incoming() gets ORIGIN_WRITE_OK, calls replied_rw().</DD><LI><DD CLASS="western" STYLE="font-weight: medium">
+		replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		dequeues it.  For a write to the origin (per ORIGIN_WRITE_OK), it
+		passes the request to lower layers via generic_make_request().</DD></UL>
+</UL>
+<H2 CLASS="western">Glossary</H2>
+<UL>
+	<LI><DD CLASS="western"><B>exception</B>:  A chunk that no longer
+	exists solely on the origin, but has been modified after a snapshot
+	was taken, so that a copy of the old contents has been made in the
+	affected snapshot(s).</DD></UL>
+</BODY>
+</HTML>
