@@ -261,7 +261,7 @@ struct superblock
 	char bogopad[4096 - sizeof(struct disksuper) - 2*sizeof(struct allocspace) ];
 
 	/* Derived, not saved to disk */
-	u64 snapmask;
+	u64 snapmask;			/* Bitmask of all valid snapshots.    */
 	unsigned flags;
 	unsigned snapdev, metadev, orgdev;
 	unsigned snaplock_hash_bits;
@@ -1932,6 +1932,13 @@ fail_delete:
  * the code gets more asynchronous and multi-threaded.  This is a hairball
  * and needs a rewrite.
  */
+/*
+ * This creates "exceptions" to the rule that all chunks go to the origin.
+ * If any snapshot has not had the chunk copied to it, this routine performs
+ * that task.  It returns zero if no copies took place (that is, "exceptions"
+ * for this chunk already existed for all snapshots), nonzero otherwise.  A
+ * return of -1 indicates an error that caused make_unique() to fail.
+ */
 static chunk_t make_unique(struct superblock *sb, chunk_t chunk, int snapbit)
 {
 	chunk_t exception = 0;
@@ -1951,10 +1958,17 @@ static chunk_t make_unique(struct superblock *sb, chunk_t chunk, int snapbit)
 
 	unsigned levels = sb->image.etree_levels;
 	struct etree_path path[levels + 1];
+	/*
+	 * Find the proper leaf for this chunk.
+	 */
 	struct buffer *leafbuf = probe(sb, chunk, path);
 	if (!leafbuf) 
 		return -1;
 
+	/*
+	 * If snapbit is -1, we're doing I/O to the origin.  The snapmask
+	 * field, here, is a bitmask of all valid snapshots for the volume.
+	 */
 	if (snapbit == -1?
 		origin_chunk_unique(buffer2leaf(leafbuf), chunk, sb->snapmask):
 		snapshot_chunk_unique(buffer2leaf(leafbuf), chunk, snapbit, &exception))
@@ -2798,7 +2812,7 @@ static int incoming(struct superblock *sb, struct client *client)
 					if (exception == -1) {
 						warn("ERROR: unable to perform copyout during origin write.");
 						message.head.code = ORIGIN_WRITE_ERROR;
-					} else if (exception)
+					} else if (exception) /* We did a copy-out. */
 						waitfor_chunk(sb, chunk, &pending);
 				}
 			finish_copyout(sb);
@@ -2871,18 +2885,37 @@ static int incoming(struct superblock *sb, struct client *client)
 				chunk_t chunk = body->ranges[i].chunk + j, exception = 0;
 				trace(warn("read %Lx", chunk););
 				test_unique(sb, chunk, snapshot->bit, &exception);
-				if (exception) {
+				/*
+				 * If this chunk is only in a snapshot, we
+				 * want to read only from the snapshot; if it's
+				 * shared with the origin, we want to read
+				 * that instead.  Add the chunk to the
+				 * appropriate message.
+				 */
+				if (exception) { /* It's only in a snapshot.  */
 					trace(warn("read exception %Lx", exception););
 					addto_response(&snap, chunk);
 					check_response_full(&snap, sizeof(chunk_t));
 					*(snap.top)++ = exception;
-				} else {
+				} else {	 /* Shared with the origin.   */
 					trace(warn("read origin %Lx", chunk););
 					addto_response(&org, chunk);
 					trace(printf("locking chunk %Lx\n", chunk););
 					readlock_chunk(sb, chunk, client);
 				}
 			}
+		/*
+		 * Above, we built both a SNAPSHOT_READ_ORIGIN_OK message and a
+		 * SNAPSHOT_READ_OK message.  We placed chunks that were only
+		 * in a snapshot into the latter and chunks that were shared
+		 * with the origin in the former.  We now need to finish and
+		 * transmit both messages.
+		 *
+		 * If there happened to be no chunks that satisfied one or the
+		 * other criterion, the corresponding message will be empty.
+		 * The finish_reply() function conveniently frees any empty
+		 * message it receives.
+		 */
 		finish_reply(client->sock, &org, SNAPSHOT_READ_ORIGIN_OK, body->id);
 		finish_reply(client->sock, &snap, SNAPSHOT_READ_OK, body->id);
 		break;
