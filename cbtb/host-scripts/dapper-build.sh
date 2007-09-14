@@ -167,13 +167,33 @@ do
   time ${SCP} $f build/ || rc=$?
 done
 
+# create symlinks to latest build debs if rc is still 0 (good)
+if [ $rc -eq 0 ] ; then
+  pushd zumastor/build
+  ln -sf ddsnap_${DEBVERS}_${ARCH}.deb ddsnap_build_${ARCH}.deb
+  ln -sf zumastor_${DEBVERS}_${ARCH}.deb zumastor_build_${ARCH}.deb 
+  ln -sf kernel-headers-${KVERS}_${ARCH}.deb kernel-headers-build_${ARCH}.deb
+  ln -sf kernel-image-${KVERS}_${ARCH}.deb kernel-image-build_${ARCH}.deb
+  popd
+fi
+
+# tell the instance to start shutting itself off.  This sometimes eventually
+# results in the qemu process exitting
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
+# tell the qemu instance to quit directly.  This should always work, and clean
+# up sockets, and be quicker, but if it doesn't the above should also cause
+# a cleanup
 socat unix:${MONITOR} - <<EOF
 quit
 EOF
 
+# eventually put a timeout in front of this.  timeout the command won't work
+# since wait is a builtin
 time wait $qemu || rc=$?
+
+# if somehow qemu is still running, kill -9 it.  This can happen, especially
+# with acceleration modules in use.
 kill -0 $qemu && kill -9 $qemu
 
 rm -rf ${tmpdir}
