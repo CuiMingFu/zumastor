@@ -7,7 +7,7 @@
 	<META NAME="AUTHOR" CONTENT="Frank Mayhar">
 	<META NAME="CREATED" CONTENT="20070913;13250800">
 	<META NAME="CHANGEDBY" CONTENT="Frank Mayhar">
-	<META NAME="CHANGED" CONTENT="20070914;11054200">
+	<META NAME="CHANGED" CONTENT="20070914;13552600">
 	<STYLE TYPE="text/css">
 	<!--
 		H1 { margin-top: 0.17in; margin-bottom: 0.1in; text-align: center }
@@ -37,7 +37,7 @@ necessary, and returns an indication of whether that happened.</P>
 <H3 CLASS="western">Path of a bio request through dm-ddsnap and
 ddsnapd.</H3>
 <H4 CLASS="western">The path a bio request takes as a result of a
-read from the device.  Snapshot origin reads only.</H4>
+read from a snapshot device that goes to the origin.</H4>
 <UL>
 	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD>
 	<UL><LI><DD CLASS="western">
@@ -80,8 +80,8 @@ read from the device.  Snapshot origin reads only.</H4>
 		destroys all requests on the &ldquo;pending&rdquo; queue as well as
 		the lock itself.</DD></UL>
 </UL>
-<H4 CLASS="western">This is the path a bio request takes as a result
-of a write to the device.  Origin writes only.</H4>
+<H4 CLASS="western">The path a bio request takes as a result of a
+write to the origin device.</H4>
 <UL>
 	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD></UL>
 <UL>
@@ -117,6 +117,41 @@ of a write to the device.  Origin writes only.</H4>
 		replied_rw() finds each chunk id in &quot;pending&quot; queue,
 		dequeues it.  For a write to the origin (per ORIGIN_WRITE_OK), it
 		passes the request to lower layers via generic_make_request().</DD></UL>
+</UL>
+<H4 CLASS="western">The path a bio request takes as a result of a
+write to a snapshot device.</H4>
+<UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD></UL>
+<UL>
+	<UL>
+		<LI><DD CLASS="western">Generic device handling (or in this case
+		the device mapper) calls ddsnap_map() with the initial bio. 
+		ddsnap_map() queues the bio on the &quot;queries&quot; queue of the
+		dm_target private (devinfo) structure.</DD></UL>
+</UL>
+<UL>
+	<UL>
+		<LI><DD CLASS="western">worker() finds the bio on the &quot;queries&quot;
+		queue.  It dequeues it from &quot;queries&quot; and queues it on
+		the &quot;pending&quot; queue, then sends a QUERY_WRITE message to
+		ddsnapd.</DD></UL>
+</UL>
+<UL>
+	<LI><DD CLASS="western"><B>Process space (ddsnapd):</B></DD>
+	<UL><LI><DD CLASS="western">
+		incoming() gets QUERY_WRITE for a snapshot.</DD><LI><DD CLASS="western">
+		If snapshot not squashed, calls make_unique() to copy each chunk
+		from the origin out to snapshot(s) if necessary.</DD><LI><DD CLASS="western">
+		Sends a SNAPSHOT_WRITE_OK (SNAPSHOT_WRITE_ERROR if squashed or an
+		error on make_unique()) message to the kernel.</DD></UL>
+	<LI><DD CLASS="western"><B>Kernel (dm-ddsnap):</B></DD>
+	<UL><LI><DD CLASS="western" STYLE="font-weight: medium">
+		incoming() gets SNAPSHOT_WRITE_OK, calls replied_rw().</DD><LI><DD CLASS="western" STYLE="font-weight: medium">
+		replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		dequeues it.  For a write to a snapshot (per SNAPSHOT_WRITE_OK), it
+		fills in the appropriate device and computes the physical block for
+		each chunk, then passes the request to lower layers via
+		generic_make_request().</DD></UL>
 </UL>
 <H2 CLASS="western">Glossary</H2>
 <UL>
