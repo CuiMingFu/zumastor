@@ -1,5 +1,5 @@
 --- /dev/null	2006-05-22 07:25:23.000000000 -0700
-+++ linux-2.6.21.1/Documentation/accounting/getrusage.txt	2007-08-24 13:04:35.000000000 -0700
++++ linux-2.6.21.1/Documentation/accounting/getrusage.txt	2007-09-12 10:55:53.000000000 -0700
 @@ -0,0 +1,53 @@
 +Notes on implementation of getrusage() in Linux 2.6.
 +
@@ -49,14 +49,22 @@
 +RUSAGE_CHILDREN parameter.
 +
 +When the kernel "collects" child statistics, most of the statistics are simply
-+added to the parent process "child" fields, which then cumulcontain the
-+cumulative sum of those statistics for all of its terminated, wait()ed-for
-+children.  The ru_maxrss field is slightly different in that it is only updated
-+when the new value is larger than the older value; it tracks the largest RSS
-+of all children.
---- Linux/linux-2.6.21.1/kernel/fork.c	2007-04-27 14:49:26.000000000 -0700
-+++ linux-2.6.21.1/kernel/fork.c	2007-08-22 16:08:17.000000000 -0700
-@@ -875,6 +875,7 @@ static inline int copy_signal(unsigned l
++added to the parent process "child" fields, which then contain the cumulative
++sum of those statistics for all of its terminated, wait()ed-for children.  The
++ru_maxrss field is slightly different in that it is only updated when the new
++value is larger than the older value; it tracks the largest RSS of all
++children.
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/fork.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/fork.c	2007-09-07 10:45:22.000000000 -0700
+@@ -531,6 +531,7 @@ static int copy_mm(unsigned long clone_f
+ 
+ 	tsk->min_flt = tsk->maj_flt = 0;
+ 	tsk->nvcsw = tsk->nivcsw = 0;
++	tsk->maxrss = 0;
+ 
+ 	tsk->mm = NULL;
+ 	tsk->active_mm = NULL;
+@@ -875,6 +876,7 @@ static inline int copy_signal(unsigned l
  	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
  	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
  	sig->sched_time = 0;
@@ -64,78 +72,78 @@
  	INIT_LIST_HEAD(&sig->cpu_timers[0]);
  	INIT_LIST_HEAD(&sig->cpu_timers[1]);
  	INIT_LIST_HEAD(&sig->cpu_timers[2]);
---- Linux/linux-2.6.21.1/kernel/exit.c	2007-07-30 18:03:18.000000000 -0700
-+++ linux-2.6.21.1/kernel/exit.c	2007-08-22 16:09:02.000000000 -0700
-@@ -116,6 +116,11 @@ static void __exit_signal(struct task_st
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/exit.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/exit.c	2007-09-12 11:12:21.000000000 -0700
+@@ -113,6 +113,8 @@ static void __exit_signal(struct task_st
  		sig->nvcsw += tsk->nvcsw;
  		sig->nivcsw += tsk->nivcsw;
  		sig->sched_time += tsk->sched_time;
-+		if (tsk->mm != NULL) {
-+			update_hiwater_rss(tsk->mm);
-+			if (tsk->mm->hiwater_rss > sig->cmaxrss)
-+				sig->cmaxrss = tsk->mm->hiwater_rss;
-+		}
++		if (tsk->maxrss > sig->cmaxrss)
++			sig->cmaxrss = tsk->maxrss;
  		sig = NULL; /* Marker for below. */
  	}
  
-@@ -904,6 +909,8 @@ fastcall NORET_TYPE void do_exit(long co
+@@ -901,6 +903,14 @@ fastcall NORET_TYPE void do_exit(long co
  	if (tsk->mm) {
  		update_hiwater_rss(tsk->mm);
  		update_hiwater_vm(tsk->mm);
-+		if (tsk->mm->hiwater_rss > tsk->signal->cmaxrss)
-+			tsk->signal->cmaxrss = tsk->mm->hiwater_rss;
++		BUG_ON(tsk->maxrss != 0);
++		/*
++		 * Store the hiwater_rss in a task field, since when we need
++		 * it in __exit_signal() the mm structure is gone; we can't
++		 * stuff it in the signal structure since then we would be
++		 * racing with wait_task_zombie().
++		 */
++		tsk->maxrss = tsk->mm->hiwater_rss;
  	}
  	group_dead = atomic_dec_and_test(&tsk->signal->live);
  	if (group_dead) {
-@@ -1194,6 +1201,8 @@ static int wait_task_zombie(struct task_
+@@ -1191,6 +1201,17 @@ static int wait_task_zombie(struct task_
  			p->nvcsw + sig->nvcsw + sig->cnvcsw;
  		psig->cnivcsw +=
  			p->nivcsw + sig->nivcsw + sig->cnivcsw;
++		/*
++		 * Save the maximum RSS of this task and all its terminated,
++		 * waited-for children.  Don't accumulate the RSS since, one,
++		 * other operating systems (FreeBSD, AIX) do it this way and,
++		 * two, the cumulative RSS of a long-lived process with lots
++		 * of sequential child process would be meaningless.
++		 */
 +		if (sig->cmaxrss > psig->cmaxrss)
 +			psig->cmaxrss = sig->cmaxrss;
++		if (p->maxrss > psig->cmaxrss)
++			psig->cmaxrss = p->maxrss;
  		spin_unlock_irq(&p->parent->sighand->siglock);
  	}
  
---- Linux/linux-2.6.21.1/kernel/sys.c	2007-08-16 09:50:30.000000000 -0700
-+++ linux-2.6.21.1/kernel/sys.c	2007-08-22 16:07:48.000000000 -0700
-@@ -2002,6 +2002,7 @@ static void k_getrusage(struct task_stru
- 	struct task_struct *t;
- 	unsigned long flags;
- 	cputime_t utime, stime;
-+	unsigned long hiwater_rss;
- 
- 	memset((char *) r, 0, sizeof *r);
- 	utime = stime = cputime_zero;
-@@ -2021,9 +2022,12 @@ static void k_getrusage(struct task_stru
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/sys.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/sys.c	2007-09-12 11:05:17.000000000 -0700
+@@ -2021,6 +2021,7 @@ static void k_getrusage(struct task_stru
  			r->ru_nivcsw = p->signal->cnivcsw;
  			r->ru_minflt = p->signal->cmin_flt;
  			r->ru_majflt = p->signal->cmaj_flt;
 +			r->ru_maxrss = p->signal->cmaxrss;
  
--			if (who == RUSAGE_CHILDREN)
-+			if (who == RUSAGE_CHILDREN) {
-+				r->ru_maxrss <<= PAGE_SHIFT - 10;
+ 			if (who == RUSAGE_CHILDREN)
  				break;
-+			}
- 
- 		case RUSAGE_SELF:
- 			utime = cputime_add(utime, p->signal->utime);
-@@ -2042,6 +2046,13 @@ static void k_getrusage(struct task_stru
+@@ -2042,11 +2043,15 @@ static void k_getrusage(struct task_stru
  				r->ru_majflt += t->maj_flt;
  				t = next_thread(t);
  			} while (t != p);
 +			update_hiwater_rss(p->mm);
-+			hiwater_rss = p->mm->hiwater_rss;
-+			if (hiwater_rss < p->signal->cmaxrss)
-+				hiwater_rss = p->signal->cmaxrss;
-+			if (r->ru_maxrss < hiwater_rss)
-+				r->ru_maxrss = hiwater_rss;
-+			r->ru_maxrss <<= PAGE_SHIFT - 10;
++			if (r->ru_maxrss < p->mm->hiwater_rss)
++				r->ru_maxrss = p->mm->hiwater_rss;
  			break;
  
  		default:
---- Linux/linux-2.6.21.1/include/linux/sched.h	2007-07-30 18:03:17.000000000 -0700
-+++ linux-2.6.21.1/include/linux/sched.h	2007-08-22 16:08:07.000000000 -0700
+ 			BUG();
+ 	}
++	r->ru_maxrss <<= PAGE_SHIFT - 10; /* Convert from pages to kilobytes. */
+ 
+ 	unlock_task_sighand(p, &flags);
+ 	rcu_read_unlock();
+--- /home/fmayhar/Static/linux-2.6.21.1/include/linux/sched.h	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/include/linux/sched.h	2007-09-07 10:57:41.000000000 -0700
 @@ -457,6 +457,7 @@ struct signal_struct {
  	cputime_t utime, stime, cutime, cstime;
  	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
@@ -144,3 +152,12 @@
  
  	/*
  	 * Cumulative ns of scheduled CPU time for dead threads in the
+@@ -887,6 +888,8 @@ struct task_struct {
+ 	struct timespec start_time;
+ /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
+ 	unsigned long min_flt, maj_flt;
++/* maxrss gets the hiwater_rss in do_exit() */
++	unsigned long maxrss;
+ 
+   	cputime_t it_prof_expires, it_virt_expires;
+ 	unsigned long long it_sched_expires;
