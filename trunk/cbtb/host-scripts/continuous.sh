@@ -9,7 +9,7 @@
 # the repository parent directory to avoid running unsafe code on your host
 # machine.  Code direct from the repository is only run on virtual instances.
 
-sendmail=/usr/sbin/sendmail
+mailto=/usr/sbin/mailto
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
@@ -44,17 +44,20 @@ testret=-1
 
 time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh >${buildlog} 2>&1
 buildret=$?
+echo continuous dapper-build returned $buildret
 
 if [ $buildret -eq 0 ] ; then
   rm -f ${diskimg}
   pushd cbtb/host-scripts
   time ${TUNBR} timeout -14 7200 ${top}/zuma-dapper-i386.sh >${installlog} 2>&1
   installret=$?
+  echo continuous zuma-dapper-i386 returned $installret
   popd
 
   if [ $installret -eq 0 ] ; then
     time timeout -14 7200 ${top}/runtests.sh >>${testlog} 2>&1
     testret=$?
+    echo continuous runtests returned $testret
   fi
 fi
     
@@ -81,13 +84,15 @@ fi
 
 
 # send $subject and $files to $email
-( echo $subject
-  echo
+(
   for f in $files
   do
-    cat $f
+    echo '~*'
+    echo 1
+    echo $f
+    echo text/plain
   done
-) | ${sendmail} ${email}
+) | ${mailto} -s "${subject}" ${email}
 
 
 # loop waiting for a new update
