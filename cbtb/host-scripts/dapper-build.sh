@@ -39,8 +39,8 @@ if [ "x$MACFILE" = "x" -o "x$MACADDR" = "x" -o "x$IFACE" = "x" ] ; then
 fi
 
 SSH='ssh -o StrictHostKeyChecking=no'
-SCP='time timeout -14 3600 scp -o StrictHostKeyChecking=no'
-CMDTIMEOUT='time timeout -14 120'
+SCP='timeout -14 3600 scp -o StrictHostKeyChecking=no'
+CMDTIMEOUT='time timeout -14 300'
 BUILDTIMEOUT='time timeout -14 36000'
 SETUPTIMEOUT='time timeout -14 3600'
 WGETTIMEOUT='time timeout -14 3600'
@@ -169,9 +169,9 @@ done
 
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
-#socat STDIN UNIX-CONNECT:${MONITOR} <<EOF
-#quit
-#EOF
+socat unix:${MONITOR} - <<EOF
+quit
+EOF
 
 time wait $qemu || rc=$?
 kill -0 $qemu && kill -9 $qemu
