@@ -39,7 +39,7 @@ VIRTHOST=192.168.23.1
 
 IMAGE=dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
+diskimg=../../build/${IMAGE}.img
 SERIAL=${IMAGEDIR}/serial
 MONITOR=${IMAGEDIR}/monitor
 VNC=${IMAGEDIR}/vnc

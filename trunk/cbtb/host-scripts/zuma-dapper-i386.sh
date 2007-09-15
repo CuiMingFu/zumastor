@@ -21,7 +21,9 @@ if [ "x$VERSION" = "x" ] ; then
   echo "Suspect Version file"
   exit 1
 fi
-SVNREV=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+if [ "x$SVNREV" = "x" ] ; then
+  SVNREV=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+fi
 ARCH=i386
 DEBVERS="${VERSION}-r${SVNREV}"
 KVERS="${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0"
@@ -65,8 +67,8 @@ if [ ! -e ${IMAGEDIR} ]; then
   mkdir -p ${IMAGEDIR}
 fi
 
-
-templateimg=${diskimgdir}/dapper-i386/hda.img
+BUILDSRC=../../build
+templateimg=${BUILDSRC}/dapper-i386.img
 
 if [ ! -f ${templateimg} ] ; then
 
@@ -103,7 +105,6 @@ date
 
 # copy the debs that were built in the build directory
 # onto the new zuma template instance
-BUILDSRC=../../build
 for f in \
     ${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.deb \
     ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.deb \
@@ -156,6 +157,8 @@ fi
 
 echo "Instance shut down, removing ssh hostkey"
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
+
+mv {$diskimg} ${BUILDSRC}/dapper-i386-r${SVNREV}.img
 
 exit $retval
 
