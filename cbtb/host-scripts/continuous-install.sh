@@ -1,4 +1,4 @@
-#!/bin/sh -x
+>#!/bin/sh -x
 #
 # $Id$
 #
@@ -9,12 +9,12 @@
 # against.
 
 buildrev=''
-if [ -e buildrev ] ; then
+if [ -L buildrev ] ; then
   buildrev=`readlink buildrev`
 fi
 
 testrev=''
-if [ -e testrev ] ; then
+if [ -L testrev ] ; then
   testrev=`readlink testrev`
 fi
 
@@ -59,7 +59,7 @@ echo continuous zuma-dapper-i386 returned $installret
 popd
 
 if [ $installret -eq 0 ]; then
-  subject="Subject: zumastor r$revision install success"
+  subject="zumastor r$revision install success"
   files="$installlog"
   email="${email_success}"
 
@@ -67,10 +67,10 @@ if [ $installret -eq 0 ]; then
   # keep repeating on failure.  For the moment, while the continuous build
   # is maturing, this is desired.  Modify the logic later to not loop over
   # installation attempts.
-  ln -sf $buildrev ${TOP}/installrev
+  ln -sf $buildrev ${HOME}/installrev
 
 else
-  subject="Subject: zumastor r$revision install failure $installret"
+  subject="zumastor r$revision install failure $installret"
   files="$installlog"
   email="${email_failure}"
 fi
@@ -89,11 +89,13 @@ if [ -x ${mailto} ] ; then
   ) | ${mailto} -s "${subject}" ${email}
 elif [ -x ${sendmail} ] ; then
   (
+    echo "Subject: $subject"
+    echo
     for f in $files
     do
       cat $f
     done
-  ) | ${sendmail} -s "${subject}" ${email}
+  ) | ${sendmail} ${email}
 fi
 
 # pause 5 minutes, then restart and try again if there has been an update

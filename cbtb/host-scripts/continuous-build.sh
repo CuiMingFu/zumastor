@@ -46,14 +46,14 @@ echo continuous dapper-build returned $buildret
 
 
 if [ $buildret -eq 0 ]; then
-  subject="Subject: zumastor r$revision build success"
+  subject="zumastor r$revision build success"
   files="$buildlog"
   email="${email_success}"
   # store the revision just built in a symlink for use by readlink
   # in the installer stage running in a separate loop
   ln -sf $revision ${top}/buildrev
 else
-  subject="Subject: zumastor r$revision build failure $buildret"
+  subject="zumastor r$revision build failure $buildret"
   files="$buildlog"
   email="${email_failure}"
 fi
@@ -72,11 +72,13 @@ if [ -x ${mailto} ] ; then
   ) | ${mailto} -s "${subject}" ${email}
 elif [ -x ${sendmail} ] ; then
   (
+    echo "Subject: " $subject
+    echo
     for f in $files
     do
       cat $f
     done
-  ) | ${sendmail} -s "${subject}" ${email}
+  ) | ${sendmail} ${email}
 fi
 
 # loop waiting for a new update
