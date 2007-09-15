@@ -28,6 +28,7 @@ fi
 
 
 mailto=/usr/bin/mailto
+sendmail=/usr/sbin/sendmail
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
@@ -76,15 +77,24 @@ fi
 
 
 # send $subject and $files to $email
-(
-  for f in $files
-  do
-    echo '~*'
-    echo 1
-    echo $f
-    echo text/plain
-  done
-) | ${mailto} -s "${subject}" ${email}
+if [ -x ${mailto} ] ; then
+  (
+    for f in $files
+    do
+      echo '~*'
+      echo 1
+      echo $f
+      echo text/plain
+    done
+  ) | ${mailto} -s "${subject}" ${email}
+elif [ -x ${sendmail} ] ; then
+  (
+    for f in $files
+    do
+      cat $f
+    done
+  ) | ${sendmail} -s "${subject}" ${email}
+fi
 
 # pause 5 minutes, then restart and try again if there has been an update
 sleep 300

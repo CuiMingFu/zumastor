@@ -9,6 +9,7 @@
 # has arrived.
 
 mailto=/usr/bin/mailto
+sendmail=/usr/sbin/sendmail
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
@@ -50,7 +51,7 @@ if [ $buildret -eq 0 ]; then
   email="${email_success}"
   # store the revision just built in a symlink for use by readlink
   # in the installer stage running in a separate loop
-  ln -sf $revision buildrev
+  ln -sf $revision ${top}/buildrev
 else
   subject="Subject: zumastor r$revision build failure $buildret"
   files="$buildlog"
@@ -59,16 +60,24 @@ fi
 
 
 # send $subject and $files to $email
-(
-  for f in $files
-  do
-    echo '~*'
-    echo 1
-    echo $f
-    echo text/plain
-  done
-) | ${mailto} -s "${subject}" ${email}
-
+if [ -x ${mailto} ] ; then
+  (
+    for f in $files
+    do
+      echo '~*'
+      echo 1
+      echo $f
+      echo text/plain
+    done
+  ) | ${mailto} -s "${subject}" ${email}
+elif [ -x ${sendmail} ] ; then
+  (
+    for f in $files
+    do
+      cat $f
+    done
+  ) | ${sendmail} -s "${subject}" ${email}
+fi
 
 # loop waiting for a new update
 oldrevision=${revision}

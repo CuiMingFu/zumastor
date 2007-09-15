@@ -169,7 +169,7 @@ done
 
 # create symlinks to latest build debs if rc is still 0 (good)
 if [ $rc -eq 0 ] ; then
-  pushd zumastor/build
+  pushd build
   ln -sf ddsnap_${DEBVERS}_${ARCH}.deb ddsnap_build_${ARCH}.deb
   ln -sf zumastor_${DEBVERS}_${ARCH}.deb zumastor_build_${ARCH}.deb 
   ln -sf kernel-headers-${KVERS}_${ARCH}.deb kernel-headers-build_${ARCH}.deb
