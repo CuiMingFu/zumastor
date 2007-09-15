@@ -27,7 +27,7 @@ if [ "x$buildrev" = "x$testrev" ] ; then
 fi
 
 
-mailto=/usr/sbin/mailto
+mailto=/usr/bin/mailto
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"

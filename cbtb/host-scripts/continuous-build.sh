@@ -8,7 +8,7 @@
 # so other continuous-* scripts can tell at a glance that a new one
 # has arrived.
 
-mailto=/usr/sbin/mailto
+mailto=/usr/bin/mailto
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
