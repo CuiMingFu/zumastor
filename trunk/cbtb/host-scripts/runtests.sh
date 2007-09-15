@@ -12,7 +12,7 @@
 
 set -e
 
-repo=${PWD}
+testrepo=${PWD}
 diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
@@ -20,11 +20,11 @@ TUNBR=tunbr
 
 
 
-pushd cbtb/tests/1
+pushd ${testrepo}/1
 for f in *-test.sh
 do
   # timeout any test that runs for more than an hour
-  if ${TUNBR} timeout -14 3600 ../../../../test-zuma-dapper-i386.sh $f
+  if ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f
   then
     echo PASS $f
   else
@@ -35,10 +35,10 @@ do
 done
 popd
 
-pushd cbtb/tests/2
+pushd ${testrepo}/2
 for f in *-test.sh
 do
-  if ${TUNBR} ${TUNBR} timeout -14 3600 ../../../../test-zuma-dapper-i386.sh $f
+  if ${TUNBR} ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f
   then
     echo PASS $f
   else

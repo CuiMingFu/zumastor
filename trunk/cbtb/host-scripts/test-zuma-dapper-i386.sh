@@ -37,7 +37,11 @@ VIRTHOST=192.168.23.1
 
 IMAGE=zuma-dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
+BUILDSRC=${HOME}/zumastor/build
+diskimg=${BUILDSRC}/dapper-i386-r${SVNREV}.img
+if [ ! -f "diskimg" ] ; then
+  diskimg=${IMAGEDIR}/hda.img
+fi
 
 tmpdir=`mktemp -d /tmp/${IMAGE}.XXXXXX`
 SERIAL=${tmpdir}/serial
