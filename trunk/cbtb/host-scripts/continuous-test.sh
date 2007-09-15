@@ -8,12 +8,12 @@
 # install revision, fire off a new round of tests.
 
 installrev=''
-if [ -e installrev ] ; then
+if [ -L installrev ] ; then
   installrev=`readlink installrev`
 fi
   
 testrev=''
-if [ -e testrev ] ; then
+if [ -L testrev ] ; then
   testrev=`readlink testrev`
 fi
     
@@ -67,7 +67,7 @@ echo continuous runtests returned $testret
 # send just the failing log on any failure with subject and to the
 # possibly different failure address.
 if [ $testret -eq 0 ]; then
-  subject="Subject: zumastor r$installrev test success"
+  subject="Szumastor r$installrev test success"
   files="$testlog"
   email="${email_success}"
 
@@ -78,7 +78,7 @@ if [ $testret -eq 0 ]; then
   ln -sf $installrev ${TOP}/testrev
 
 else
-  subject="Subject: zumastor r$installrev test failure $testret"
+  subject="zumastor r$installrev test failure $testret"
   files="$testlog"
   email="${email_failure}"
 fi
@@ -97,11 +97,13 @@ if [ -x ${mailto} ] ; then
   ) | ${mailto} -s "${subject}" ${email}
 elif [ -x ${sendmail} ] ; then
   (
+    echo "Subject: " $subject
+    echo
     for f in $files
     do
       cat $f
     done
-  ) | ${sendmail} -s "${subject}" ${email}
+  ) | ${sendmail} ${email}
 fi
 
 # loop and reload the script
