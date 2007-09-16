@@ -57,8 +57,12 @@ VIRTHOST=192.168.23.1
 
 IMAGE=zuma-dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
+BUILDSRC=../../build
 
+if [ "x$DISKIMG" = "x" ] ; then
+  DISKIMG=${IMAGEDIR}/hda.img
+fi
+  
 SERIAL=${IMAGEDIR}/serial
 MONITOR=${IMAGEDIR}/monitor
 VNC=${IMAGEDIR}/vnc
@@ -67,24 +71,27 @@ if [ ! -e ${IMAGEDIR} ]; then
   mkdir -p ${IMAGEDIR}
 fi
 
-BUILDSRC=../../build
-templateimg=${BUILDSRC}/dapper-i386.img
+if [ "x$TEMPLATEIMG" = "x" ] ; then
 
-if [ ! -f ${templateimg} ] ; then
+  TEMPLATEIMG=${BUILDSRC}/dapper-i386.img
 
-  echo "No template image ${templateimg} exists yet."
-  echo "Run tunbr dapper-i386.sh first."
-  exit 1
+  if [ ! -f ${TEMPLATEIMG} ] ; then
+
+    echo "No template image ${TEMPLATEIMG} exists yet."
+    echo "Run tunbr dapper-i386.sh first."
+    exit 1
+  fi
 fi
 
-if [ -f ${diskimg} ] ; then
+if [ -f ${DISKIMG} ] ; then
   echo Zuma/dapper image already exists, remove if you wish to build a new one
-  echo rm ${diskimg}
+  echo rm ${DISKIMG}
   exit 2
 fi
 
 
-${qemu_img} create  -b ${templateimg} -f qcow2 ${diskimg}
+${qemu_img} create  -b ${TEMPLATEIMG} -f qcow2 ${DISKIMG}
+ls -l ${DISKIMG}
 
 ${qemu_i386} -m 256 \
   -serial unix:${SERIAL},server,nowait \
@@ -92,8 +99,10 @@ ${qemu_i386} -m 256 \
   -vnc unix:${VNC} \
   -net nic,macaddr=${MACADDR},model=ne2k_pci \
   -net tap,ifname=${IFACE},script=no \
-  -boot c -hda ${diskimg} -no-reboot & qemu=$!
+  -boot c -hda ${DISKIMG} -no-reboot & qemu=$!
   
+ls -l ${DISKIMG}
+
 # wait for ssh to work
 while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
 do
@@ -123,7 +132,7 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm *.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 
 # halt the new image, and wait for qemu to exit
-${CMDTIMEOUT} ${SSH} root@${IPADDR} halt
+${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
 time wait $qemu || retval=$?
 kill -0 $qemu && kill -9 $qemu
@@ -137,7 +146,7 @@ then
     -monitor unix:${MONITOR},server,nowait \
     -vnc unix:${VNC} \
     -net nic,macaddr=${MACADDR} -net tap,ifname=${IFACE},script=no \
-    -boot c -hda ${diskimg} -no-reboot & qemu=$!
+    -boot c -hda ${DISKIMG} -no-reboot & qemu=$!
 
   while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
   do
@@ -157,8 +166,6 @@ fi
 
 echo "Instance shut down, removing ssh hostkey"
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
-
-mv {$diskimg} ${BUILDSRC}/dapper-i386-r${SVNREV}.img
 
 exit $retval
 
