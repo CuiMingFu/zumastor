@@ -34,12 +34,8 @@ email_success="zumastor-buildd@google.com"
 repo="${HOME}/zumastor-tests"
 top="${HOME}"
 
-diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-IMAGE=zuma-dapper-i386
-IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
 
 
 
@@ -59,15 +55,18 @@ svn update -r $installrev
 testlog=`mktemp`
 testret=-1
 
-time timeout -14 7200 ${top}/runtests.sh >>${testlog} 2>&1
+export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
+SVNREV=$installrev time timeout -14 7200 ${HOME}/runtests.sh >>${testlog} 2>&1
 testret=$?
 echo continuous runtests returned $testret
+
+popd
     
 # send full logs on success for use in comparisons.
 # send just the failing log on any failure with subject and to the
 # possibly different failure address.
 if [ $testret -eq 0 ]; then
-  subject="Szumastor r$installrev test success"
+  subject="zumastor r$installrev test success"
   files="$testlog"
   email="${email_success}"
 
@@ -75,7 +74,7 @@ if [ $testret -eq 0 ]; then
   # keep repeating on failure.  For the moment, while the continuous build
   # is maturing, this is desired.  Modify the logic later to not loop over
   # test attempts.
-  ln -sf $installrev ${TOP}/testrev
+  ln -sf $installrev ${HOME}/testrev
 
 else
   subject="zumastor r$installrev test failure $testret"

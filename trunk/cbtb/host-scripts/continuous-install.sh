@@ -1,4 +1,4 @@
->#!/bin/sh -x
+#!/bin/sh -x
 #
 # $Id$
 #
@@ -13,12 +13,12 @@ if [ -L buildrev ] ; then
   buildrev=`readlink buildrev`
 fi
 
-testrev=''
-if [ -L testrev ] ; then
-  testrev=`readlink testrev`
+installrev=''
+if [ -L installrev ] ; then
+  installrev=`readlink installrev`
 fi
 
-if [ "x$buildrev" = "x$testrev" ] ; then
+if [ "x$buildrev" = "x$installrev" ] ; then
   # wait 5 minutes and restart the script.  Don't do anything until
   # the symlinks to the revision numbers are actually different
   # restarting allows for easily deploying changes to this script.
@@ -38,9 +38,8 @@ top="${PWD}"
 diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-IMAGE=zuma-dapper-i386
-IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
+export TEMPLATEIMG="${HOME}/zumastor/build/dapper-i386.img"
+export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r706.img"
 
 
 pushd ${repo}
@@ -51,15 +50,17 @@ installret=-1
 
 rm -f ${diskimg}
 pushd cbtb/host-scripts
-time ${TUNBR} \
+SVNREV=$buildrev time ${TUNBR} \
   timeout -14 7200 \
-  SVNREV=$buildrev ${top}/zuma-dapper-i386.sh >${installlog} 2>&1
+  ${top}/zuma-dapper-i386.sh >${installlog} 2>&1
 installret=$?
 echo continuous zuma-dapper-i386 returned $installret
 popd
 
+popd
+
 if [ $installret -eq 0 ]; then
-  subject="zumastor r$revision install success"
+  subject="zumastor r$buildrev install success"
   files="$installlog"
   email="${email_success}"
 
