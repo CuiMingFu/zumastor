@@ -34,10 +34,10 @@ that goes to the origin.</H4>
 	<UL>
 		<LI>Generic device handling (or in this case the device mapper) calls
 		ddsnap_map() with the initial bio. ddsnap_map() queues the bio on
-		the &quot;queries&quot; queue of the dm_target private (devinfo)
+		the &quot;queries" queue of the dm_target private (devinfo)
 		structure.</li>
-		<li>worker() finds the bio on the &quot;queries&quot; queue. It
-		dequeues it from &quot;queries&quot; and queues it on the &quot;pending&quot;
+		<li>worker() finds the bio on the "queries" queue. It
+		dequeues it from "queries" and queues it on the "pending"
 		queue, then sends a QUERY_SNAPSHOT_READ message to ddsnapd.</li>
 	</UL></li>
 	<li><B>Process space (ddsnapd):</B>
@@ -49,25 +49,25 @@ that goes to the origin.</H4>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
 		<li>incoming() gets SNAPSHOT_READ_ORIGIN_OK, calls replied_rw().</li>
-		<li>replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		<li>replied_rw() finds each chunk id in "pending" queue,
 		dequeues it. For a read from the origin (per
 		SNAPSHOT_READ_ORIGIN_OK), sets the bi_end_io callback to
-		snapshot_read_end_io() and queues the bio in the &quot;locked&quot;
+		snapshot_read_end_io() and queues the bio in the "locked"
 		queue. It then passes the request to lower layers via
 		generic_make_request().</li>
 		<li>When the request has completed, the lower level calls
-		snapshot_read_end_io(), which moves the bio from the &quot;locked&quot;
-		queue to the &quot;releases&quot; queue (and pings the worker that
+		snapshot_read_end_io(), which moves the bio from the "locked"
+		queue to the "releases" queue (and pings the worker that
 		there's more work). It also calls any chained end_io routine.</li><li>
-		worker() finds the bio on the &quot;releases&quot; queue. It
-		dequeues it from &quot;releases&quot; and sends a
+		worker() finds the bio on the "releases" queue. It
+		dequeues it from "releases" and sends a
 		FINISH_SNAPSHOT_READ message to ddsnapd.</li>
 	</ul></li>
 	<li><B>Process space (ddsnapd):</B> 
 	<UL>
 		<li>incoming() gets FINISH_SNAPSHOT_READ and calls release_chunk() for
 		each chunk, which in turn calls release_lock() which releases and
-		destroys all requests on the &ldquo;pending&rdquo; queue as well as
+		destroys all requests on the "pending" queue as well as
 		the lock itself.</li>
 	</UL></li>
 </UL>
@@ -77,11 +77,11 @@ that goes to the origin.</H4>
 	<UL>
 		<li>Generic device handling (or in this case the device mapper)
 		calls ddsnap_map() with the initial bio. ddsnap_map() queues
-		the bio on the &quot;queries&quot;
+		the bio on the "queries"
 		queue of the dm_target private (devinfo) structure.</li>
 		<li>worker() finds
-		the bio on the &quot;queries&quot; queue. It dequeues it from
-		&quot;queries&quot; and queues it on the &quot;pending&quot; queue,
+		the bio on the "queries" queue. It dequeues it from
+		"queries" and queues it on the "pending" queue,
 		then sends a QUERY_WRITE message to ddsnapd.</li>
 	</UL></li>
 	<li><B>Process space (ddsnapd):</B>
@@ -91,16 +91,16 @@ that goes to the origin.</H4>
 		necessary.</li>
 		<li>If chunk was copied out, calls waitfor_chunk(), which finds any
 		snaplock outstanding for the chunk. If one is found, it adds the
-		request to the lock &ldquo;pending&rdquo; queue.</li>
-		<li>If no chunk was queued &ldquo;pending,&rdquo; it sends an
+		request to the lock "pending" queue.</li>
+		<li>If no chunk was queued "pending," it sends an
 		ORIGIN_WRITE_OK message to the kernel. Otherwise it copies that
-		message to the message buffer at the head of the &ldquo;pending&rdquo;
+		message to the message buffer at the head of the "pending"
 		queue and finishes.</li>
 	</UL></li>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
 		<li>incoming() gets ORIGIN_WRITE_OK, calls replied_rw().</li>
-		<li>replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		<li>replied_rw() finds each chunk id in "pending" queue,
 		dequeues it. For a write to the origin (per ORIGIN_WRITE_OK), it
 		passes the request to lower layers via generic_make_request().</li>
 	</UL></li>
@@ -112,11 +112,11 @@ write to a snapshot device.</H4>
 	<UL>
 		<li>Generic device
 		handling (or in this case the device mapper) calls ddsnap_map()
-		with the initial bio. ddsnap_map() queues the bio on the &quot;queries&quot;
+		with the initial bio. ddsnap_map() queues the bio on the "queries"
 		queue of the dm_target private (devinfo) structure.</li>
 		<li>worker() finds
-		the bio on the &quot;queries&quot; queue. It dequeues it from
-		&quot;queries&quot; and queues it on the &quot;pending&quot; queue,
+		the bio on the "queries" queue. It dequeues it from
+		"queries" and queues it on the "pending" queue,
 		then sends a QUERY_WRITE message to ddsnapd.</li>
 	</UL></li>
 	<li><B>Process space (ddsnapd):</B>
@@ -130,18 +130,63 @@ write to a snapshot device.</H4>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
 		<li>incoming() gets SNAPSHOT_WRITE_OK, calls replied_rw().</li>
-		<li>replied_rw() finds each chunk id in &quot;pending&quot; queue,
+		<li>replied_rw() finds each chunk id in "pending" queue,
 		dequeues it. For a write to a snapshot (per SNAPSHOT_WRITE_OK), it
 		fills in the appropriate device and computes the physical block for
 		each chunk, then passes the request to lower layers via
 		generic_make_request().</li>
 	</UL></li>
 </UL>
+<H2>Startup stuff (in progress).</H2>
+<UL>
+	<li>Generally, the agent gets a new connection, accepts it, allocates
+	a client structure and adds to its client list.  It adds the fd for
+	that client to the poll vector and uses the offset therein to locate
+	the client information later.</li>
+	<li>dm-ddsnap clnt starts and initializes, sends NEED_SERVER to agent,
+	blocks on server_in_sem.</li>
+	<ul>
+		<li>Agent gets NEED_SERVER, calls have_address() (which unconditionally
+		returns true), then calls connect_clients():
+		<ul>
+			<li>Connects to client address.</li>
+			<li>Sends CONNECT_SERVER and fd to dm-ddsnap cntl.</li>
+		</ul>
+		</li>
+	</ul>
+	<li>ddsnapd starts and initializes, then sends SERVER_READY to agent.</li>
+	<ul>
+		<li>Agent gets SERVER_READY, calls try_to_instantiate() to send
+		START_SERVER to ddsnapd (which initializes its superblock).</li>
+		<li>Agent calls connect_clients():
+		<ul>
+			<li>Connects to client address.</li>
+			<li>Sends CONNECT_SERVER and fd to dm-ddsnap cntl.</li>
+		</ul>
+		</li>
+	</ul>
+	<li>dm-ddsnap cntl gets CONNECT_SERVER, gets fd, ups server_in_sem
+	(unblocking clnt), sends IDENTIFY over just-received server fd, ups
+	recover_sem.</li>
+	<li>ddsnapd gets IDENTIFY, sends IDENTIFY_OK to clnt, passing
+	"chunksize_bits." <i>(To "identify" a snapshot?  What does this
+	mean?)</i></li>
+	<li>dm-ddsnap clnt gets IDENTIFY_OK:</li>	
+	<UL>
+		<li>Sets READY_FLAG.</li>
+		<li>Sets chunksize_bits from message.</li>
+		<li>Sends CONNECT_SERVER_OK to agent.</li>
+		<li>ups identify_sem, which allows ddsnap_create() to return.</li>
+	</UL>
+	</li>
+	<li>Agent receives CONNECT_SERVER_OK, does nothing.</li>
+</UL>
 <H2>Glossary</H2>
 <UL>
-	</li><li><B>exception</B>:
+	<li><B>exception</B>:
 	A chunk that no longer exists solely on the origin, but has been
 	modified after a snapshot was taken, so that a copy of the old
-	contents has been made in the affected snapshot(s).</UL>
+	contents has been made in the affected snapshot(s).</li>
+</UL>
 </BODY>
 </HTML>
