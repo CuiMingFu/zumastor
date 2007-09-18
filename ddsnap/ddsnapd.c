@@ -3238,7 +3238,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		}
 
 		unsigned snapshots = sb->image.snapshots;
-		unsigned reply_len = (unsigned)snapshot_details(NULL, snapshots, snapshots);
+		size_t reply_len = snapshot_details_calc_size(snapshots, snapshots);
 		struct status_reply *reply = calloc(reply_len, 1); // !!! error check?
 
 		uint64_t share_array[MAX_SNAPSHOTS * MAX_SNAPSHOTS];

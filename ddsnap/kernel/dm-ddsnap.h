@@ -123,6 +123,11 @@ static inline struct snapshot_details *snapshot_details(struct status_reply *rep
 	return (void *)(reply->details + row * rowsize);
 }
 
+static inline size_t snapshot_details_calc_size(unsigned row, unsigned snapshots)
+{
+	return (size_t) snapshot_details(NULL, row, snapshots);
+}
+
 /* !!! more things to move out of kernel !!! */
 
 struct state_message {uint32_t snap; uint32_t state; } PACKED;
