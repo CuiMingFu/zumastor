@@ -13,6 +13,7 @@
 		H3 { font-size: 13pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
 		H2 { font-size: 14pt; margin-top: 0.2in; margin-bottom: 0.1in; text-align: left }
 		H4 { margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
+		DIV.indent { margin-left: 2em; }
 	-->
 	</STYLE>
 </HEAD>
@@ -28,7 +29,7 @@ function checks whether the chunk needs to be copied out, does so if
 necessary, and returns an indication of whether that happened.</P>
 <H3>Path of a bio request through dm-ddsnap and ddsnapd.</H3>
 <H4>The path a bio request takes as a result of a read from a snapshot device
-that goes to the origin.</H4>
+that goes to the origin (aka "snapshot origin read").</h4>
 <UL>
 	<LI><B>Kernel (dm-ddsnap):</B>
 	<UL>
@@ -65,13 +66,24 @@ that goes to the origin.</H4>
 	</ul></li>
 	<li><B>Process space (ddsnapd):</B> 
 	<UL>
-		<li>incoming() gets FINISH_SNAPSHOT_READ and calls release_chunk() for
-		each chunk, which in turn calls release_lock() which releases and
-		destroys all requests on the "pending" queue as well as
-		the lock itself.</li>
+		<li>incoming() gets FINISH_SNAPSHOT_READ and calls
+		release_chunk() for each chunk, which finds the lock for that
+		chunk and calls release_lock().
+		<ul>
+			<li>release_lock() finds the client on the hold list for that
+			lock and frees that hold.</li>
+			<li>If there are still holds remaining (on behalf of other
+			clients), release_lock() terminates, leaving the snaplock and
+			any waiting writes pending.</li>
+			<li>If there are no more holds, release_lock() walks the
+			waitlist, freeing each wait as well as each "pending"
+			structure and transmitting the associated
+			ORIGIN_WRITE_OK message to permit each pending write to
+			continue.</li>
+		</ul></li>
 	</UL></li>
 </UL>
-<H4>The path a bio request takes as a result of a write to the origin device.</H4>
+<H4>The path a bio request takes as a result of a write to the origin device (aka "origin write").</H4>
 <UL>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
@@ -90,12 +102,17 @@ that goes to the origin.</H4>
 		<li>Calls make_unique() to copy each chunk out to snapshot(s) if
 		necessary.</li>
 		<li>If chunk was copied out, calls waitfor_chunk(), which finds any
-		snaplock outstanding for the chunk. If one is found, it adds the
-		request to the lock "pending" queue.</li>
+		snaplock outstanding for the chunk. If one is found, it adds a
+		"pending" structure (allocated as needed) to the lock wait
+		list.</li>
 		<li>If no chunk was queued "pending," it sends an
-		ORIGIN_WRITE_OK message to the kernel. Otherwise it copies that
-		message to the message buffer at the head of the "pending"
-		queue and finishes.</li>
+		ORIGIN_WRITE_OK message to the kernel.</li>
+		<li>If any chunk was queued "pending" it copies the
+		ORIGIN_WRITE_OK message to the message buffer on the "pending"
+		structure.  This message is transmitted as a side effect of
+		when ddsnapd receiving FINISH_SNAPSHOT_READ and removing all
+		holds and waiters on the associated lock, as outlined in the
+		description of snapshot origin read.</li>
 	</UL></li>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
@@ -105,8 +122,7 @@ that goes to the origin.</H4>
 		passes the request to lower layers via generic_make_request().</li>
 	</UL></li>
 </UL>
-<H4>The path a bio request takes as a result of a
-write to a snapshot device.</H4>
+<H4>The path a bio request takes as a result of a write to a snapshot device (aka "snapshot write").</H4>
 <UL>
 	<li><B>Kernel (dm-ddsnap):</B>
 	<UL>
@@ -179,14 +195,36 @@ write to a snapshot device.</H4>
 		<li>ups identify_sem, which allows ddsnap_create() to return.</li>
 	</UL>
 	</li>
-	<li>Agent receives CONNECT_SERVER_OK, does nothing.</li>
+	<li>Agent receives CONNECT_SERVER_OK, does nothing, is happy.</li>
 </UL>
+<h2>Locking</h2>
+<div class="indent"><p>When a chunk is shared between the origin and one or more
+snapshots, any reads of that chunk must go to the origin device.  A write to
+that chunk on the origin, however, may change the shared data and must therefore
+be properly serialized with any outstanding reads.</p>
+<p>Locks are created when a read to a shared chunk takes place; a snaplock is
+allocated if necessary and a hold record added to its "hold" list.  When a
+write to such a chunk takes place, we first copy the chunk out to the snapshots
+with which it is shared so that future snapshot reads no longer must lock the
+chunk.  We then check whether the chunk has already been locked.  If it has,
+we create a "pending" structure and append it to the eponymous list on the
+snaplock, thereby queueing the write for later processing.  When all
+outstanding reads of that chunk have completed, the chunk will be unlocked and
+the queued writes allowed to complete.</p></div>
 <H2>Glossary</H2>
 <UL>
+	<li><B>chunk</B>:
+	A unit of data in a Zumastor volume, measured in bytes, which may not
+	(and probably will not) correspond to sector, block or page sizes;
+	Zumastor manipulates the contents of a volume in "chunk"-sized units.</li>
 	<li><B>exception</B>:
 	A chunk that no longer exists solely on the origin, but has been
 	modified after a snapshot was taken, so that a copy of the old
 	contents has been made in the affected snapshot(s).</li>
+	<li><B>snaplock</B>:
+	A data structure that describes a list of read locks associated with
+	a chunk associated with a snapshot but actually shared with the origin
+	for which there is a read outstanding.</li>
 </UL>
 </BODY>
 </HTML>
