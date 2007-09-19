@@ -3444,12 +3444,84 @@ int snap_server_setup(const char *agent_sockname, const char *server_sockname, i
 	return 0;
 }
 
+#ifdef DDSNAP_MEM_MONITOR
+
+#include <sys/time.h>
+#include <sys/resource.h>
+
+/*
+ * itoa() and reverse() lifted straight from K&R C, 2nd edition.
+ */
+void reverse(char s[])
+{
+	int c, i, j;
+
+	for (i = 0, j = strlen(s)-1; i < j; i++, j--) {
+		c = s[i];
+		s[i] = s[j];
+		s[j] = c;
+	}
+}
+
+void itoa(int n, char s[])
+{
+	int i, sign;
+	sign = n;
+	
+	i = 0;
+	do {
+		s[i++] = abs(n % 10) + '0';
+	} while (n /= 10);
+	if (sign < 0)
+		s[i++] = '-';
+	
+	s[i] = '\0';
+	reverse(s);
+}
+
+void
+ddsnap_mem_monitor(void)
+{
+	extern int mmon_interval;
+	static int old_maxrss = -1;
+	struct rusage ru;
+	char buf[128];
+
+	if (mmon_interval <= 0)		/* No interval?  Don't monitor.       */
+		return;
+	if (getrusage(RUSAGE_SELF, &ru) < 0) {
+		perror("getrusage() failed");
+		mmon_interval = 0;
+		return;
+	}
+	if (ru.ru_maxrss > old_maxrss) {
+		/*
+		 * Go to great lengths to avoid an allocate as a result of
+		 * this log message.
+		 */
+		strcpy(buf, "WARNING:  RSS increased from ");
+		itoa(old_maxrss, &buf[strlen(buf)]);
+		strcat(buf, " to ");
+		itoa(ru.ru_maxrss, &buf[strlen(buf)]);
+		strcat(buf, " @ ");
+		itoa(time(NULL), &buf[strlen(buf)]);
+		strcat(buf, "\n");
+		write(2, buf, strlen(buf));
+		old_maxrss = ru.ru_maxrss;
+	}
+}
+#endif /* DDSNAP_MEM_MONITOR */
+
 int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, const char *logfile)
 {
 	unsigned maxclients = 100, clients = 0, others = 3;
 	struct client *clientvec[maxclients];
 	struct pollfd pollvec[others+maxclients];
 	int err = 0;
+#ifdef DDSNAP_MEM_MONITOR
+	int poll_timeout = -1;
+	extern int mmon_interval;
+#endif
 
 	pollvec[0] = (struct pollfd){ .fd = listenfd, .events = POLLIN };
 	pollvec[1] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
@@ -3459,12 +3531,19 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 		warn("can not set process to throttle less (error %i, %s)", errno, strerror(errno));
 	if ((err = prctl(PR_SET_MEMALLOC, 0, 0, 0, 0)))
 		warn("failed to enter memalloc mode (may deadlock) (error %i, %s)", errno, strerror(errno));
-	
+#ifdef DDSNAP_MEM_MONITOR
+	if (mmon_interval > 0)
+		poll_timeout = mmon_interval;
+	ddsnap_mem_monitor();
+#endif	
 	while (1) {
 		trace(warn("Waiting for activity"););
 
+#ifdef DDSNAP_MEM_MONITOR
+		int activity = poll(pollvec, others+clients, poll_timeout);
+#else
 		int activity = poll(pollvec, others+clients, -1);
-
+#endif
 		if (activity < 0) {
 			if (errno != EINTR)
 				error("poll failed: %s", strerror(errno));
@@ -3472,7 +3551,13 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 		}
 
 		if (!activity) {
+#ifdef DDSNAP_MEM_MONITOR
+			ddsnap_mem_monitor();
+			if (mmon_interval == 0) /* If we stopped monitoring, */
+				poll_timeout = -1; /* kill timeout.          */
+#else
 			printf("waiting...\n");
+#endif
 			continue;
 		}
 
@@ -3660,6 +3745,10 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 			return 0;
 		}
 	}
+
+#ifdef DDSNAP_MEM_MONITOR
+	ddsnap_mem_monitor();
+#endif
 
 	/* should only return on an error */
 	if ((ret = snap_server(sb, listenfd, getsigfd, agentfd, logfile)) < 0)
