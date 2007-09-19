@@ -1,0 +1,84 @@
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/softlockup.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/softlockup.c	2007-09-06 14:15:55.000000000 -0700
+@@ -13,6 +13,7 @@
+ #include <linux/kthread.h>
+ #include <linux/notifier.h>
+ #include <linux/module.h>
++#include <linux/workqueue.h>
+ 
+ static DEFINE_SPINLOCK(print_lock);
+ 
+@@ -73,6 +74,7 @@ void softlockup_tick(void)
+ 		printk(KERN_ERR "BUG: soft lockup detected on CPU#%d!\n",
+ 			this_cpu);
+ 		dump_stack();
++		show_workqueues();
+ 		spin_unlock(&print_lock);
+ 	}
+ }
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/workqueue.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/workqueue.c	2007-09-06 14:47:53.000000000 -0700
+@@ -811,6 +811,31 @@ static int __devinit workqueue_cpu_callb
+ 	return NOTIFY_OK;
+ }
+ 
++void show_workqueues(void)
++{
++	struct workqueue_struct *wq;
++	int cpu;
++
++	mutex_lock(&workqueue_mutex);
++	list_for_each_entry(wq, &workqueues, list) {
++		printk("\n");
++		printk("Workqueue %s:\n", wq->name);
++		for_each_online_cpu(cpu) {
++			struct cpu_workqueue_struct *cwq = per_cpu_ptr(wq->cpu_wq, cpu);
++			struct work_struct *work;
++
++			printk("\tCPU %d ", cpu);
++			list_for_each_entry(work, &(cwq->worklist), entry) {
++				print_symbol("function %s", (unsigned long)work->func);
++			}
++			printk("\n");
++		}
++	}
++	mutex_unlock(&workqueue_mutex);
++	
++}
++EXPORT_SYMBOL(show_workqueues);
++
+ void init_workqueues(void)
+ {
+ 	singlethread_cpu = first_cpu(cpu_possible_map);
+@@ -818,4 +843,3 @@ void init_workqueues(void)
+ 	keventd_wq = create_workqueue("events");
+ 	BUG_ON(!keventd_wq);
+ }
+-
+--- /home/fmayhar/Static/linux-2.6.21.1/drivers/char/sysrq.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/drivers/char/sysrq.c	2007-09-06 11:40:07.000000000 -0700
+@@ -212,11 +212,12 @@ static struct sysrq_key_op sysrq_showreg
+ static void sysrq_handle_showstate(int key, struct tty_struct *tty)
+ {
+ 	show_state();
++	show_workqueues();
+ }
+ static struct sysrq_key_op sysrq_showstate_op = {
+ 	.handler	= sysrq_handle_showstate,
+-	.help_msg	= "showTasks",
+-	.action_msg	= "Show State",
++	.help_msg	= "showTasks-workqueues",
++	.action_msg	= "Show State & Workqueues",
+ 	.enable_mask	= SYSRQ_ENABLE_DUMP,
+ };
+ 
+--- /home/fmayhar/Static/linux-2.6.21.1/include/linux/workqueue.h	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/include/linux/workqueue.h	2007-09-06 14:15:30.000000000 -0700
+@@ -183,6 +183,7 @@ extern void flush_scheduled_work(void);
+ extern int current_is_keventd(void);
+ extern int keventd_up(void);
+ 
++extern void show_workqueues(void);
+ extern void init_workqueues(void);
+ void cancel_rearming_delayed_work(struct delayed_work *work);
+ void cancel_rearming_delayed_workqueue(struct workqueue_struct *,
