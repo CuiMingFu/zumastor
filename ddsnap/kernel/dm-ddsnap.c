@@ -365,7 +365,7 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 	bio->bi_end_io = hook->old_end_io;
 	bio->bi_private = hook->old_private;
 	hook->old_end_io = NULL;
-	if (!worker_ready(info))
+	if (!(info->flags & READY_FLAG))
 		kmem_cache_free(end_io_cache, hook);
 	else if (info->dont_switch_lists == 0)
 		list_move(&hook->list, &info->releases);
@@ -749,14 +749,15 @@ void upload_locks(struct devinfo *info)
 	}
 	outbead(info->sock, FINISH_UPLOAD_LOCK, struct {});
 	spin_lock_irqsave(&info->end_io_lock, irqflags);
+	/* if worker not ready, there should not be any new bios added to locked list */
 	if (worker_ready(info)) {
 		list_for_each_safe(entry, tmp, &info->locked){
 			hook = list_entry(entry, struct hook, list);
 			if (hook->old_end_io == NULL)
 				list_move(&hook->list, &info->releases);
 		}
-		info->dont_switch_lists = 0;
 	}
+	info->dont_switch_lists = 0;
 	spin_unlock_irqrestore(&info->end_io_lock, irqflags);
 }
 
@@ -1044,6 +1045,7 @@ static int control(struct dm_target *target)
 	}
 out:
 	warn("%s exiting for snapshot %d", task->comm, info->snap);
+	up(&info->identify_sem); // unblock any process pending on ddsnap create
 	up(&info->exit3_sem); /* !!! will crash if module unloaded before ret executes */
 	return 0;
 message_too_long:
