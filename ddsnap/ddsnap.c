@@ -1980,6 +1980,10 @@ static void cdUsage(poptContext optCon, int exitcode, char const *error, char co
 	exit(exitcode);
 }
 
+#ifdef DDSNAP_MEM_MONITOR
+int mmon_interval = DDSNAP_MEM_MONITOR;
+#endif
+
 #define DEVMAP_PATH "/dev/mapper"
 int main(int argc, char *argv[])
 {
@@ -2008,6 +2012,9 @@ int main(int argc, char *argv[])
 	struct poptOption serverOptions[] = {
 		{ "foreground", 'f', POPT_ARG_NONE, &nobg, 0, "run in foreground. daemonized by default.", NULL }, // !!! unusual semantics, we should be foreground by default, and optionally daemonize
 		{ "logfile", 'l', POPT_ARG_STRING, &logfile, 0, "use specified log file", NULL },
+#ifdef DDSNAP_MEM_MONITOR
+		{ "mmonitor", 'm', POPT_ARG_INT, &mmon_interval, 0, "Memory monitor delay, seconds, zero to disable.", NULL },
+#endif
 		{ "pidfile", 'p', POPT_ARG_STRING, &pidfile, 0, "use specified process id file", NULL },
 		{ "progress", 'o', POPT_ARG_STRING, &progress_file, 0, "Output progress to specified file", NULL },
 		POPT_TABLEEND
