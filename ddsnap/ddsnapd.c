@@ -2162,6 +2162,87 @@ struct client
 	u32 flags; 
 };
 
+
+/*
+ * Cross-client Locking strategy
+ *
+ * Counterintuitively, no locking is required even between multiple clients
+ * on multiple different nodes, when the accesses lie in the same virtual
+ * snapshot or origin image.  This is because the requirement serialization
+ * must necessarily be supplied by the filesystem accessing the block device,
+ * whether that is a local filesystem running only on one node (at a time)
+ * or a cluster filesystem.
+ *
+ * This "inherited" locking does not exist between different volumes,
+ * because the mounted filesystem knows nothing about parallel accesses
+ * performed on other volume images which may share some of physical data.
+ * The ddsnap server must therefore supply locking between these accesses,
+ * which turns out to be somewhat subtle, even taking advantage of the
+ * simplification of having one central server that handles all inter-client
+ * synchronization, as we have here.
+ *
+ * Here is a description of the locking events that occur.
+ *
+ * Lock an origin region for reading:
+ *
+ * If part of a read from a snapshot lies on the origin volume (very
+ * common) then the region needs to be locked against origin writers
+ * so that the data does not change while being read.  So a snapshot
+ * write request loops across each chunk of the requested region and
+ * either finds an existing lock on the chunk or creates a new one if
+ * there are none.  Then a hold record is created and added to a list
+ * on the lock record, to remember which snapshot client has locked
+ * that chunk.
+ *
+ * A snapshot reader never has to wait to obtain its lock, because any
+ * write requests are serialized against the read request by the server's
+ * incoming message queue.  Any write request that has already been
+ * granted and is currently in progress on an origin client will necessarily
+ * have already copied out all its chunks to the snapshot store, and they
+ * therefore do not have to be locked.
+ *
+ * Write a region of the origin:
+ *
+ * We walk across each chunk of the region and, if no snapshot client
+ * has locked any of these origin chunks for reading, the write request
+ * can be granted immediately.  Otherwise the write request has to be
+ * granted later, after some read locks have been released.
+ *
+ * For each chunk that some client has locked for reading, a "wait"
+ * record is created and entered onto a list.  (The first time a wait record
+ * is created for a given write request, a "pending" structure is created
+ * so that all the read locks involved have something to point at.  We
+ * only want one of these pending structures per write request, because
+ * we only want to reply to a pending write request once.)
+ *
+ * The wait record is pushed onto a list in the read lock record so that
+ * when the reader releases the lock on that chunk, if that was the last
+ * lock, the pending record will be used to submit the reply for the
+ * pending write request.  Note that multiple write requests may be
+ * waiting on a given chunk, and that multiple chunks of any given write
+ * request may be locked by multiple different snapshot clients.  So this
+ * little problem and the given solution is not simple at all.  Really not
+ * simple.
+ *
+ * While the write request is being processed chunk by chunk, the head
+ * of the pending list is held in a variable on the stack, if any read locks
+ * were found.  This list head will end up being referenced by one or
+ * more read locks, not through a global list.  This is why the pending
+ * variable in incoming is allowed to go out of scope, seemingly without
+ * being used.  The referenced pending structure will eventually be
+ * freed when some read lock is released.
+ *
+ * Release an origin region:
+ *
+ * When a snapshot client sends a release message to the server, the
+ * server loops across each chunk (which must be on the origin) to find
+ * a corresponding lock hold record (which must be in the hash) and
+ * releases the hold.  If the hold count is now zero, then if there are any
+ * write requests waiting on the read lock, their pending counts may be
+ * reduced.  Any pending counts that hit zero cause a pending write
+ * request to be granted.
+ */
+
 struct pending
 {
 	unsigned holdcount;
