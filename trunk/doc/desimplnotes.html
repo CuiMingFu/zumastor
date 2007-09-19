@@ -7,12 +7,12 @@
 	<META NAME="CREATED" CONTENT="20070913;13250800">
 	<STYLE TYPE="text/css">
 	<!--
-		BODY { font-family: "Verdana", sans-serif; }
-		H1 { font-size: 16pt; margin-top: 0.17in; margin-bottom: 0.1in; text-align: center }
+		BODY { font-size: 10pt; font-family: "Verdana", sans-serif; }
+		H1 { font-size: 14pt; margin-top: 0.2in; text-align: center }
 		P { margin-bottom: 0.1in }
-		H3 { font-size: 13pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
-		H2 { font-size: 14pt; margin-top: 0.2in; margin-bottom: 0.1in; text-align: left }
-		H4 { margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
+		H2 { font-size: 13pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H3 { font-size: 12pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H4 { font-size: 11pt; margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
 		DIV.indent { margin-left: 2em; }
 	-->
 	</STYLE>
@@ -153,14 +153,21 @@ that goes to the origin (aka "snapshot origin read").</h4>
 		generic_make_request().</li>
 	</UL></li>
 </UL>
-<H2>Startup stuff (in progress).</H2>
-<p>Generally, the agent gets a new connection, accepts it, allocates
-a client structure and adds to its client list.  It adds the fd for
+<H2>Startup.</H2>
+<p>The Zumastor system of processes is started as a side effect of creating a
+Zumastor volume by use of the "zumastor define volume" command.  Zumastor starts
+the user-space daemons (ddsnap agent and ddsnap server), then commands the
+devmapper to create the actual devices; this eventually results in a call
+to the kernel function ddsnap-create() through the constructor call from the
+devmapper.  This function creates the control, client and worker threads,
+which proceed as outlined below.</p>
+<p>Generally, when it is started the ddsnap agent just waits for connections;
+it sends no messages and all further operations are performed on behalf of
+clients.  During processing it gets a new connection, accepts it, allocates
+a client structure and adds it to its client list.  It adds the fd for
 that client to the poll vector and uses the offset therein to locate
-the client information later.  The ddsnap server (ddsnapd) operates the
-same way.</p>
-<p>The ddsnap agent just starts and waits for connections, it sends no messages
-and all further operations are performed on behalf of clients.</p>
+the client information later.  After startup the ddsnap server (ddsnapd)
+operates the same way.</p>
 <UL>
 	<li>dm-ddsnap client ("incoming" thread) starts and initializes, sends
 	NEED_SERVER to agent, blocks on server_in_sem.</li>
