@@ -2669,7 +2669,6 @@ static void expand_snapstore(struct superblock *sb, u64 newchunks)
 }
 #endif
 
-#if 0
 static int client_locks(struct superblock *sb, struct client *client, int check)
 {
 	int i;
@@ -2697,8 +2696,6 @@ next:
 
 #define check_client_locks(x, y) client_locks(x, y, 1)
 #define free_client_locks(x, y) client_locks(x, y, 0)
-
-#endif
 
 /* A very simple-minded implementation.  You can do it in very
  * few operations with whole-register bit twiddling but I assume
@@ -3554,6 +3551,7 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 							assert(sb->usecount[snapshot->bit] > 0);
 							sb->usecount[snapshot->bit]--;
 						}
+						free_client_locks(sb, client);
 					}
 					close(client->sock);
 					free(client);
