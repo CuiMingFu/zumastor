@@ -23,9 +23,27 @@ struct client { int sock; enum { CLIENT_CON, SERVER_CON } type; };
 
 static inline int have_address(struct server *server)
 {
-	return 1;
+	return 1; // bug! pass &context here and check for non-zero fd
 	/*return !!server->address_len;*/
 }
+
+/*
+ * The order in which server and client connect to the agent is not fixed,
+ * and cannot be fixed because this driver supports server failover on a
+ * cluster.  A client may connect before the server has started, or before
+ * a server failover has completed.
+ *
+ * The agent handles this flexible event ordering as follows:
+ *
+ *  - If a client connects to the agent while a server is connected, the
+ *    agent hands a fd for the server socket to the client immediately.
+ *
+ *  - Otherwise, the client is placed on a list of clients waiting for a
+ *    server connection
+ *
+ * When the server connects to the agent, the agent sends fds for the
+ * server socket to any clients waiting for a server connection.
+ */
 
 int connect_clients(struct context *context)
 {
