@@ -1591,6 +1591,8 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 	for (;;) {
 		int csock;
 
+		if ((poll(pollvec, 1, 0) < 0) && (errno != EINTR))
+			error("poll failed, %s", strerror(errno));
                 if (pollvec[0].revents) {
                         u8 sig = 0;
                         /* it's stupid but this read also gets interrupted, so... */
@@ -1602,6 +1604,12 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
                                         fflush(stdout);
                                         re_open_logfile(logfile);
                                         break;
+				case SIGTERM:
+				case SIGINT:
+					close(csock);
+					exit(0);
+				default:
+					break;
                         }
                 }
 
