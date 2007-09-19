@@ -76,6 +76,56 @@
 
 #define DIVROUND(N, D) (((N)+(D)-1)/(D))
 
+/* then following variables and functions are used for debugging purpose */
+enum event_ids
+{
+	EVENT_TX_IDENTIFY = 0,
+	EVENT_TX_SERVER_READY = 1,
+	EVENT_END = 2,
+};
+
+const char *event_names[] = {
+       "tx_identify",
+       "tx_server_ready",
+};
+
+int event_shoulddelay[EVENT_END] = { 0 };
+int event_delay_ms = 0;
+
+static void debug_delay_ms(unsigned long sleep_msecs)
+{
+	struct timespec sleep_time, left_time;
+	sleep_time.tv_sec = sleep_msecs / 1000;
+	sleep_time.tv_nsec = 0;
+	while (nanosleep(&sleep_time, &left_time) && (errno == EINTR)) {
+		sleep_time.tv_sec = left_time.tv_sec;
+		sleep_time.tv_nsec = left_time.tv_nsec;
+	}
+}
+
+static int parse_debug_options(void)
+{
+	int i;
+	char *debug_string = NULL;
+	if ((debug_string = getenv("DDSNAP_DELAY_MSEC"))) {
+		if ((event_delay_ms = atol(debug_string)) <= 0) {
+			warn("invalid delay time");	
+			return -1;
+		}
+		for (i=0; i < EVENT_END; i++) {
+			if (strstr(debug_string, event_names[i]))
+				event_shoulddelay[i] = 1;
+		}
+	}
+	return 0;
+}
+
+static inline void eventHook(enum event_ids event_id) {
+	if (event_shoulddelay[event_id])
+		debug_delay_ms(event_delay_ms);
+}
+/* end of debug */
+
 /*
 Todo:
 
@@ -2985,6 +3035,7 @@ static int incoming(struct superblock *sb, struct client *client)
 			goto identify_error;
 		}
 
+		eventHook(EVENT_TX_IDENTIFY);
 		if (outbead(sock, IDENTIFY_OK, struct identify_ok,
 				 .chunksize_bits = sb->snapdata.asi->allocsize_bits) < 0)
 			warn("unable to reply to IDENTIFY message");
@@ -3436,6 +3487,7 @@ int snap_server_setup(const char *agent_sockname, const char *server_sockname, i
 
 	struct server_head server_head = { .type = AF_UNIX, .length = (strlen(server_sockname) + 1) };
 	trace(warn("server socket name is %s and length is %d", server_sockname, server_head.length););
+	eventHook(EVENT_TX_SERVER_READY);
 	if (writepipe(*agentfd, &(struct head){ SERVER_READY, sizeof(struct server_head) }, sizeof(struct head)) < 0 ||
 	    writepipe(*agentfd, &server_head, sizeof(server_head)) < 0 ||
 	    writepipe(*agentfd, server_sockname, server_head.length) < 0)
@@ -3531,6 +3583,7 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 		warn("can not set process to throttle less (error %i, %s)", errno, strerror(errno));
 	if ((err = prctl(PR_SET_MEMALLOC, 0, 0, 0, 0)))
 		warn("failed to enter memalloc mode (may deadlock) (error %i, %s)", errno, strerror(errno));
+	parse_debug_options();
 #ifdef DDSNAP_MEM_MONITOR
 	if (mmon_interval > 0)
 		poll_timeout = mmon_interval;
