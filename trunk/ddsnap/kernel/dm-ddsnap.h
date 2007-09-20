@@ -5,6 +5,7 @@ typedef uint64_t chunk_t;
 
 struct head { uint32_t code; uint32_t length; } PACKED;
 
+/* FIXME: this enum must match csnap_names[] in ../ddsnap/event.c */
 enum csnap_codes
 {
 	PROTOCOL_ERROR = 0xbead0000,

@@ -21,13 +21,13 @@
 #include <sys/un.h>
 #include <linux/fs.h> // for BLKGETSIZE
 #include <poll.h>
+#include "dm-ddsnap.h"
 #include "buffer.h"
 #include "daemonize.h"
 #include "ddsnap.h"
 #include "ddsnap.agent.h"
 #include "delta.h"
 #include "diskio.h"
-#include "dm-ddsnap.h"
 #include "list.h"
 #include "sock.h"
 #include "trace.h"

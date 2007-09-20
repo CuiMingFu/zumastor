@@ -31,11 +31,11 @@
 #include <netdb.h> // gethostbyname2_r
 #include <popt.h>
 #include <sys/prctl.h>
+#include "dm-ddsnap.h"
 #include "buffer.h"
 #include "daemonize.h"
 #include "ddsnap.h"
 #include "diskio.h"
-#include "dm-ddsnap.h"
 #include "list.h"
 #include "sock.h"
 #include "trace.h"
@@ -3067,7 +3067,6 @@ static int incoming(struct superblock *sb, struct client *client)
 			goto identify_error;
 		}
 
-		event_hook(EVENT_TX_IDENTIFY);
 		if (outbead(sock, IDENTIFY_OK, struct identify_ok,
 				 .chunksize_bits = sb->snapdata.asi->allocsize_bits) < 0)
 			warn("unable to reply to IDENTIFY message");
@@ -3519,7 +3518,7 @@ int snap_server_setup(const char *agent_sockname, const char *server_sockname, i
 
 	struct server_head server_head = { .type = AF_UNIX, .length = (strlen(server_sockname) + 1) };
 	trace(warn("server socket name is %s and length is %d", server_sockname, server_head.length););
-	event_hook(EVENT_TX_SERVER_READY);
+	event_hook(*agentfd, SERVER_READY);
 	if (writepipe(*agentfd, &(struct head){ SERVER_READY, sizeof(struct server_head) }, sizeof(struct head)) < 0 ||
 	    writepipe(*agentfd, &server_head, sizeof(server_head)) < 0 ||
 	    writepipe(*agentfd, server_sockname, server_head.length) < 0)

@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <errno.h>
+#include "event.h"
 
 #define u8 unsigned char
 #define s8 char
@@ -50,9 +51,11 @@ static inline int writepipe(int fd, void const *buffer, size_t count)
 #define outbead(SOCK, CODE, STRUCT, VALUES...) ({ \
 	struct { struct head head; STRUCT body; } PACKED message = \
 		{ { CODE, sizeof(STRUCT) }, { VALUES } }; \
+	event_hook(SOCK, CODE); \
 	writepipe(SOCK, &message, sizeof(message)); })
 
-#define outhead(SOCK, CODE, SIZE) writepipe(SOCK, &(struct head){ CODE, SIZE }, sizeof(struct head) )
+/* outhead calls event_hook, then writepipe, and returns writepipe's value. */
+#define outhead(SOCK, CODE, SIZE) (event_hook(SOCK, CODE), writepipe(SOCK, &(struct head){ CODE, SIZE }, sizeof(struct head) ))
 
 struct server { struct server_head { u8 type; u8 length; } header; char *address; } PACKED;
 
