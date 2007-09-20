@@ -12,7 +12,7 @@ endif
 
 kernel=./kernel
 instdir=$(prefix)/$(bindir)
-deps = Makefile trace.h diskio.h buffer.h list.h sock.h
+deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
 ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h
 ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h
 ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
@@ -46,8 +46,11 @@ ddsnapd.o: ddsnapd.c $(ddsnapd_deps)
 diskio.o: diskio.c $(deps)
 	cc diskio.c -c $(flags)
 
-buffer.o: buffer.c diskio.c $(deps)
+buffer.o: buffer.c $(deps)
 	cc buffer.c -c $(flags)
+
+event.o: event.c
+	cc event.c -c $(flags)
 
 daemonize.o: daemonize.c $(deps)
 	cc daemonize.c -c $(flags)
@@ -61,8 +64,8 @@ ddraidd: ddraid.c diskio.o buffer.o $(ddraid_deps)
 ddraid-agent: ddraid.agent.c $(ddraid_deps)
 	cc ddraid.agent.c $(flags) -I$(includes) -lpthread -o ddraid-agent -lpopt
 
-ddsnap: ddsnap.c buffer.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
-	cc ddsnap.c $(flags) -I$(includes) buffer.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
+ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
+	cc ddsnap.c $(flags) -I$(includes) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
 
 devspam: tests/devspam.c trace.h
 	cd tests && cc devspam.c $(flags) -I$(includes) -o ../devspam
