@@ -93,7 +93,7 @@ fi
 ${qemu_img} create  -b ${TEMPLATEIMG} -f qcow2 ${DISKIMG}
 ls -l ${DISKIMG}
 
-${qemu_i386} -m 256 \
+${qemu_i386} -m 512 \
   -serial unix:${SERIAL},server,nowait \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
@@ -112,6 +112,9 @@ done
 
 date
 
+# create a tmpfs /tmp on the instance to place the debs into
+${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
+
 # copy the debs that were built in the build directory
 # onto the new zuma template instance
 for f in \
@@ -120,15 +123,15 @@ for f in \
     ${BUILDSRC}/kernel-headers-${KVERS}_${ARCH}.deb \
     ${BUILDSRC}/kernel-image-${KVERS}_${ARCH}.deb
 do
-  ${SCP} $f root@${IPADDR}: || retval=$?
+  ${SCP} $f root@${IPADDR}:/tmp || retval=$?
 done
 
 # install the copied debs in the correct order
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} aptitude install -y tree || retval=$?
-${KINSTTIMEOUT} ${SSH} root@${IPADDR} dpkg -i kernel-image-${KVERS}_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i ddsnap_${DEBVERS}_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i zumastor_${DEBVERS}_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm *.deb' || retval=$?
+${KINSTTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/kernel-image-${KVERS}_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/ddsnap_${DEBVERS}_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_${DEBVERS}_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm /tmp/*.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 
 # halt the new image, and wait for qemu to exit

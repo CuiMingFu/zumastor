@@ -9,13 +9,13 @@
 # against.
 
 buildrev=''
-if [ -L buildrev ] ; then
-  buildrev=`readlink buildrev`
+if [ -L ${HOME}/buildrev ] ; then
+  buildrev=`readlink ${HOME}/buildrev`
 fi
 
 installrev=''
-if [ -L installrev ] ; then
-  installrev=`readlink installrev`
+if [ -L ${HOME}/installrev ] ; then
+  installrev=`readlink ${HOME}/installrev`
 fi
 
 if [ "x$buildrev" = "x$installrev" ] ; then
@@ -32,14 +32,15 @@ sendmail=/usr/sbin/sendmail
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
-repo="${PWD}/zumastor"
-top="${PWD}"
+repo="${HOME}/zumastor"
 
 diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-export TEMPLATEIMG="${HOME}/zumastor/build/dapper-i386.img"
-export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r706.img"
+export BUILDDIR="${HOME}/zumastor/build"
+export SVNREV=$buildrev
+export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
+export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
 pushd ${repo}
@@ -50,9 +51,9 @@ installret=-1
 
 rm -f ${diskimg}
 pushd cbtb/host-scripts
-SVNREV=$buildrev time ${TUNBR} \
+time ${TUNBR} \
   timeout -14 7200 \
-  ${top}/zuma-dapper-i386.sh >${installlog} 2>&1
+  ${HOME}/zuma-dapper-i386.sh >${installlog} 2>&1
 installret=$?
 echo continuous zuma-dapper-i386 returned $installret
 popd
