@@ -21,10 +21,11 @@
 
 struct client { int sock; enum { CLIENT_CON, SERVER_CON } type; };
 
-static inline int have_address(struct server *server)
+static inline int have_server(struct context *context)
 {
-	return 1; // bug! pass &context here and check for non-zero fd
-	/*return !!server->address_len;*/
+	if (context->serv == -1)
+		return(0);
+	return(1);
 }
 
 /*
@@ -141,7 +142,7 @@ static int incoming(struct context *context, struct client *client)
 		 * will be attempted when/if the local server shows up.
 		 */
 		trace(printf("NEED SERVER is being called\n"););
-		if (have_address(&context->active)) {
+		if (have_server(context)) {
 			trace(printf("Calling connect_clients\n"););
 			if (connect_clients(context) == 0)
 			    trace(printf("connected\n"););
@@ -232,6 +233,9 @@ int monitor(int listenfd, struct context *context, const char *logfile, int gets
 	unsigned maxclients = 100, clients = 0, others = 2;
 	struct pollfd pollvec[others+maxclients];
 	struct client *clientvec[maxclients];
+
+	/* Note that we don't have a server yet. */
+	context->serv = -1;
 
 	pollvec[0] = (struct pollfd){ .fd = listenfd, .events = (POLLIN | POLLHUP | POLLERR) };
         pollvec[1] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
