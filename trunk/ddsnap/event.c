@@ -138,7 +138,8 @@ int event_parse_options(void)
 			warn("invalid action name in DDSNAP_ACTION");	
 			return -1;
 		}
-	}
+	} else
+		action_opt = "";
 
 	trigger_opt = getenv("DDSNAP_TRIGGER");
 	if (trigger_opt) {
@@ -150,7 +151,8 @@ int event_parse_options(void)
 			warn("invalid action name in DDSNAP_TRIGGER");	
 			return -1;
 		}
-	}
+	} else
+		trigger_opt = "";
 
 	count_opt = getenv("DDSNAP_COUNT");
 	if (count_opt)
@@ -158,7 +160,8 @@ int event_parse_options(void)
 	if (new_want_count <= 0) {
 		warn("invalid count in DDSNAP_COUNT");	
 		return -1;
-	}
+	} else
+		count_opt = "";
 
 	event_action = new_action;
 	event_want_count = new_want_count;
