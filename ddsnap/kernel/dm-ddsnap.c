@@ -1008,9 +1008,10 @@ static int control(struct dm_target *target)
 			}
 			trace(warn("Received socket %i", fd);)
 			info->sock = fget(fd);
-			current->files->fd_array[fd] = NULL; /* this is sooo hokey */
+			/* we have two counts on the file, one from recv_fd and the other from fget */
+			sys_close(fd); /* drop one count here */
+			current->files->fd_array[sock_fd] = NULL; // should we grab file_lock?
 			put_unused_fd(sock_fd);
-			sys_close(fd);
 			up(&info->server_in_sem);
 			if (outbead(info->sock, IDENTIFY, struct identify, 
 						.id = info->id, .snap = info->snap, 
@@ -1362,6 +1363,13 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 #ifdef CACHE
 	unsigned bm_size;
 #endif
+	/* 
+	 * We are holding the big kernel lock grabbed in do_ioctl
+	 * We doubt if BKL is required to prevent any races in device mapper methods
+	 * FIXME: get rid of BKL from device mapper ioctls
+	 */
+	unlock_kernel();
+
 	error = "ddsnap usage: snapdev orgdev sockname snapnum";
 	err = -EINVAL;
 	if (argc != 4)
@@ -1432,19 +1440,29 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 		goto eek;
 	warn("Created snapshot device snapstore=%s origin=%s socket=%s snapshot=%i", argv[0], argv[1], argv[2], snap);
 	ddsnap_add_proc(argv[3], target); // use snapshot number as file name
-	while (down_interruptible(&info->identify_sem))
-		;
+
+	/*
+	 * This down call needs to be interruptible. Otherwise, a 'dmsetup create' command
+	 * is not killable when 'ddsnap server' isn't there, which is not desiable to users.
+	 */
+	err = down_interruptible(&info->identify_sem);
+	if (err == -EINTR) {
+		err = -ERESTARTSYS;
+		goto eek;
+	}
 	if (!(info->flags & READY_FLAG)) {
 			warn("snapshot device %d failed to be identified", info->snap);
 			error = "Can't identify snapshot";
 			err = -EINVAL;
 			goto eek;
 	}
+	lock_kernel(); // FIXME, see unlock_kernel above
 	return 0;
 
 eek:	warn("Virtual device create error %i: %s!", err, error);
 	ddsnap_destroy(target);
 	target->error = error;
+	lock_kernel(); // FIXME, see unlock_kernel above
 	return err;
 
 	{ void *useme = show_pending; useme = useme; }
