@@ -132,6 +132,13 @@ then
 fi
 
 
+# Kill emulators if more than 10 minutes pass during shutdown
+# They haven't been dying properly
+( sleep 600 ; kill -9 $qemu_pid ) & killer=$!
+if [ "x$qemu2_pid" != "x" ] ; then
+  ( sleep 600 ; kill -9 $qemu2_pid ) & killer2=$!
+fi
+
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
 if [ "x$IPADDR2" != "x" ] ; then
@@ -149,7 +156,14 @@ kill -0 ${qemu_pid} && kill -9 ${qemu_pid}
 
 if [ "x$qemu2_pid" != "x" ] ; then
   time wait ${qemu2_pid} || retval=$?
-  kill -0 ${qemu2_pid} && kill -9 ${qemu2_pid}
+  kill -0 ${qemu2_pid} && kill -14 ${qemu2_pid}
+fi
+
+
+# clean up the 10 minute shutdown killers
+kill -0 $killer && kill -9 $killer
+if [ "x$killer2" != "x" ] ; then
+  kill -0 && kill -9 $killer2
 fi
 
 rm -rf ${tmpdir}

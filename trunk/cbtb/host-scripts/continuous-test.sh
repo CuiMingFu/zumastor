@@ -8,13 +8,13 @@
 # install revision, fire off a new round of tests.
 
 installrev=''
-if [ -L installrev ] ; then
-  installrev=`readlink installrev`
+if [ -L ${HOME}/installrev ] ; then
+  installrev=`readlink ${HOME}/installrev`
 fi
   
 testrev=''
-if [ -L testrev ] ; then
-  testrev=`readlink testrev`
+if [ -L ${HOME}/testrev ] ; then
+  testrev=`readlink ${HOME}/testrev`
 fi
     
 if [ "x$installrev" = "x$testrev" ] ; then
@@ -24,15 +24,28 @@ if [ "x$installrev" = "x$testrev" ] ; then
   sleep 300
   exec $0
 fi
+
+if [ "x$FAILED_TEST_REV" = "x$installrev" ] ; then
+  # if the last install test failed, FAILED_TEST_REV was exported
+  # before this script was rerun, and if installrev still points to the
+  # same revision number, continue waiting rather than trying to restart.
+  # Intervention (such as a build-system reboot) is required to re-test
+  # the same version.
+  sleep 300
+  exec $0
+fi
           
           
 mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
+biabam=/usr/bin/biabam
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
 repo="${HOME}/zumastor-tests"
-top="${HOME}"
+export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
+
+summary=`mktemp`
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
@@ -49,16 +62,48 @@ fi
 
 pushd ${repo}
 
-# build and test the last successfully install revision
+# build and test the last successfully installed revision
 svn update -r $installrev
 
-testlog=`mktemp`
-testret=-1
+testret=0
 
-export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
-SVNREV=$installrev time timeout -14 7200 ${HOME}/runtests.sh >>${testlog} 2>&1
-testret=$?
-echo continuous runtests returned $testret
+pushd 1
+for f in *-test.sh
+do
+  # timeout any test that runs for more than an hour
+  
+  testlog=`mktemp`
+  ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  files="$testlog $files"
+  testrc=$?
+  if [ $testrc -eq 0 ]
+  then
+    echo PASS $f >>$summary
+  else
+    echo runtests $f testrc=${testrc}
+    echo FAIL $f >>$summary
+    testret=$testrc
+  fi
+done
+popd
+
+pushd 2
+for f in *-test.sh
+do
+  testlog=`mktemp`
+  ${TUNBR} ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  testrc=$?
+  files="$testlog $files"
+  if  [ $testrc -eq 0 ]
+  then
+    echo PASS $f >>$summary
+  else
+    testret=$testrc
+    echo runtests $f testrc=${testrc}
+    echo FAIL $f >>$summary
+  fi
+done
+popd
 
 popd
     
@@ -67,7 +112,6 @@ popd
 # possibly different failure address.
 if [ $testret -eq 0 ]; then
   subject="zumastor r$installrev test success"
-  files="$testlog"
   email="${email_success}"
 
   # creating this symlink only on success will cause the test step to
@@ -78,14 +122,15 @@ if [ $testret -eq 0 ]; then
 
 else
   subject="zumastor r$installrev test failure $testret"
-  files="$testlog"
   email="${email_failure}"
+  export FAILED_TEST_REV=$installrev
 fi
 
 
 # send $subject and $files to $email
 if [ -x ${mailto} ] ; then
   (
+    cat $summary
     for f in $files
     do
       echo '~*'
@@ -94,16 +139,27 @@ if [ -x ${mailto} ] ; then
       echo text/plain
     done
   ) | ${mailto} -s "${subject}" ${email}
+
+elif [ -x ${biabam} ] ; then
+  bfiles=`echo $files | tr ' ' ','`
+  cat $summary | ${biabam} $bfiles -s "${subject}" ${email}
+
 elif [ -x ${sendmail} ] ; then
   (
     echo "Subject: " $subject
     echo
+    cat $summary
     for f in $files
     do
+      echo
+      echo $f
+      echo "------------------"
       cat $f
     done
   ) | ${sendmail} ${email}
 fi
+
+rm -f $summary $files
 
 # loop and reload the script
 sleep 300
