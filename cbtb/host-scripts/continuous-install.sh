@@ -29,6 +29,7 @@ fi
 
 mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
+biabam=/usr/bin/biabam
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
@@ -43,20 +44,18 @@ export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
 export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
-pushd ${repo}
+pushd ${BUILDDIR}
 
 # build and test the current working directory packages
 installlog=`mktemp`
 installret=-1
 
 rm -f ${diskimg}
-pushd cbtb/host-scripts
 time ${TUNBR} \
   timeout -14 7200 \
   ${HOME}/zuma-dapper-i386.sh >${installlog} 2>&1
 installret=$?
 echo continuous zuma-dapper-i386 returned $installret
-popd
 
 popd
 
@@ -89,6 +88,11 @@ if [ -x ${mailto} ] ; then
       echo text/plain
     done
   ) | ${mailto} -s "${subject}" ${email}
+
+elif [ -x ${biabam} ] ; then
+  bfiles=`echo $files | tr ' ' ','`
+  cat $summary | ${biabam} $bfiles -s "${subject}" ${email}
+
 elif [ -x ${sendmail} ] ; then
   (
     echo "Subject: $subject"

@@ -11,25 +11,27 @@
 
 set -e
 
-KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' ../../KernelVersion`
+KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' ../KernelVersion`
 if [ "x$KERNEL_VERSION" = "x" ] ; then
   echo "Suspect KernelVersion file"
   exit 1
 fi
-VERSION=`awk '/[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' ../../Version`
+VERSION=`awk '/[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' ../Version`
 if [ "x$VERSION" = "x" ] ; then
   echo "Suspect Version file"
   exit 1
 fi
 if [ "x$SVNREV" = "x" ] ; then
+  pushd ..
   SVNREV=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+  popd
 fi
 ARCH=i386
 DEBVERS="${VERSION}-r${SVNREV}"
 KVERS="${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0"
 
-SSH='time ssh -o StrictHostKeyChecking=no'
-SCP='time timeout -14 3600 scp -o StrictHostKeyChecking=no'
+SSH='ssh -o StrictHostKeyChecking=no'
+SCP='timeout -14 1800 scp -o StrictHostKeyChecking=no'
 # CMDTIMEOUT='time timeout -14 120'
 # KINSTTIMEOUT='time timeout -14 1200'
 # SHUTDOWNTIMEOUT='time timeout -14 300'
@@ -51,16 +53,15 @@ diskimgdir=${HOME}/testenv
 tftpdir=/tftpboot
 qemu_img=qemu-img  # could be kvm, kqemu version, etc.
 qemu_i386=qemu  # could be kvm, kqemu version, etc.
-rqemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
+rqemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot
 VIRTHOST=192.168.23.1
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
 IMAGE=zuma-dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-BUILDSRC=../../build
 
 if [ "x$DISKIMG" = "x" ] ; then
-  DISKIMG=${IMAGEDIR}/hda.img
+  DISKIMG=./hda.img
 fi
   
 SERIAL=${IMAGEDIR}/serial
@@ -73,7 +74,7 @@ fi
 
 if [ "x$TEMPLATEIMG" = "x" ] ; then
 
-  TEMPLATEIMG=${BUILDSRC}/dapper-i386.img
+  TEMPLATEIMG=./dapper-i386.img
 
   if [ ! -f ${TEMPLATEIMG} ] ; then
 
@@ -118,10 +119,10 @@ ${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
 # copy the debs that were built in the build directory
 # onto the new zuma template instance
 for f in \
-    ${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.deb \
-    ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.deb \
-    ${BUILDSRC}/kernel-headers-${KVERS}_${ARCH}.deb \
-    ${BUILDSRC}/kernel-image-${KVERS}_${ARCH}.deb
+    ddsnap_${DEBVERS}_${ARCH}.deb \
+    zumastor_${DEBVERS}_${ARCH}.deb \
+    kernel-headers-${KVERS}_${ARCH}.deb \
+    kernel-image-${KVERS}_${ARCH}.deb
 do
   ${SCP} $f root@${IPADDR}:/tmp || retval=$?
 done
@@ -133,6 +134,10 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/ddsnap_${DEBVERS}_${ARCH}.deb |
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_${DEBVERS}_${ARCH}.deb || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm /tmp/*.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
+
+# temporary hack before going to LABEL= or UUID=
+${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /boot/grub/menu.lst' || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /etc/fstab' || retval=$?
 
 # halt the new image, and wait for qemu to exit
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff

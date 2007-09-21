@@ -10,6 +10,7 @@
 
 mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
+biabam=/usr/bin/biabam
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
@@ -70,6 +71,11 @@ if [ -x ${mailto} ] ; then
       echo text/plain
     done
   ) | ${mailto} -s "${subject}" ${email}
+
+elif [ -x ${biabam} ] ; then
+  bfiles=`echo $files | tr ' ' ','`
+  cat $summary | ${biabam} $bfiles -s "${subject}" ${email}
+
 elif [ -x ${sendmail} ] ; then
   (
     echo "Subject: " $subject
