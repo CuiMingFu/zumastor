@@ -49,7 +49,7 @@
 #define SB_DIRTY 1
 #define SB_BUSY 2
 #define SB_SELFCHECK 4
-#define SB_SECTOR 8
+#define SB_SECTOR 8			/* Sector where superblock lives.     */
 #define SB_MAGIC { 't', 'e', 's', 't', 0xdd, 0x07, 0x06, 0x04 } /* date of latest incompatible sb format */
 /*
  * Snapshot store format revision history
@@ -234,7 +234,9 @@ struct disksuper
 	} snaplist[MAX_SNAPSHOTS]; // entries are contiguous, in creation order
 	u32 snapshots;
 	u32 etree_levels;
-	s32 journal_base, journal_next, journal_size;
+	s32 journal_base;		/* Block offset of start of journal.  */
+	s32 journal_next;
+	s32 journal_size;
 	u32 sequence;
 	struct allocspace_img
 	{
@@ -249,9 +251,10 @@ struct disksuper
 
 struct allocspace { // everything bogus here!!!
 	struct allocspace_img *asi;
-	u32 allocsize;
-	u32 chunk_sectors_bits;
-	u32 alloc_per_node; /* only for metadata */
+	u32 allocsize;			/* Size of a chunk in bytes.          */
+	u32 chunk_sectors_bits;		/* Mask of # sectors in a chunk.      */
+	u32 alloc_per_node;		/* Number of entries per tree node    */
+					/* (metadata only).                   */
 };
 
 struct superblock
@@ -936,6 +939,10 @@ static int init_allocation(struct superblock *sb)
 
 	unsigned reserved = meta_bitmap_base_chunk + sb->metadata.asi->bitmap_blocks + sb->image.journal_size;
 
+	/*
+	 * If we're using combined snapshot and metadata, we don't need to
+	 * compute everything again.
+	 */
 	if (!combined(sb)) {
 		u64 snap_bitmap_base_chunk = (sb->metadata.asi->bitmap_base >> sb->metadata.chunk_sectors_bits) + sb->metadata.asi->bitmap_blocks; // !!! expressing bitmap_base in sectors instead of chunks is brain damage
 
@@ -947,7 +954,7 @@ static int init_allocation(struct superblock *sb)
 
 	sb->metadata.asi->freechunks = sb->metadata.asi->chunks - reserved;
 
-	// !!! express journal_base in chunks, not sectors
+	// !!! express journal_base in blocks, not sectors
 	sb->image.journal_base = sb->metadata.asi->bitmap_base 
 		+ ((sb->metadata.asi->bitmap_blocks +
 		    (!combined(sb) ? sb->snapdata.asi->bitmap_blocks : 0)) 
@@ -2293,6 +2300,15 @@ static void show_locks(struct superblock *sb)
 }
 # endif
 
+/*
+ * If the passed chunk is locked, append a new node to the lock's wait list,
+ * allocating a new "pending" structure if necessary.  There is one "pending"
+ * structure per client I/O, to which all affected waitlist nodes point.
+ * The holdcount indicates the number of lock waitlist nodes that point to
+ * it, since more than one waitlist node can point to the same "pending"
+ * structure if the chunk has been locked by more than one client or more
+ * than once by a client.
+ */
 static void waitfor_chunk(struct superblock *sb, chunk_t chunk, struct pending **pending)
 {
 	struct snaplock *lock;
@@ -2317,6 +2333,11 @@ static void waitfor_chunk(struct superblock *sb, chunk_t chunk, struct pending *
 #endif
 }
 
+/*
+ * Lock a chunk.  If the lock structure doesn't exist for the chunk, create
+ * it.  In any event, create a new hold structure and add it to the lock
+ * hold list.
+ */
 static void readlock_chunk(struct superblock *sb, chunk_t chunk, struct client *client)
 {
 	struct snaplock **bucket = &sb->snaplocks[snaplock_hash(sb, chunk)];
@@ -2980,6 +3001,11 @@ static int incoming(struct superblock *sb, struct client *client)
 					trace(warn("read origin %Lx", chunk););
 					addto_response(&org, chunk);
 					trace(printf("locking chunk %Lx\n", chunk););
+					/*
+					 * Lock the chunk so that later origin
+					 * writes can't change it out from
+					 * under us.
+					 */
 					readlock_chunk(sb, chunk, client);
 				}
 			}

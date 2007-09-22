@@ -228,6 +228,17 @@ int monitor_setup(char const *sockname, int *listenfd)
 	return 0;
 }
 
+/*
+ * listenfd is the socket upon which we listen for new connections from
+ * clients.
+ * getsigfd is a pipe created in daemonize() that allows us to catch the
+ * appropriate signals.
+ * pollvec[] has the array of fds we're polling.  [0] is listenfd, [1] is
+ * getsigfd.  The rest (up to 'clients + 2') are the various clients from
+ * which we have accepted connections.  When polling, we can tell which
+ * client we're talking to by virtue of the fd that had the event, in terms
+ * of its offset in pollvec[].
+ */
 int monitor(int listenfd, struct context *context, const char *logfile, int getsigfd)
 {
 	unsigned maxclients = 100, clients = 0, others = 2;
@@ -283,7 +294,11 @@ int monitor(int listenfd, struct context *context, const char *logfile, int gets
                         }
                 }
 
-		/* New connection? */
+		/*
+		 * Accept a new connection.  Allocate a new client; stuff that
+		 * into clientvec[] and the new fd into pollvec[] so we can
+		 * identify them appropriately below.
+		 */
 		if (pollvec[0].revents) {
 			struct sockaddr_in addr;
 			int addr_len = sizeof(addr), sock;
