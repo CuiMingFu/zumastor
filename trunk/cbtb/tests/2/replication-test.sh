@@ -73,7 +73,10 @@ zumastor status --usage
 echo ok 6 - replication manually kicked off from master
 
 # reasonable wait for these small volumes to finish the initial replication
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
 sleep 120
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
 zumastor snapshot testvol hourly 
@@ -87,6 +90,14 @@ hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 # that it is there
 sleep 60
 rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile`
+
+zumastor status --usage
+${SSH} root@${slave} zumastor status --usage
+
+sleep 300
+
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+
 
 if [ "$rhash" = "$hash" ] ; then
   echo ok 8 - origin and slave testfiles are in sync
