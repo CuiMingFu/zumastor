@@ -749,7 +749,10 @@ void upload_locks(struct devinfo *info)
 	}
 	outbead(info->sock, FINISH_UPLOAD_LOCK, struct {});
 	spin_lock_irqsave(&info->end_io_lock, irqflags);
-	/* if worker not ready, there should not be any new bios added to locked list */
+	/*
+	 * If the worker's not ready, don't move locked bios to the releases
+	 * list.
+	 */
 	if (worker_ready(info)) {
 		list_for_each_safe(entry, tmp, &info->locked){
 			hook = list_entry(entry, struct hook, list);
