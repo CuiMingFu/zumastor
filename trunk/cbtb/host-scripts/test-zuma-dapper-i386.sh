@@ -163,7 +163,7 @@ fi
 # clean up the 10 minute shutdown killers
 kill -0 $killer && kill -9 $killer
 if [ "x$killer2" != "x" ] ; then
-  kill -0 && kill -9 $killer2
+  kill -0 $killer2 && kill -9 $killer2
 fi
 
 rm -rf ${tmpdir}
