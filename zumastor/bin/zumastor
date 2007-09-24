@@ -331,7 +331,7 @@ function run_target {
 	local -r period_file=$target_dir/period
 	local -r log=${LOGS}/$vol/target-${host}.log
 	local -r master_fifo=$VOLUMES/$vol/master/trigger
-	local snap="" period starttime newperiod delay
+	local snap="" period starttime newperiod delay status
 
 	[ -r $fifo ] && [ -p $fifo ] || { log "target replication trigger '$fifo' is missing" $log; return 1; }
 
@@ -365,10 +365,11 @@ function run_target {
 		starttime=$(now)
 
 		replicate_snapshot $vol $host $snap >> $log 2>&1
-		if [[ $? -eq 0 ]]; then #success 
+		status=$?
+		if [[ $status -eq 0 ]]; then #success 
 			log "successfully replicated snapshot $snap" $log
 			snap=""
-		elif [[ $? -eq 13 ]]; then
+		elif [[ $status -eq 13 ]]; then
 			log "successfully replicated resumed snapshot" $log
 			drop_snapshot $vol $snap >> $log 2>&1
 			snap=""
