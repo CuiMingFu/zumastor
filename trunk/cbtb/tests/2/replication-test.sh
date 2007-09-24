@@ -106,6 +106,4 @@ else
   exit 8
 fi
 
-kill $tmoutpid
-
 exit 0
