@@ -104,9 +104,10 @@ fi
 popd
 
 ${SETUPTIMEOUT} ${SSH} root@${IPADDR} <<EOF
-lvcreate --name home --size 5G sysvg
-mke2fs /dev/sysvg/home
-mount /dev/sysvg/home /home
+lvcreate --name swap --size 5G sysvg
+mkswap /dev/sysvg/swap
+swapon /dev/sysvg/swap
+mount -t tmpfs -o size=4G tmpfs /home
 useradd build
 mkdir -p ~build/.ssh ~build/zumastor/build
 cp ~/.ssh/authorized_keys ~build/.ssh/
