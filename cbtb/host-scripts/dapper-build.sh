@@ -178,8 +178,8 @@ if [ $rc -eq 0 ] ; then
 fi
 
 # tell the instance to start shutting itself off.  This sometimes eventually
-# results in the qemu process exitting
-${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
+# results in the qemu process exitting.  Kill some other way if poweroff fails.
+${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff || true
 
 # tell the qemu instance to quit directly.  This should always work, and clean
 # up sockets, and be quicker, but if it doesn't the above should also cause
