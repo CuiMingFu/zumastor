@@ -85,6 +85,12 @@ echo ok 7 - testfile written, synced, and snapshotted
 
 hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 
+#
+# schedule an immediate replication cycle
+#
+zumastor replicate testvol slave
+
+
 # give it a minute to replicate (on a 30 second cycle), and verify
 # that it is there.  If not, look at the target volume, wait 5 minutes,
 # and look again
