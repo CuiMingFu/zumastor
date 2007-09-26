@@ -25,8 +25,6 @@ slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 
-retval=0
-
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
@@ -74,29 +72,27 @@ echo ok 6 - replication manually kicked off from master
 
 # reasonable wait for these small volumes to finish the initial replication
 ${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
-sleep 120
-${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
 zumastor snapshot testvol hourly 
 sleep 2
 zumastor status --usage
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+${SSH} root@${slave} zumastor status --usage
+
 echo ok 7 - testfile written, synced, and snapshotted
 
 hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 
 # give it a minute to replicate (on a 30 second cycle), and verify
-# that it is there
+# that it is there.  If not, look at the target volume, wait 5 minutes,
+# and look again
 sleep 60
-rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile`
-
-zumastor status --usage
-${SSH} root@${slave} zumastor status --usage
-
-sleep 300
-
-${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
+  ( ${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol ; \
+    sleep 300 ; \
+    ${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol )
 
 
 if [ "$rhash" = "$hash" ] ; then
