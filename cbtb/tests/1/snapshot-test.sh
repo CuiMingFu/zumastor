@@ -12,7 +12,7 @@
 set -e
 
 # Terminate test in 10 minutes.  Read by test harness.
-TIMEOUT=600
+TIMEOUT=1200
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5

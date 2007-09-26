@@ -45,7 +45,8 @@ email_success="zumastor-buildd@google.com"
 repo="${HOME}/zumastor-tests"
 export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
 
-summary=`mktemp`
+logdir=`mktemp -d`
+summary=${logdir}/summary
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
@@ -68,14 +69,14 @@ svn update -r $installrev
 testret=0
 
 pushd 1
-for f in *-test.sh
+for f in *.sh
 do
   # timeout any test that runs for more than an hour
+  testlog=${logdir}/$f.log
   
-  testlog=`mktemp`
   ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
-  files="$testlog $files"
   testrc=$?
+  files="$testlog $files"
   if [ $testrc -eq 0 ]
   then
     echo PASS $f >>$summary
@@ -88,9 +89,9 @@ done
 popd
 
 pushd 2
-for f in *-test.sh
+for f in *.sh
 do
-  testlog=`mktemp`
+  testlog=${logdir}/$f.log
   ${TUNBR} ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
@@ -107,9 +108,8 @@ popd
 
 popd
     
-# send full logs on success for use in comparisons.
-# send just the failing log on any failure with subject and to the
-# possibly different failure address.
+# send summary, logs, and a success or failure subject to the
+# success or failure mailing lists
 if [ $testret -eq 0 ]; then
   subject="zumastor r$installrev test success"
   email="${email_success}"
@@ -160,6 +160,7 @@ elif [ -x ${sendmail} ] ; then
 fi
 
 rm -f $summary $files
+rmdir ${logdir}
 
 # loop and reload the script
 sleep 300
