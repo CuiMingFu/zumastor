@@ -11,7 +11,7 @@
 
 set -e
 
-TIMEOUT=300
+TIMEOUT=1200
 
 echo "1..2"
 rc=0
