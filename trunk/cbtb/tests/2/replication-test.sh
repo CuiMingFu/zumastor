@@ -90,11 +90,16 @@ hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 # and look again
 sleep 60
 rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
-  ( ${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol ; \
-    sleep 300 ; \
-    mount ; \
-    df ; \
-    ${SSH} root@${slave} ls -lR /var/run/zumastor/mount/ )
+  ${SSH} root@${slave} <<EOF
+    mount
+    df
+    ls -lR /var/run/zumastor/mount/
+    tail -200 /var/log/syslog
+    sleep 300
+    mount
+    df
+    ls -lR /var/run/zumastor/mount/
+EOF
 
 
 if [ "$rhash" = "$hash" ] ; then
