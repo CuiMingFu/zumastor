@@ -530,6 +530,10 @@ function define_target {
 
 	if [[ ! -e $path ]]; then
 		new=1
+		if [[ $(($(used_snapshots $vol) + $SNAPSHOTS_PER_TARGET)) -gt $MAX_SNAPSHOTS ]]; then
+			echo error: target would exceed volume snapshot limit of $MAX_SNAPSHOTS
+			return 1
+		fi
 		mkdir $path || return 1
 		mkfifo $path/trigger || return 1
 	fi
@@ -891,7 +895,7 @@ define)
 		define_target $vol $host $port $period
 		exit $? ;;
 	master)
-		declare args arg kind count
+		declare args arg kind count delta=0
 		declare -a token value
 
 		declare name="$0 $1 $2"
@@ -935,15 +939,25 @@ define)
 
 		shift # remove --
 		[[ $# = 1 ]] || { echo "usage: $name <vol> [Options]"; exit 2; }
-
 		declare vol=$1
 
 		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 
+		# check if we attempting to violate the snapshot limit
+		for (( i=0; i < ${#token[@]}; i++)) do
+			kind=${token[i]}
+			count=${value[i]}
+			let delta+=$(($count - $(cat $VOLUMES/$vol/master/schedule/$kind 2>/dev/null || echo 0)))
+		done
+		if [[ $(($(used_snapshots $vol) + $delta)) -gt $MAX_SNAPSHOTS ]]; then
+			echo error: master configuration would exceed snapshots limit of $MAX_SNAPSHOTS
+			exit 3
+		fi
+
 		if [ ! -e $VOLUMES/$vol/master ]; then
 			define_master $vol || exit $?
 		fi
-
+		
 		for (( i=0; i < ${#token[@]}; i++)) do
 			set_master_schedule $vol ${token[i]} ${value[i]} || exit $?
 		done

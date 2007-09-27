@@ -25,6 +25,11 @@ declare -r SSH_COMMAND=$(cat $CONFIG/ssh_command)
 # the other.  We do this rather than trying to resolve hostnames.
 declare -r MYHOSTNAME=`uname -n`
 
+# constants for determining if a configurtion is valid
+declare -r MAX_SNAPSHOTS=64
+declare -r SNAPSHOTS_PER_TARGET=2 # hold and send
+declare -r SNAPSHOTS_FOR_SOURCE=4 # only three are necessary if do things in the right order
+
 declare yes_to_all
 function prompt_continue {
 	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
@@ -343,4 +348,17 @@ function touch_atomic {
 	touch $tmpfile
 	ln $tmpfile $file 2>/dev/null || { rm $tmpfile; return 1; }
 	rm $tmpfile
+}
+
+function used_snapshots {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local file num total
+
+	total=$(($SNAPSHOTS_PER_TARGET * $(ls $VOLUMES/$vol/targets 2>/dev/null|wc -l))) # two snapshots per downstream target
+	[[ -e $VOLUMES/$vol/source ]] && total=$(($total + $SNAPSHOTS_FOR_SOURCE))
+	for file in $VOLUMES/$vol/master/schedule/*; do
+		[[ -e $file ]] && read num <$file && [[ $num -gt 0 ]] && total=$(($total + $num))
+	done
+	echo $total
 }
