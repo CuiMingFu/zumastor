@@ -334,6 +334,9 @@ int monitor(int listenfd, struct context *context, const char *logfile, int gets
 						if (context->local.address)
 							free(context->local.address);
 						memset(&context->local, 0, sizeof(struct server));
+						/* exit now to prevent any potential IO hanging */
+						/* FIXME: we would fail over the server here if this was a cluster */
+						exit(0);
 					}
 					close(client->sock);
 					free(client);
