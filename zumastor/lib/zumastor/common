@@ -172,10 +172,9 @@ function stop_volume {
 	local -r server=${SERVERS}/$vol
 	local -r agentlog=${LOGS}/${vol}/agent.log
 	local -r serverlog=${LOGS}/${vol}/server.log
-	local -r list=$(ddsnap status $server --list)
 	local -r pidfile=${RUNPATH}/${vol}-server.pid
 
-	for id in $list; do
+	for id in $(ddsnap status $server --list) $(get_managed_snapshots $vol); do
 		umount_remove_device $vol $id || return 1
 	done
 	umount_remove_device $vol -1 || return 1
