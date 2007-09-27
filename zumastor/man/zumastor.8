@@ -46,7 +46,7 @@ zumastor \- block level snapshot and replication
 .IP \fBdefine\ \fBvolume\fP 
 .I volume_name snapshot_device origin_device \fP[\fB-i\fP|\fB--initialize\fP] [\fB-m\fP|\fB--metadev\fP \fImetadata_device\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP]
 .br
-Define a new zumastor volume named \fIvolume_name\fP based on the underlying volumes \fIorigin_device\fP and \fIsnapshot_device\fP.  If specified, the \fImetadata_device\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the newly created volume data will be overwritten with zeros, overwriting all data on the origin device. The snapshot block and chunk sizes can be specified with the \fBblocksize\fP and \fBchunksize\fP options, respectively. They may only diff if separate metadata and snapshot devices are specified.
+Define a new zumastor volume named \fIvolume_name\fP based on the underlying volumes \fIorigin_device\fP and \fIsnapshot_device\fP.  If specified, the \fImetadata_device\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the newly created volume data will be overwritten with zeros, overwriting all data on the origin device. The snapshot block and chunk sizes can be specified with the \fBblocksize\fP and \fBchunksize\fP options, respectively. They may only differ if separate metadata and snapshot devices are specified.
 .IP \fBdefine\ \fBmaster\fP
 .I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
 .br
