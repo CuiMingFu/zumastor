@@ -370,7 +370,7 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 		kmem_cache_free(end_io_cache, hook);
 	else if (info->dont_switch_lists == 0)
 		list_move(&hook->list, &info->releases);
-	spin_unlock_irqsave(&info->end_io_lock, irqflags);
+	spin_unlock_irqrestore(&info->end_io_lock, irqflags);
 	up(&info->more_work_sem);
 
 	return bio->bi_end_io(bio, done, error);
