@@ -359,9 +359,10 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 {
 	struct hook *hook = bio->bi_private;
 	struct devinfo *info = hook->info;
+	unsigned long irqflags;
 
 	trace(warn("sector %Lx", (long long)hook->sector);)
-	spin_lock(&info->end_io_lock);
+	spin_lock_irqsave(&info->end_io_lock, irqflags);
 	bio->bi_end_io = hook->old_end_io;
 	bio->bi_private = hook->old_private;
 	hook->old_end_io = NULL;
@@ -369,7 +370,7 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 		kmem_cache_free(end_io_cache, hook);
 	else if (info->dont_switch_lists == 0)
 		list_move(&hook->list, &info->releases);
-	spin_unlock(&info->end_io_lock);
+	spin_unlock_irqsave(&info->end_io_lock, irqflags);
 	up(&info->more_work_sem);
 
 	return bio->bi_end_io(bio, done, error);
