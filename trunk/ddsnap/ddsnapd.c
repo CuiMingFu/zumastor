@@ -234,26 +234,26 @@ struct disksuper
 	} snaplist[MAX_SNAPSHOTS]; // entries are contiguous, in creation order
 	u32 snapshots;
 	u32 etree_levels;
-	s32 journal_base;		/* Block offset of start of journal.  */
-	s32 journal_next;
-	s32 journal_size;
-	u32 sequence;
+	s32 journal_base;		/* Sector offset of start of journal. */
+	s32 journal_next;		/* Next chunk of journal to write.    */
+	s32 journal_size;		/* Size of the journal in chunks.     */
+	u32 sequence;			/* Latest commit block sequence num.  */
 	struct allocspace_img
 	{
-		sector_t bitmap_base;
+		sector_t bitmap_base;	/* Allocation bitmap starting sector. */
 		sector_t chunks; /* if zero then snapdata is combined in metadata space */
 		sector_t freechunks;
-		chunk_t  last_alloc;
-		u64      bitmap_blocks;
-		u32      allocsize_bits;
+		chunk_t  last_alloc;	/* Last chunk allocated.              */
+		u64      bitmap_blocks;	/* Num blocks in allocation bitmap.   */
+		u32      allocsize_bits; /* Bits of number of bytes in chunk. */
 	} metadata, snapdata;
 };
 
 struct allocspace { // everything bogus here!!!
-	struct allocspace_img *asi;
+	struct allocspace_img *asi;	/* Points at image.metadata/snapdata. */
 	u32 allocsize;			/* Size of a chunk in bytes.          */
-	u32 chunk_sectors_bits;		/* Mask of # sectors in a chunk.      */
-	u32 alloc_per_node;		/* Number of entries per tree node    */
+	u32 chunk_sectors_bits;	     /* Bits of number of sectors in a chunk. */
+	u32 alloc_per_node;		/* Number of entries per tree node.   */
 					/* (metadata only).                   */
 };
 
@@ -321,6 +321,10 @@ struct commit_block
 	u64 sector[];
 } PACKED;
 
+/*
+ * Given journal offset i, return the actual sector number of that block,
+ * suitable for bread()ing.
+ */
 static sector_t journal_sector(struct superblock *sb, unsigned i)
 {
 	return sb->image.journal_base + (i << sb->metadata.chunk_sectors_bits);
@@ -359,6 +363,9 @@ static struct buffer *jgetblk(struct superblock *sb, unsigned i)
 	return getblk(sb->metadev, journal_sector(sb, i), sb->metadata.allocsize);
 }
 
+/*
+ * Read the journal block at the given offset.
+ */
 static struct buffer *jread(struct superblock *sb, unsigned i)
 {
 	return bread(sb->metadev, journal_sector(sb, i), sb->metadata.allocsize);
@@ -923,6 +930,17 @@ static inline void clear_bitmap_bit(unsigned char *bitmap, unsigned bit)
 	bitmap[bit >> 3] &= ~(1 << (bit & 7));
 }
 
+/*
+ * Round "chunks" up to the next even block boundary based on the number of
+ * bits in a block.  That is, since the bitmap must be big enough to
+ * accommodate "chunks" number of chunks, there must be that number of bits
+ * in the bitmap.  Since we're allocating the bitmap in terms of integral
+ * blocks, we must round any fractional number of blocks up to the next
+ * higher block boundary.
+ *
+ * This could also be written to round up based on the number of bytes in
+ * a block, rather than the number of bits.
+ */
 static u64 calc_bitmap_blocks(struct superblock *sb, u64 chunks)
 {
 	unsigned chunkshift = sb->metadata.asi->allocsize_bits;
