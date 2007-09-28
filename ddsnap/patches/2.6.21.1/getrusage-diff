@@ -73,7 +73,7 @@
  	INIT_LIST_HEAD(&sig->cpu_timers[1]);
  	INIT_LIST_HEAD(&sig->cpu_timers[2]);
 --- /home/fmayhar/Static/linux-2.6.21.1/kernel/exit.c	2007-04-27 14:49:26.000000000 -0700
-+++ linux-2.6.21.1/kernel/exit.c	2007-09-12 11:12:21.000000000 -0700
++++ linux-2.6.21.1/kernel/exit.c	2007-09-26 11:17:51.000000000 -0700
 @@ -113,6 +113,8 @@ static void __exit_signal(struct task_st
  		sig->nvcsw += tsk->nvcsw;
  		sig->nivcsw += tsk->nivcsw;
@@ -87,14 +87,14 @@
  	if (tsk->mm) {
  		update_hiwater_rss(tsk->mm);
  		update_hiwater_vm(tsk->mm);
-+		BUG_ON(tsk->maxrss != 0);
 +		/*
 +		 * Store the hiwater_rss in a task field, since when we need
 +		 * it in __exit_signal() the mm structure is gone; we can't
 +		 * stuff it in the signal structure since then we would be
 +		 * racing with wait_task_zombie().
 +		 */
-+		tsk->maxrss = tsk->mm->hiwater_rss;
++		if (tsk->maxrss < tsk->mm->hiwater_rss)
++			tsk->maxrss = tsk->mm->hiwater_rss;
  	}
  	group_dead = atomic_dec_and_test(&tsk->signal->live);
  	if (group_dead) {
@@ -107,7 +107,7 @@
 +		 * waited-for children.  Don't accumulate the RSS since, one,
 +		 * other operating systems (FreeBSD, AIX) do it this way and,
 +		 * two, the cumulative RSS of a long-lived process with lots
-+		 * of sequential child process would be meaningless.
++		 * of sequential child processes would be meaningless.
 +		 */
 +		if (sig->cmaxrss > psig->cmaxrss)
 +			psig->cmaxrss = sig->cmaxrss;
@@ -117,7 +117,7 @@
  	}
  
 --- /home/fmayhar/Static/linux-2.6.21.1/kernel/sys.c	2007-04-27 14:49:26.000000000 -0700
-+++ linux-2.6.21.1/kernel/sys.c	2007-09-12 11:05:17.000000000 -0700
++++ linux-2.6.21.1/kernel/sys.c	2007-09-26 11:40:39.000000000 -0700
 @@ -2021,6 +2021,7 @@ static void k_getrusage(struct task_stru
  			r->ru_nivcsw = p->signal->cnivcsw;
  			r->ru_minflt = p->signal->cmin_flt;
@@ -126,13 +126,25 @@
  
  			if (who == RUSAGE_CHILDREN)
  				break;
-@@ -2042,11 +2043,15 @@ static void k_getrusage(struct task_stru
+@@ -2042,11 +2043,27 @@ static void k_getrusage(struct task_stru
  				r->ru_majflt += t->maj_flt;
  				t = next_thread(t);
  			} while (t != p);
-+			update_hiwater_rss(p->mm);
-+			if (r->ru_maxrss < p->mm->hiwater_rss)
-+				r->ru_maxrss = p->mm->hiwater_rss;
++			/*
++			 * If we were called from wait_task_zombie, p->mm
++			 * will be NULL.  Fortunately, in that case do_exit()
++			 * will have set the p->maxrss field, so use that
++			 * instead.
++			 */
++			if (p->mm != NULL) {
++				unsigned long maxrss = get_mm_rss(p->mm);
++
++				if (maxrss < p->mm->hiwater_rss)
++					maxrss = p->mm->hiwater_rss;
++				p->maxrss = maxrss;
++			}
++			if (r->ru_maxrss < p->maxrss)
++				r->ru_maxrss = p->maxrss;
  			break;
  
  		default:
@@ -161,3 +173,14 @@
  
    	cputime_t it_prof_expires, it_virt_expires;
  	unsigned long long it_sched_expires;
+@@ -1184,6 +1187,10 @@ static inline void put_task_struct(struc
+ #define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
+ #define used_math() tsk_used_math(current)
+ 
++#define tsk_restore_flags(p, pflags, mask) \
++	do {	(p)->flags &= ~(mask); \
++		(p)->flags |= ((pflags) & (mask)); } while (0)
++
+ #ifdef CONFIG_SMP
+ extern int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask);
+ #else
