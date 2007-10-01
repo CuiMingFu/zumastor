@@ -31,6 +31,7 @@
 #include <netdb.h> // gethostbyname2_r
 #include <popt.h>
 #include <sys/prctl.h>
+#include <sys/sysinfo.h>
 #include "dm-ddsnap.h"
 #include "buffer.h"
 #include "daemonize.h"
@@ -3920,7 +3921,15 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 		error("Invalid superblock\n");
 
 	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;	
-	init_buffers(bufsize, (1 << 27)); /* preallocate 128Mb of buffers */
+	unsigned prealloc_size = 1 << 27;
+	struct sysinfo info;
+	/* preallocate buffers as the minimum between 1/4 of physical RAM and 128MB */
+	if (!sysinfo(&info)) {
+		const u64 QUARTER_TOTAL_RAM = (u64)(info.totalram / 4) * (u64)info.mem_unit;
+		if (QUARTER_TOTAL_RAM < prealloc_size)
+			prealloc_size = QUARTER_TOTAL_RAM;
+	}
+	init_buffers(bufsize, prealloc_size);
 	
 	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &agentfd) < 0)
 		error("Could not setup snapshot server\n");
