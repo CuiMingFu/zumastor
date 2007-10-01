@@ -362,3 +362,12 @@ function used_snapshots {
 	done
 	echo $total
 }
+
+function num_snapshots {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local output
+
+	output=$(ddsnap status $SERVERS/$vol --list) || { echo "error getting snapshot list"; return 1; }
+	echo $output | wc -w
+}

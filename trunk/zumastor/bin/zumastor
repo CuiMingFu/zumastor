@@ -89,8 +89,8 @@ function new_snapshot {
 	num=${#snapshots[@]}
 	snapshots[$num]=$next
 
-	create_snapshot $vol $next
-	create_device $vol $next
+	create_snapshot $vol $next || { log "snapshot creation failed for $next"; return 1; }
+	create_device $vol $next || { log "device creation failed for $next"; return 1; }
 
 	[[ $kind == "/manual" ]] && return 0
 	mount_device $vol $next
@@ -315,6 +315,10 @@ function run_master {
 			new_target_snapshot $vol ${kind/target\//} >> $log 2>&1
 		else
 			new_snapshot $vol $kind >> $log 2>&1
+		fi
+		if [[ $(num_snapshots $vol) -ge $MAX_SNAPSHOTS ]]; then
+			# must have leaked snapshots.  TODO notify admin
+			log "error: snapshot limit reached, further progress not possible!"
 		fi
 	done &
 }
@@ -1196,8 +1200,7 @@ replicate)
 	;;
 status)
 	declare name="$0 $1"
-	declare showfull=""
-	declare showuse=0
+	declare showfull="" showuse=0 snapshots
 	declare usage="Usage: $0 status [<vol> [<snap>]] [--full] [--usage]"
 
 	shift 1
@@ -1229,12 +1232,16 @@ status)
 		pushd $VOLUMES >/dev/null
 		[[ `ls | wc -l` -gt 0 ]] && for vol in *; do
 			echo VOLUME $vol:
-			if [ $showuse -eq 1 ]; then
-				if [ -e $SERVERS/$vol ]; then
-					ddsnap status $SERVERS/$vol && echo Status: running || echo Status: failed
+			if [[ -e $SERVERS/$vol ]]; then
+				if snapshots=$(num_snapshots $vol); then
+					echo Status: running
+					[[ $snapshots -eq $MAX_SNAPSHOTS ]] && echo Warning: all $MAX_SNAPSHOTS snapshots exhausted!
+					[[ $showuse -eq 1 ]] && ddsnap status $SERVERS/$vol 
 				else
-					echo Status: not running
+					echo Status: failed
 				fi
+			else
+				echo Status: not running
 			fi
 			echo "Configuration:"
 			tree -Fx --noreport $showfull $VOLUMES/$vol
