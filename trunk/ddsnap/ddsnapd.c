@@ -987,6 +987,16 @@ static int init_allocation(struct superblock *sb)
 	     chunks, chunks << sb->snapdata.chunk_sectors_bits);
 
 	warn("Initializing %u bitmap block(s)", bitmaps);
+	/*
+	 * Initialize the allocation bitmap.  Mark all chunks free except
+	 * those we reserve for the superblock and the allocation bitmap
+	 * itself.  Note that the bitmap will likely take a fractional block
+	 * and indeed may also take a fractional byte.  In the latter case,
+	 * we cheat by using the whole byte but marking the last few chunks
+	 * (those past the end of the volume) as used.  They'll never be freed
+	 * so we don't have to worry about dealing with the partial byte in
+	 * alloc_chunk_from_range().
+	 */
 	unsigned i, sector = sb->metadata.asi->bitmap_base;
 	for (i = 0; i < bitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
 		struct buffer *buffer = getblk(sb->metadev, sector, sb->metadata.allocsize);
@@ -1056,30 +1066,70 @@ static void grab_chunk(struct superblock *sb, struct allocspace *as, chunk_t chu
 }
 #endif
 
-static chunk_t alloc_chunk_range(struct superblock *sb, struct allocspace *as, chunk_t chunk, chunk_t range)
+/*
+ * Allocate a single chunk out of a given range of chunks from the given
+ * allocation space.
+ *
+ * This computes the block in the allocation bitmap that contains the bit
+ * corresponding to the passed chunk as well as the offset to the byte that
+ * contains that bit and the offset within that byte of the bit itself.  It
+ * then scans the bitmap from that point to find a free chunk.  If it reaches
+ * the end of the bitmap without finding a free chunk it starts over from the
+ * beginning.  If it exhausts the range it's searching without finding a free
+ * chunk, return failure.
+ */
+static chunk_t alloc_chunk_from_range(struct superblock *sb, struct allocspace *as, chunk_t startchunk, chunk_t nchunks)
 {
-	unsigned bitmap_shift = sb->metadata.asi->allocsize_bits + 3, bitmap_mask = (1 << bitmap_shift ) - 1;
-	u64 blocknum = chunk >> bitmap_shift;
-	unsigned bit = chunk & 7, offset = (chunk & bitmap_mask) >> 3;
-	u64 length = (range + bit + 7) >> 3;
+	/*
+	 * Set up a useful few bits of information here:
+	 *	bitmap_shift - Conversion factor between bit and block offsets.
+	 *	bitmap_mask  - "Modulo" mask to get a bit offset within a
+	 *	               block.
+	 *	blocknum     - The bitmap block at which we're starting.
+	 *	offset       - The offset of the byte in that block with the
+	 *	               bit for the starting chunk.
+	 *	bit          - The bit offset of that bit within that byte.
+	 *	length       - How far, in bytes, that we're going to scan
+	 *	               within the allocation space.
+	 */
+	const unsigned bitmap_shift = sb->metadata.asi->allocsize_bits + 3;
+	const unsigned bitmap_mask = (1 << bitmap_shift ) - 1;
+	u64 blocknum = startchunk >> bitmap_shift;
+	unsigned offset = (startchunk & bitmap_mask) >> 3;
+	unsigned bit = startchunk & 7;
+	u64 length = (nchunks + bit + 7) >> 3;
 
 	while (1) {
 		struct buffer *buffer = snapread(sb, as->asi->bitmap_base + (blocknum << sb->metadata.chunk_sectors_bits));
 		if (!buffer)
 			return -1;
 		unsigned char c, *p = buffer->data + offset;
+		/*
+		 * Get number of bytes in the rest of the block and the
+		 * number of bytes we're actually going to scan.
+		 */
 		unsigned tail = sb->metadata.allocsize - offset, n = tail > length? length: tail;
 
 		trace(printf("search %u bytes of bitmap %Lx from offset %u\n", n, blocknum, offset););
 		// dump_buffer(buffer, 4086, 10);
 
+		/*
+		 * Scan this block for a free chunk.
+		 */
 		for (length -= n; n--; p++)
-			if ((c = *p) != 0xff) {
+			if ((c = *p) != 0xff) { /* Any free chunks in this byte? */
+				/* WARNING: Shadows 'bit' in outer block. */
 				int i, bit;
 				trace_off(printf("found byte at offset %u of bitmap %Lx = %hhx\n",
 					p - buffer->data, blocknum, c););
+				/*
+				 * Scan the byte for the chunk we found.
+				 */
 				for (i = 0, bit = 1;; i++, bit <<= 1)
+					/* Free chunk?  Return it! */
 					if (!(c & bit)) {
+						chunk_t chunk;
+
 						chunk = i + ((p - buffer->data) << 3) + (blocknum << bitmap_shift);
 						assert(!get_bitmap_bit(buffer->data, chunk & bitmap_mask));
 						set_bitmap_bit(buffer->data, chunk & bitmap_mask);
@@ -1089,10 +1139,16 @@ static chunk_t alloc_chunk_range(struct superblock *sb, struct allocspace *as, c
 						return chunk;
 					}
 			}
-
+		/*
+		 * Scan failed, release that block.  If we've exhausted the
+		 * range we were going to scan, return failure.
+		 */
 		brelse(buffer);
 		if (!length)
 			return -1;
+		/*
+		 * Go to the next block, wrapping if necessary.
+		 */
 		if (++blocknum == as->asi->bitmap_blocks)
 			 blocknum = 0;
 		offset = 0;
@@ -1647,12 +1703,21 @@ static int delete_snap(struct superblock *sb, struct snapshot *snap)
  * Snapshot Store Allocation
  */
 
+/*
+ * Allocate a chunk from the passed allocation space.
+ *
+ * Calls alloc_chunk_from_range() to actually do the allocate.  The search
+ * for a free chunk is optimized by starting from the position of the last
+ * allocation and searching forward to the end of the allocation space.  If
+ * no free chunk is found, then search from the beginning of the space to the
+ * last allocation position.  Fail if both searches turn up nothing.
+ */
 static chunk_t alloc_chunk(struct superblock *sb, struct allocspace *as)
 {
 	chunk_t last = as->asi->last_alloc, total = as->asi->chunks, found;
 
-	if ((found = alloc_chunk_range(sb, as, last, total - last)) != -1 ||
-	    (found = alloc_chunk_range(sb, as, 0, last)) != -1) {
+	if ((found = alloc_chunk_from_range(sb, as, last, total - last)) != -1 ||
+	    (found = alloc_chunk_from_range(sb, as, 0, last)) != -1) {
 		as->asi->last_alloc = found;
 		set_sb_dirty(sb);
 		return (found);
@@ -2628,7 +2693,7 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	set_sb_dirty(sb);
 
 #ifdef INITDEBUG1
-	printf("chunk = %Lx\n", alloc_chunk_range(sb, sb->image.chunks - 1, 1));
+	printf("chunk = %Lx\n", alloc_chunk_from_range(sb, sb->image.chunks - 1, 1));
 //	struct buffer *buffer = snapread(sb, sb->image.bitmap_base + 3 * 8);
 //	dump_buffer(buffer, 4090, 6);
 	return 0;
