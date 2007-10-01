@@ -1279,7 +1279,7 @@ receive)
 	declare holdfile=$VOLUMES/$vol/source/hold
 	declare progressfile=$VOLUMES/$vol/source/apply
 	declare log=${LOGS}/$vol/delta.log
-	declare hold send_snap send_chunk send_addr count=0
+	declare hold send_snap send_chunk send_addr count=0 status
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 	read send_snap send_chunk send_addr <$progressfile 2>/dev/null
@@ -1294,7 +1294,18 @@ receive)
 	case $startstop in
 	start)
 		read hold <$holdfile 2>/dev/null
-		[[ $hold ]] && verify_existing_snap $vol $hold || hold=-1
+		if [[ $hold ]]; then
+			verify_existing_snap $vol $hold
+			status=$?
+			# Return -1 for non-existing/squashed hold snapshot, letting upstream roll
+			# back to fullvolume replication. Don't start replication for any other errors.
+			case $status in
+			0) ;; # snapshot is in good state
+			1) log "hold snapshot $hold does not exist" $log && hold=-1 ;;
+			2) log "hold snapshot $hold was squashed" $log && hold=-1 ;;
+			*) log "fail to obtain the state of snapshot $hold" $log && exit 2
+			esac
+		fi
 		[[ $hold = $send_snap ]] && { send_snap= send_addr=; }
 		echo $hold $send_snap $send_addr
 
