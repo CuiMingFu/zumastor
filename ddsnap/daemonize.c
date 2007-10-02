@@ -23,7 +23,7 @@
 
 static int sigpipe;
 
-static void sighandler(int signum)
+void sighandler(int signum)
 {
 	signal(signum, sighandler);
         trace(printf("caught signal %i\n", signum););
