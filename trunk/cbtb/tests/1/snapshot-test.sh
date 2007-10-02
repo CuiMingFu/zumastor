@@ -35,7 +35,7 @@ sleep $SLEEP
 if [ -d /var/run/zumastor/mount/testvol\(0\)/ ] ; then
   echo "ok 2 - first snapshot mounted"
 else
-  ls -lR /var/run/sumastor/mount
+  ls -lR /var/run/zumastor/mount
   echo "not ok 2 - first snapshot mounted"
   exit 2
 fi
@@ -43,7 +43,7 @@ fi
 if [ ! -f /var/run/zumastor/mount/testvol\(0\)/testfile ] ; then
   echo "ok 3 - testfile not present in first snapshot"
 else
-  ls -lR /var/run/sumastor/mount
+  ls -lR /var/run/zumastor/mount
   echo "not ok 3 - testfile not present in first snapshot"
   exit 3
 fi
@@ -54,7 +54,7 @@ sleep $SLEEP
 if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
   echo "ok 4 - second snapshot mounted"
 else
-  ls -lR /var/run/sumastor/mount
+  ls -lR /var/run/zumastor/mount
   echo "not ok 4 - second snapshot mounted"
   exit 4
 fi
@@ -63,7 +63,7 @@ if diff -q /var/run/zumastor/mount/testvol/testfile \
     /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
   echo "ok 5 - identical testfile immediately after second snapshot"
 else
-  ls -lR /var/run/sumastor/mount
+  ls -lR /var/run/zumastor/mount
   echo "not ok 5 - identical testfile immediately after second snapshot"
   exit 5
 fi
@@ -74,7 +74,7 @@ if ! diff -q /var/run/zumastor/mount/testvol/testfile \
     /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
   echo "ok 6 - testfile changed between origin and second snapshot"
 else
-  ls -lR /var/run/sumastor/mount
+  ls -lR /var/run/zumastor/mount
   echo "not ok 6 - testfile changed between origin and second snapshot"
   exit 6
 fi
