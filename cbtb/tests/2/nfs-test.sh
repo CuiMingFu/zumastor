@@ -21,6 +21,9 @@ SLEEP=5
 
 slave=${IPADDR2}
 
+SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
+SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
+
 echo "1..8"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
