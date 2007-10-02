@@ -55,7 +55,7 @@ else
 fi
     
 aptitude install -y nfs-kernel-server
-echo "/var/run/zumastor/mount/testvol slave(rw,sync)" >>/etc/exports
+echo "/var/run/zumastor/mount/testvol slave(rw,sync,no_root_squash)" >>/etc/exports
 /etc/init.d/nfs-common restart
 /etc/init.d/nfs-kernel-server restart
 if showmount -e ; then
@@ -72,22 +72,23 @@ ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} aptitude install -y nfs-common
 ${SSH} root@${slave} mount master:/var/run/zumastor/mount/testvol /mnt
+${SSH} root@${slave} mount
 echo ok 5 - slave set up
 
 
 date >> /var/run/zumastor/mount/testvol/masterfile
-hash=`md5sum /var/run/zumastor/mount/testvol/masterfile`
-rhash=`${SSH} root@${slave} md5sum /mnt/masterfile`
+hash=`md5sum </var/run/zumastor/mount/testvol/masterfile`
+rhash=`${SSH} root@${slave} 'md5sum </mnt/masterfile'`
 if [ "x$hash" = "x$rhash" ] ; then
-  echo ok 5 - file written on master visible on NFS client
+  echo ok 5 - file written on master matches NFS client view
 else
   rc=5
-  echo not ok 5 - file written on master visible on NFS client
+  echo not ok 5 - file written on master matches NFS client view
 fi
 
 date | ${SSH} root@${slave} "cat >/mnt/clientfile"
-hash=`md5sum /var/run/zumastor/mount/testvol/clientfile`
-rhash=`${SSH} root@${slave} md5sum /mnt/clientfile`
+hash=`md5sum </var/run/zumastor/mount/testvol/clientfile`
+rhash=`${SSH} root@${slave} 'md5sum </mnt/clientfile'`
 if [ "x$hash" = "x$rhash" ] ; then
   echo ok 6 - file written on NFS client visible on master
 else
