@@ -146,10 +146,12 @@ function new_target_snapshot {
 	# need to create the device in order for ddsnap transmit to work
 	create_snapshot $vol $next
 	create_device $vol $next
-	# but we don't need to mount it
 
-	send_to_fifo $target_fifo $next || return 1
-
+	# this will cause the blocking write to the target's fifo to get interrupted (timeout)
+	# FIXME TODO: this doesn't work in ptxdist
+	sleep 2 & # we want this to be short so we don't tie up the master
+	send_to_fifo $target_fifo $next && return 0
+	drop_snapshot $vol $next && return 1
 }
 
 function run_remote  {
