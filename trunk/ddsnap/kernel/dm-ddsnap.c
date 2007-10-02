@@ -543,7 +543,7 @@ static int incoming(struct dm_target *target)
 	u32 chunksize_bits;
 	struct socket *vm_sock;
 
-	daemonize("%s %d", "ddsnap-clnt", info->snap);
+	daemonize("%s/%x", "ddcli", info->snap);
 	while (down_interruptible(&info->exit2_sem))
 		;
 	trace_on(warn("Client thread started, pid=%i for snapshot %d", current->pid, info->snap);)
@@ -794,7 +794,7 @@ static int worker(struct dm_target *target)
 	struct task_struct *task = current;
 	int err;
 
-	daemonize("%s %d", "ddsnap-wrkr", info->snap);
+	daemonize("%s/%x", "ddwrk", info->snap);
 	current->flags |= PF_LESS_THROTTLE;
 	current->flags |= PF_MEMALLOC;
 	trace_on(warn("Worker thread started, pid=%i for snapshot %d", current->pid, info->snap);)
@@ -971,7 +971,7 @@ static int control(struct dm_target *target)
 	int err, length;
 	char *err_msg;
 
-	daemonize("ddsnap-cntl", info->snap);
+	daemonize("%s/%x", "ddcon", info->snap);
 	trace_on(warn("Control thread started, pid=%i for snapshot %d", current->pid, info->snap);)
 	sock = info->control_socket;
 	trace(warn("got socket %p", sock);)
