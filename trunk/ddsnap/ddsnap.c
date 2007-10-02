@@ -1585,8 +1585,13 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 {
 	char const *origindev = devstem;
         struct pollfd pollvec[1];
+	struct sigaction sigact = { .sa_handler = sighandler, .sa_flags = (SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESETHAND) };
+	/* FIXME: keep list of child pids if we want to support multiple children */
+	pid_t pid = -1;  /* delta server has a single child only now */
 
         pollvec[0] = (struct pollfd){ .fd = getsigfd, .events = POLLIN };
+	if (sigprocmask(0, NULL, &sigact.sa_mask))  /* get the current signal mask */
+		error("fail to set signal mask");
 
 	for (;;) {
 		int csock;
@@ -1607,7 +1612,12 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 				case SIGTERM:
 				case SIGINT:
 					close(csock);
+					if (pid > 0)
+						kill(pid, SIGKILL);
 					exit(0);
+				case SIGCHLD:
+					pid = -1; /* delta server has a single child only now */
+					break;
 				default:
 					break;
                         }
@@ -1620,8 +1630,8 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 
 		trace_on(fprintf(stderr, "got client connection\n"););
 
-		pid_t pid;
-
+		assert(pid == -1); /* delta server has a single child only now */
+		sigaction(SIGCHLD, &sigact, NULL); /* monitor child exits */
 		if ((pid = fork()) < 0) {
 			warn("unable to fork to service connection: %s", strerror(errno));
 			goto cleanup_client;
