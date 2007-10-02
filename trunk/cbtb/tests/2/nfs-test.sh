@@ -70,7 +70,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
-${SSH} root@${slave} aptitude install nfs-common
+${SSH} root@${slave} aptitude install -y nfs-common
 ${SSH} root@${slave} mount master:/var/run/zumastor/mount/testvol /mnt
 echo ok 5 - slave set up
 
