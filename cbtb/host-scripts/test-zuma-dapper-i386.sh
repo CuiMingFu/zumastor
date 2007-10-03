@@ -83,7 +83,7 @@ fi
 
 
 # kill the emulator if any abort-like signal is received
-trap "kill -9 ${qemu_pid} ${qemu2_pid} ; exit 1" 1 2 3 6 14 15
+trap "kill -9 -${qemu_pid} -${qemu2_pid} ; exit 1" 1 2 3 6 14 15
 
 while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
 do
