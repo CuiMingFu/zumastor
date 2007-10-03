@@ -24,5 +24,5 @@ in-target apt-get clean
 rm /target/etc/iftab
 
 # set noapic on all grub kernel boot stanzas
-in-target sed --in-place '/^#kopt=/s/$/ noapic/' /boot/grub/menu.lst
+in-target sed --in-place '/^# kopt=/s/$/ noapic/' /boot/grub/menu.lst
 in-target update-grub
