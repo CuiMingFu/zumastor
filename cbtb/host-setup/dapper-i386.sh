@@ -39,7 +39,12 @@ VIRTHOST=192.168.23.1
 
 IMAGE=dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=../../build/${IMAGE}.img
+if [ "x$DISKIMG" = "x" ] ; then
+  diskimg=${IMAGEDIR}/hda.img
+else
+  # eg. DISKIMG=../../build/${IMAGE}.img
+  diskimg="$DISKIMG"
+fi
 SERIAL=${IMAGEDIR}/serial
 MONITOR=${IMAGEDIR}/monitor
 VNC=${IMAGEDIR}/vnc
