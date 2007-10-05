@@ -45,9 +45,15 @@ else
 fi
 
 tmpdir=`mktemp -d /tmp/${IMAGE}.XXXXXX`
-SERIAL=${tmpdir}/serial
 MONITOR=${tmpdir}/monitor
 VNC=${tmpdir}/vnc
+if [ "x$LOGDIR" != "x" ] ; then
+  SERIAL=${LOGDIR}/${LOGPREFIX}serial
+  SERIAL2=${LOGDIR}/${LOGPREFIX}serial2
+else
+  SERIAL=${tmpdir}/serial
+  SERIAL2=${tmpdir}/serial2
+fi
 
 
 if [ ! -f ${diskimg} ] ; then
@@ -61,7 +67,7 @@ echo IPADDR=${IPADDR}
 echo control/tmp dir=${tmpdir}
 
 ${qemu_i386} -snapshot \
-  -serial unix:${SERIAL},server,nowait \
+  -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
   -net nic,macaddr=${MACADDR},model=ne2k_pci \
@@ -73,7 +79,7 @@ if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
   ${qemu_i386} -snapshot \
-    -serial unix:${SERIAL2},server,nowait \
+    -serial file:${SERIAL2} \
     -monitor unix:${MONITOR2},server,nowait \
     -vnc unix:${VNC2} \
     -net nic,macaddr=${MACADDR2},model=ne2k_pci \
@@ -83,33 +89,61 @@ fi
 
 
 # kill the emulator if any abort-like signal is received
-trap "kill -9 -${qemu_pid} -${qemu2_pid} ; exit 1" 1 2 3 6 14 15
+trap "kill -9 ${qemu_pid} ${qemu2_pid} ; exit 1" 1 2 3 6 14 15
 
-while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
+count=0
+while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR} hostname 2>/dev/null
 do
+  count=$(( count + 1 ))
   echo -n .
   sleep 10
 done
-
-
+if [ $count -ge 30 ]
+then
+  if [ "x$LOGDIR" != "x" ] ; then
+    socat - unix:${MONITOR} <<EOF
+screendump $LOGDIR/${LOGPREFIX}screen.ppm
+EOF
+    convert $LOGDIR/${LOGPREFIX}screen.ppm $LOGDIR/${LOGPREFIX}screen.png
+    rm $LOGDIR/${LOGPREFIX}screen.ppm
+  fi
+  kill -9 $qemu_pid
+  retval=64
+  unset qemu_pid
+fi
+  
 if [ "x$MACADDR2" != "x" ] ; then
-  while ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
+  count=0
+  while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
   do
+    count=$(( count + 1 ))
     echo -n .
     sleep 10
   done
-fi
 
-echo IPADDR=${IPADDR} IPADDR2=${IPADDR2}
-echo control/tmp dir=${tmpdir}
+  if [ $count -ge 30 ] 
+  then
+    if [ "x$LOGDIR" != "x" ] ; then
+      socat - unix:${MONITOR2} <<EOF
+screendump $LOGDIR/${LOGPREFIX}screen2.ppm
+EOF
+      convert $LOGDIR/${LOGPREFIX}screen2.ppm $LOGDIR/${LOGPREFIX}screen2.png
+      rm $LOGDIR/${LOGPREFIX}screen2.ppm
+    fi
+    kill -9 $qemu2_pid
+    retval=65
+    unset qemu2_pid
+  fi
+fi
 
 params="IPADDR=${IPADDR}"
 if [ "x$IPADDR2" != "x" ] ; then
   params="${params} IPADDR2=${IPADDR2}"
 fi
 
-# execute any parameters here
-if [ "x${execfiles}" != "x" ]
+
+# execute any parameters here, but only if all instances booted
+if [ "x${execfiles}" != "x" ] && [ $retval -eq 0 ]
 then
   ${CMDTIMEOUT} ${SCP} ${execfiles} root@${IPADDR}: </dev/null || true
   for f in ${execfiles}
@@ -134,14 +168,18 @@ fi
 
 # Kill emulators if more than 10 minutes pass during shutdown
 # They haven't been dying properly
-( sleep 600 ; kill -9 $qemu_pid ) & killer=$!
+if [ "x$qemu_pid" != "x" ] ; then
+  ( sleep 600 ; kill -9 $qemu_pid ) & killer=$!
+fi
 if [ "x$qemu2_pid" != "x" ] ; then
   ( sleep 600 ; kill -9 $qemu2_pid ) & killer2=$!
 fi
 
-${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
+if [ "x$qemu_pid" != "x" ] ; then
+  ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
+fi
 
-if [ "x$IPADDR2" != "x" ] ; then
+if [ "x$qemu2_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR2} poweroff
 fi
 
@@ -151,17 +189,21 @@ if [ "x$IPADDR2" != "x" ] ; then
   sed -i /^${IPADDR2}\ .*\$/d ~/.ssh/known_hosts || true
 fi
 
-time wait ${qemu_pid} || retval=$?
-kill -0 ${qemu_pid} && kill -9 ${qemu_pid}
+if [ "x$qemu_pid" != "x" ] ; then
+  time wait ${qemu_pid} || retval=$?
+  kill -0 ${qemu_pid} && kill -9 ${qemu_pid}
+fi
 
 if [ "x$qemu2_pid" != "x" ] ; then
   time wait ${qemu2_pid} || retval=$?
-  kill -0 ${qemu2_pid} && kill -14 ${qemu2_pid}
+  kill -0 ${qemu2_pid} && kill -9 ${qemu2_pid}
 fi
 
 
 # clean up the 10 minute shutdown killers
-kill -0 $killer && kill -9 $killer
+if [ "x$killer2" != "x" ] ; then
+  kill -0 $killer && kill -9 $killer
+fi
 if [ "x$killer2" != "x" ] ; then
   kill -0 $killer2 && kill -9 $killer2
 fi
