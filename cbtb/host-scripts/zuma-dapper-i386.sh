@@ -76,7 +76,7 @@ if [ "x$TEMPLATEIMG" = "x" ] ; then
 
   TEMPLATEIMG=./dapper-i386.img
 
-  if [ ! -f ${TEMPLATEIMG} ] ; then
+  if [ ! -e ${TEMPLATEIMG} ] ; then
 
     echo "No template image ${TEMPLATEIMG} exists yet."
     echo "Run tunbr dapper-i386.sh first."
@@ -90,8 +90,15 @@ if [ -f ${DISKIMG} ] ; then
   exit 2
 fi
 
-
-${qemu_img} create  -b ${TEMPLATEIMG} -f qcow2 ${DISKIMG}
+templatedir=`dirname ${TEMPLATEIMG}`
+diskimgdir=`dirname ${TEMPLATEIMG}`
+if [ "x$templatedir" = "x$diskimgdir" ] ; then
+  pushd $templatedir
+  ${qemu_img} create  -b `basename ${TEMPLATEIMG}` -f qcow2 `basename ${DISKIMG}`
+  popd
+else
+  ${qemu_img} create  -b ${TEMPLATEIMG} -f qcow2 ${DISKIMG}
+fi
 ls -l ${DISKIMG}
 
 ${qemu_i386} -m 512 \
