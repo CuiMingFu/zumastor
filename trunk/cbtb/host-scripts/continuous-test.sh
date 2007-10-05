@@ -44,9 +44,10 @@ email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
 repo="${HOME}/zumastor-tests"
 export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
+export LOGDIR="${HOME}/zumastor/build/logs-r$installrev"
+[ -d $LOGDIR ] || mkdir $LOGDIR
 
-logdir=`mktemp -d`
-summary=${logdir}/summary
+summary=${LOGDIR}/summary
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
@@ -72,8 +73,8 @@ pushd 1
 for f in *.sh
 do
   # timeout any test that runs for more than an hour
-  testlog=${logdir}/$f.log
-  
+  export LOGPREFIX="$f."
+  testlog="${LOGDIR}/${LOGPREFIX}log"
   ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
@@ -91,7 +92,8 @@ popd
 pushd 2
 for f in *.sh
 do
-  testlog=${logdir}/$f.log
+  export LOGPREFIX="$f."
+  testlog="${LOGDIR}/${LOGPREFIX}log"
   ${TUNBR} ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
@@ -160,7 +162,6 @@ elif [ -x ${sendmail} ] ; then
 fi
 
 rm -f $summary $files
-rmdir ${logdir}
 
 # loop and reload the script
 sleep 300
