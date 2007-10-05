@@ -1727,10 +1727,21 @@ static chunk_t alloc_chunk(struct superblock *sb, struct allocspace *as)
 	return -1;
 }
 
-static sector_t alloc_metablock(struct superblock *sb)
+/*
+ * Both alloc_metablock and alloc_snapblock call alloc_chunk to allocate
+ * a chunk.  The new_block function calls alloc_metablock to allocate a
+ * block from the metadata allocation, then calls getblk to allocate a
+ * buffer for that block.  Both new_leaf and new_node call new_block
+ * for their buffer.  The chunk allocation functions here return either the
+ * newly-allocated chunk number or -1 if the allocation failed.
+ * new_block returns NULL for failure.
+ *
+ * Note that alloc_metablock is only called here.  alloc_snapblock is
+ * called elsewhere (make_unique) to allocate snapshot blocks.
+ */
+static chunk_t alloc_metablock(struct superblock *sb)
 {
-	chunk_t new_block = alloc_chunk(sb, &sb->metadata);
-	return new_block == -1? : new_block << sb->metadata.chunk_sectors_bits; // !!! store block number in leaf instead of sectors
+	return alloc_chunk(sb, &sb->metadata);
 }
 
 static u64 alloc_snapblock(struct superblock *sb)
@@ -1740,8 +1751,11 @@ static u64 alloc_snapblock(struct superblock *sb)
 
 static struct buffer *new_block(struct superblock *sb)
 {
-	// !!! handle alloc_metablock failure
-	return getblk(sb->metadev, alloc_metablock(sb), sb->metadata.allocsize);
+	chunk_t newchunk;
+
+	if ((newchunk = alloc_metablock(sb)) == -1)
+		return NULL;
+	return getblk(sb->metadev, newchunk << sb->metadata.chunk_sectors_bits, sb->metadata.allocsize);
 }
 
 static struct buffer *new_leaf(struct superblock *sb)
@@ -2710,6 +2724,7 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 
 	struct buffer *leafbuf = new_leaf(sb);
 	struct buffer *rootbuf = new_node(sb);
+	assert(leafbuf != NULL && rootbuf != NULL);
 	buffer2node(rootbuf)->count = 1;
 	buffer2node(rootbuf)->entries[0].sector = leafbuf->sector;
 	sb->image.etree_root = rootbuf->sector;
