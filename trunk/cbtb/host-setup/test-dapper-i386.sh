@@ -34,7 +34,11 @@ qemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
 
 IMAGE=dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
+if [ "x$DISKIMG" = "x" ] ; then
+  diskimg=${IMAGEDIR}/hda.img
+else
+  diskimg="$DISKIMG"
+fi
 
 tmpdir=`mktemp -d /tmp/${IMAGE}.XXXXXX`
 SERIAL=${tmpdir}/serial
