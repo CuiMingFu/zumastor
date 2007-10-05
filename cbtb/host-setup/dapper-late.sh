@@ -23,6 +23,6 @@ in-target apt-get clean
 # Since the MAC will change on subsequent copies, get rid of persistence
 rm /target/etc/iftab
 
-# set noapic on all grub kernel boot stanzas
-in-target sed --in-place '/^# kopt=/s/$/ noapic/' /boot/grub/menu.lst
+# set noapic and noacpi on all grub kernel boot stanzas - qemu doesn't like
+in-target sed --in-place '/^# kopt=/s/$/ noapic noacpi/' /boot/grub/menu.lst
 in-target update-grub
