@@ -230,12 +230,17 @@ function create_snapshot {
 	local -r vol=$1
 	local -r id=$2
 	local -r server=${SERVERS}/$vol
+	local status
 
 	# only create snapshot for non-origin
 	[[ $id -eq -1 ]] && echo should not be creating device for origin && return 1
 
-	ddsnap create $server $id || return 1
-
+	# suspend origin device first to prevent the race between origin writes and snapshot create
+	dmsetup suspend --nolockfs $vol
+	ddsnap create $server $id
+	status=$?
+	dmsetup resume $vol
+	return $status
 }
 
 # mount_device <vol> <id>
