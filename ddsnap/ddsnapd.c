@@ -3011,8 +3011,15 @@ static int incoming(struct superblock *sb, struct client *client)
 					if (exception == -1) {
 						warn("ERROR: unable to perform copyout during origin write.");
 						message.head.code = ORIGIN_WRITE_ERROR;
-					} else if (exception) /* We did a copy-out. */
+					} else {
+						/* 
+						 * check if there is any pending readlock on the chunk.
+						 * Note: we may want to defer the copyout and/or the
+						 * update of btree if the chunk has any pending readlock.
+						 * We can then skip the lock checking if a chunk is unique.
+						 */
 						waitfor_chunk(sb, chunk, &pending);
+					}
 				}
 			finish_copyout(sb);
 			commit_transaction(sb);
