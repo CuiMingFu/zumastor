@@ -1,3 +1,0 @@
-dependencies: tree, cron, dmsetup
-
-post-install: start zumastor via "/etc/init.d/zumastor start", set to start on boot
