@@ -220,7 +220,7 @@ struct disksuper
 {
 	typeof((char[])SB_MAGIC) magic;
 	u64 create_time;
-	sector_t etree_root;
+	sector_t etree_root;		/* The b-tree root node sector.       */
 	sector_t orgoffset, orgsectors;
 	u64 flags;
 	u64 deleting;
@@ -774,6 +774,14 @@ static unsigned leaf_payload(struct eleaf *leaf)
 	return lower + upper;
 }
 
+/*
+ * Add an "exception" to a b-tree leaf.
+ *
+ * Finds the chunk to which we're adding the exception.  If it doesn't exist
+ * in the leaf, add it.  Compute the share mask and insert the exception at
+ * the appropriate place.  Return an error if there isn't enough room for the
+ * new entry.
+ */
 static int add_exception_to_leaf(struct eleaf *leaf, u64 chunk, u64 exception, int snapshot, u64 active)
 {
 	unsigned target = chunk - leaf->base_chunk;
@@ -785,10 +793,16 @@ static int add_exception_to_leaf(struct eleaf *leaf, u64 chunk, u64 exception, i
 	trace(warn("chunk %Lx exception %Lx, snapshot = %i free space = %u", 
 		chunk, exception, snapshot, free););
 
+	/*
+	 * Find the chunk for which we're adding an exception entry.
+	 */
 	for (i = 0; i < leaf->count; i++) // !!! binsearch goes here
 		if (leaf->map[i].rchunk >= target)
 			break;
 
+	/*
+	 * If we didn't find the chunk, insert a new one at map[i].
+	 */
 	if (i == leaf->count || leaf->map[i].rchunk > target) {
 		if (free < sizeof(struct exception) + sizeof(struct etree_map))
 			return -EFULL;
@@ -803,7 +817,20 @@ static int add_exception_to_leaf(struct eleaf *leaf, u64 chunk, u64 exception, i
 
 	if (free < sizeof(struct exception))
 		return -EFULL;
-
+	/*
+	 * Compute the share map from that of each existing exception entry
+	 * for this chunk.  If we're doing this for a chunk on the origin,
+	 * the new exception is shared between those snapshots that weren't
+	 * already sharing exceptions for this chunk.  (We combine the sharing
+	 * that already exists, invert it, then mask off everything but the
+	 * active snapshots.)
+	 *
+	 * If this is a chunk on a snapshot we go through the existing
+	 * exception list to turn off sharing with this snapshot (with the
+	 * side effect that if the chunk was only shared by this snapshot it
+	 * becomes unshared).  We then set sharing for this snapshot in the
+	 * new exception entry.
+	 */
 	if (snapshot == -1) {
 		for (sharemap = 0, ins = emap(leaf, i); ins < emap(leaf, i+1); ins++)
 			sharemap |= ins->share;
@@ -818,6 +845,12 @@ static int add_exception_to_leaf(struct eleaf *leaf, u64 chunk, u64 exception, i
 	}
 	ins = emap(leaf, i);
 insert:
+	/*
+	 * Insert the new exception entry.  These grow from the end of the
+	 * block toward the beginning.  First move any earlier exceptions up
+	 * to make room for the new one, then insert the new entry in the
+	 * space freed.  Adjust the offsets for all earlier chunks.
+	 */
 	memmove(exceptions - 1, exceptions, (char *)ins - (char *)exceptions);
 	ins--;
 	ins->share = sharemap;
@@ -1758,6 +1791,9 @@ static struct buffer *new_block(struct superblock *sb)
 	return getblk(sb->metadev, newchunk << sb->metadata.chunk_sectors_bits, sb->metadata.allocsize);
 }
 
+/*
+ * Get a new buffer for an eleaf, zero it and initialize it appropriately.
+ */
 static struct buffer *new_leaf(struct superblock *sb)
 {
 	trace(printf("New leaf\n"););
@@ -1770,6 +1806,9 @@ static struct buffer *new_leaf(struct superblock *sb)
 	return buffer;
 }
 
+/*
+ * Get a new buffer for an enode, zero it and set the node count to zero.
+ */
 static struct buffer *new_node(struct superblock *sb)
 {
 	trace(printf("New node\n"););
@@ -2721,7 +2760,7 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	free_chunk(sb, 32769);
 	return 0;
 #endif
-
+	/* Get an enode and an eleaf for the root of the b-tree. */
 	struct buffer *leafbuf = new_leaf(sb);
 	struct buffer *rootbuf = new_node(sb);
 	assert(leafbuf != NULL && rootbuf != NULL);
@@ -2995,6 +3034,9 @@ static int incoming(struct superblock *sb, struct client *client)
 
 	switch (message.head.code) {
 	case QUERY_WRITE:
+		/*
+		 * if snaptag is -1, we're writing to the origin.
+		 */
 		if (client->snaptag == -1) {
 			struct pending *pending = NULL;
 			struct rw_request *body = (struct rw_request *)message.body;
@@ -3033,7 +3075,9 @@ static int incoming(struct superblock *sb, struct client *client)
 			reply(sock, &message);
 			break;
 		}
-
+		/*
+		 * We're writing to a snapshot.
+		 */
 		struct rw_request *body = (struct rw_request *)message.body;
 		if (message.head.length < sizeof(*body))
 			goto message_too_short;
