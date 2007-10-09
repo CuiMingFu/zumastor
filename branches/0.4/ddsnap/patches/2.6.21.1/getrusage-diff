@@ -1,0 +1,186 @@
+--- /dev/null	2006-05-22 07:25:23.000000000 -0700
++++ linux-2.6.21.1/Documentation/accounting/getrusage.txt	2007-09-12 10:55:53.000000000 -0700
+@@ -0,0 +1,53 @@
++Notes on implementation of getrusage() in Linux 2.6.
++
++The getrusage() system call is used to retrieve two sets of process statistics
++associated with the running process and its children.  The first is indicated
++by RUSAGE_SELF as the first parameter to the function and gets the current
++statistics for the calling process itself.  The second is indicated by
++RUSAGE_CHILDREN and gets statistics for terminated, reaped (that is, wait()ed-
++for) child processes.
++
++For reference, the rusage structure is (from include/linux/resource.h):
++
++	struct rusage {
++	    struct timeval ru_utime;    // user time used		*
++	    struct timeval ru_stime;    // system time used		*
++	    long    ru_maxrss;          // maximum resident set size	*
++	    long    ru_ixrss;           // integral shared memory size
++	    long    ru_idrss;           // integral unshared data size
++	    long    ru_isrss;           // integral unshared stack size
++	    long    ru_minflt;          // page reclaims		*
++	    long    ru_majflt;          // page faults			*
++	    long    ru_nswap;           // swaps
++	    long    ru_inblock;         // block input operations	*
++	    long    ru_oublock;         // block output operations	*
++	    long    ru_msgsnd;          // messages sent
++	    long    ru_msgrcv;          // messages received
++	    long    ru_nsignals;        // signals received
++	    long    ru_nvcsw;           // voluntary context switches	*
++	    long    ru_nivcsw;          // involuntary "		*
++	};          
++                  
++Linux maintains and returns the fields marked with an asterisk ("*").  These
++statistics are kept in the process signal_struct and are updated in a handful
++of places in the kernel.  In the case of RUSAGE_SELF, the statistics are
++copied directly from the process signal structure.
++
++In the case of RUSAGE_CHILDREN, no child statistics are returned for children
++that have not both exited and been wait()ed for.  This means that no statistics
++will be returned for children for which SIGCHLD was ignored or SA_NOCLDWAIT
++was set.  When a process exits, if the kernel determines that no process will
++wait for it the task is released and any accumulated statistics are discarded.
++Otherwise it leaves a zombie which retains those statistics in the signal
++structure pointed to by the zombie task_struct.  When the parent calls wait(2),
++the kernel (in wait_task_zombie()) collects the child's statistics in the
++"children" statistics fields in the parent's signal structure.  The content of
++these fields are reported to the parent when it calls getrusage() with the
++RUSAGE_CHILDREN parameter.
++
++When the kernel "collects" child statistics, most of the statistics are simply
++added to the parent process "child" fields, which then contain the cumulative
++sum of those statistics for all of its terminated, wait()ed-for children.  The
++ru_maxrss field is slightly different in that it is only updated when the new
++value is larger than the older value; it tracks the largest RSS of all
++children.
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/fork.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/fork.c	2007-09-07 10:45:22.000000000 -0700
+@@ -531,6 +531,7 @@ static int copy_mm(unsigned long clone_f
+ 
+ 	tsk->min_flt = tsk->maj_flt = 0;
+ 	tsk->nvcsw = tsk->nivcsw = 0;
++	tsk->maxrss = 0;
+ 
+ 	tsk->mm = NULL;
+ 	tsk->active_mm = NULL;
+@@ -875,6 +876,7 @@ static inline int copy_signal(unsigned l
+ 	sig->nvcsw = sig->nivcsw = sig->cnvcsw = sig->cnivcsw = 0;
+ 	sig->min_flt = sig->maj_flt = sig->cmin_flt = sig->cmaj_flt = 0;
+ 	sig->sched_time = 0;
++	sig->cmaxrss = 0;
+ 	INIT_LIST_HEAD(&sig->cpu_timers[0]);
+ 	INIT_LIST_HEAD(&sig->cpu_timers[1]);
+ 	INIT_LIST_HEAD(&sig->cpu_timers[2]);
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/exit.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/exit.c	2007-09-26 11:17:51.000000000 -0700
+@@ -113,6 +113,8 @@ static void __exit_signal(struct task_st
+ 		sig->nvcsw += tsk->nvcsw;
+ 		sig->nivcsw += tsk->nivcsw;
+ 		sig->sched_time += tsk->sched_time;
++		if (tsk->maxrss > sig->cmaxrss)
++			sig->cmaxrss = tsk->maxrss;
+ 		sig = NULL; /* Marker for below. */
+ 	}
+ 
+@@ -901,6 +903,14 @@ fastcall NORET_TYPE void do_exit(long co
+ 	if (tsk->mm) {
+ 		update_hiwater_rss(tsk->mm);
+ 		update_hiwater_vm(tsk->mm);
++		/*
++		 * Store the hiwater_rss in a task field, since when we need
++		 * it in __exit_signal() the mm structure is gone; we can't
++		 * stuff it in the signal structure since then we would be
++		 * racing with wait_task_zombie().
++		 */
++		if (tsk->maxrss < tsk->mm->hiwater_rss)
++			tsk->maxrss = tsk->mm->hiwater_rss;
+ 	}
+ 	group_dead = atomic_dec_and_test(&tsk->signal->live);
+ 	if (group_dead) {
+@@ -1191,6 +1201,17 @@ static int wait_task_zombie(struct task_
+ 			p->nvcsw + sig->nvcsw + sig->cnvcsw;
+ 		psig->cnivcsw +=
+ 			p->nivcsw + sig->nivcsw + sig->cnivcsw;
++		/*
++		 * Save the maximum RSS of this task and all its terminated,
++		 * waited-for children.  Don't accumulate the RSS since, one,
++		 * other operating systems (FreeBSD, AIX) do it this way and,
++		 * two, the cumulative RSS of a long-lived process with lots
++		 * of sequential child processes would be meaningless.
++		 */
++		if (sig->cmaxrss > psig->cmaxrss)
++			psig->cmaxrss = sig->cmaxrss;
++		if (p->maxrss > psig->cmaxrss)
++			psig->cmaxrss = p->maxrss;
+ 		spin_unlock_irq(&p->parent->sighand->siglock);
+ 	}
+ 
+--- /home/fmayhar/Static/linux-2.6.21.1/kernel/sys.c	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/kernel/sys.c	2007-09-26 11:40:39.000000000 -0700
+@@ -2021,6 +2021,7 @@ static void k_getrusage(struct task_stru
+ 			r->ru_nivcsw = p->signal->cnivcsw;
+ 			r->ru_minflt = p->signal->cmin_flt;
+ 			r->ru_majflt = p->signal->cmaj_flt;
++			r->ru_maxrss = p->signal->cmaxrss;
+ 
+ 			if (who == RUSAGE_CHILDREN)
+ 				break;
+@@ -2042,11 +2043,27 @@ static void k_getrusage(struct task_stru
+ 				r->ru_majflt += t->maj_flt;
+ 				t = next_thread(t);
+ 			} while (t != p);
++			/*
++			 * If we were called from wait_task_zombie, p->mm
++			 * will be NULL.  Fortunately, in that case do_exit()
++			 * will have set the p->maxrss field, so use that
++			 * instead.
++			 */
++			if (p->mm != NULL) {
++				unsigned long maxrss = get_mm_rss(p->mm);
++
++				if (maxrss < p->mm->hiwater_rss)
++					maxrss = p->mm->hiwater_rss;
++				p->maxrss = maxrss;
++			}
++			if (r->ru_maxrss < p->maxrss)
++				r->ru_maxrss = p->maxrss;
+ 			break;
+ 
+ 		default:
+ 			BUG();
+ 	}
++	r->ru_maxrss <<= PAGE_SHIFT - 10; /* Convert from pages to kilobytes. */
+ 
+ 	unlock_task_sighand(p, &flags);
+ 	rcu_read_unlock();
+--- /home/fmayhar/Static/linux-2.6.21.1/include/linux/sched.h	2007-04-27 14:49:26.000000000 -0700
++++ linux-2.6.21.1/include/linux/sched.h	2007-09-07 10:57:41.000000000 -0700
+@@ -457,6 +457,7 @@ struct signal_struct {
+ 	cputime_t utime, stime, cutime, cstime;
+ 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
+ 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
++	unsigned long cmaxrss;
+ 
+ 	/*
+ 	 * Cumulative ns of scheduled CPU time for dead threads in the
+@@ -887,6 +888,8 @@ struct task_struct {
+ 	struct timespec start_time;
+ /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
+ 	unsigned long min_flt, maj_flt;
++/* maxrss gets the hiwater_rss in do_exit() */
++	unsigned long maxrss;
+ 
+   	cputime_t it_prof_expires, it_virt_expires;
+ 	unsigned long long it_sched_expires;
+@@ -1184,6 +1187,10 @@ static inline void put_task_struct(struc
+ #define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
+ #define used_math() tsk_used_math(current)
+ 
++#define tsk_restore_flags(p, pflags, mask) \
++	do {	(p)->flags &= ~(mask); \
++		(p)->flags |= ((pflags) & (mask)); } while (0)
++
+ #ifdef CONFIG_SMP
+ extern int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask);
+ #else

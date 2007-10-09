@@ -1,0 +1,33 @@
+source					target
+=================================	=================================
+ssh start_target(volume,                spins up ddsnap listen daemon
+                 host,
+                 port)
+sends {CODE,                            replies {PROCEED/ERROR, message}
+       sizeof rest,
+       magic,
+       count,
+       chunksize/2,
+       source snapshot,
+       target snapshot}
+
+while (!done)
+  sends {CODE,                          replies {DONE/ERROR, message}
+         sizeof rest,
+         magic,
+         mode,
+         compressed?,
+         address,
+         # of chunks,
+         source checksum,
+         target checksum,
+         data }
+
+ssh receive_done(volume, host)          kills ddsnap listen
+					  freeze nfs
+                                          unmount/remount
+                                          unfreeze nfs
+
+NOTES:
+- CODE refers to an enum indicating the message type
+- magic refers to a magic number for the payload

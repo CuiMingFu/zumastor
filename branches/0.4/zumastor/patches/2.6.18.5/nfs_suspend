@@ -1,0 +1,107 @@
+diff -rup linux-2.6.18.5/fs/nfsd/export.c linux-2.6.18.5.zumastor/fs/nfsd/export.c
+--- linux-2.6.18.5/fs/nfsd/export.c	2006-12-01 16:13:05.000000000 -0800
++++ linux-2.6.18.5.zumastor/fs/nfsd/export.c	2007-03-16 16:10:24.000000000 -0700
+@@ -735,7 +735,7 @@ exp_readlock(void)
+ 	down_read(&hash_sem);
+ }
+ 
+-static inline void
++void
+ exp_writelock(void)
+ {
+ 	down_write(&hash_sem);
+@@ -747,7 +747,7 @@ exp_readunlock(void)
+ 	up_read(&hash_sem);
+ }
+ 
+-static inline void
++void
+ exp_writeunlock(void)
+ {
+ 	up_write(&hash_sem);
+@@ -1290,6 +1290,17 @@ exp_verify_string(char *cp, int max)
+ }
+ 
+ /*
++ * Flush exports table without calling RW semaphore.
++ * The caller is required to lock and unlock the export table.
++ */
++void
++export_purge(void)
++{
++	        cache_purge(&svc_expkey_cache);
++	        cache_purge(&svc_export_cache);
++}
++
++/*
+  * Initialize the exports module.
+  */
+ void
+diff -rup linux-2.6.18.5/fs/nfsd/nfsctl.c linux-2.6.18.5.zumastor/fs/nfsd/nfsctl.c
+--- linux-2.6.18.5/fs/nfsd/nfsctl.c	2006-12-01 16:13:05.000000000 -0800
++++ linux-2.6.18.5.zumastor/fs/nfsd/nfsctl.c	2007-03-16 16:10:24.000000000 -0700
+@@ -38,7 +38,7 @@
+ unsigned int nfsd_versbits = ~0;
+ 
+ /*
+- *	We have a single directory with 9 nodes in it.
++ *	We have a single directory with several nodes in it.
+  */
+ enum {
+ 	NFSD_Root = 1,
+@@ -53,6 +53,7 @@ enum {
+ 	NFSD_Fh,
+ 	NFSD_Threads,
+ 	NFSD_Versions,
++	NFSD_Suspend,
+ 	/*
+ 	 * The below MUST come last.  Otherwise we leave a hole in nfsd_files[]
+ 	 * with !CONFIG_NFSD_V4 and simple_fill_super() goes oops
+@@ -139,6 +140,26 @@ static const struct file_operations tran
+ 	.release	= simple_transaction_release,
+ };
+ 
++static ssize_t nfsctl_suspend_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
++{
++	printk("Suspending NFS transactions!\n");
++	exp_writelock();
++	export_purge();
++	return size;
++}
++
++static ssize_t nfsctl_suspend_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
++{
++	printk("Resuming NFS transactions!\n");
++	exp_writeunlock();
++	return 0;
++}
++
++static struct file_operations suspend_ops = {
++	.write		= nfsctl_suspend_write,
++	.read		= nfsctl_suspend_read,
++};
++
+ extern struct seq_operations nfs_exports_op;
+ static int exports_open(struct inode *inode, struct file *file)
+ {
+@@ -484,6 +505,7 @@ static int nfsd_fill_super(struct super_
+ 		[NFSD_Fh] = {"filehandle", &transaction_ops, S_IWUSR|S_IRUSR},
+ 		[NFSD_Threads] = {"threads", &transaction_ops, S_IWUSR|S_IRUSR},
+ 		[NFSD_Versions] = {"versions", &transaction_ops, S_IWUSR|S_IRUSR},
++		[NFSD_Suspend] = {"suspend", &suspend_ops, S_IWUSR|S_IRUSR},
+ #ifdef CONFIG_NFSD_V4
+ 		[NFSD_Leasetime] = {"nfsv4leasetime", &transaction_ops, S_IWUSR|S_IRUSR},
+ 		[NFSD_RecoveryDir] = {"nfsv4recoverydir", &transaction_ops, S_IWUSR|S_IRUSR},
+diff -rup linux-2.6.18.5/include/linux/nfsd/export.h linux-2.6.18.5.zumastor/include/linux/nfsd/export.h
+--- linux-2.6.18.5/include/linux/nfsd/export.h	2006-12-01 16:13:05.000000000 -0800
++++ linux-2.6.18.5.zumastor/include/linux/nfsd/export.h	2007-03-16 16:10:24.000000000 -0700
+@@ -84,6 +84,9 @@ struct svc_expkey {
+ void			nfsd_export_init(void);
+ void			nfsd_export_shutdown(void);
+ void			nfsd_export_flush(void);
++void			export_purge(void);
++void			exp_writelock(void);
++void			exp_writeunlock(void);
+ void			exp_readlock(void);
+ void			exp_readunlock(void);
+ struct svc_export *	exp_get_by_name(struct auth_domain *clp,

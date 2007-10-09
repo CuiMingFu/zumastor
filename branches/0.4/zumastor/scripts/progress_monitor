@@ -1,0 +1,38 @@
+#!/bin/bash
+
+. /lib/zumastor/common
+
+clear
+while true; do
+clear
+for vol in $(ls $VOLUMES 2>/dev/null); do
+	echo Volume $vol:
+	sock=$SERVERS/$vol
+	size=$(ddsnap status $sock --size) || exit 1
+	size=$(($size*512))
+	for host in $(ls $VOLUMES/$vol/targets 2>/dev/null); do
+		echo "  Target: $host"
+		sendfile=$VOLUMES/$vol/targets/$host/send
+		holdfile=$VOLUMES/$vol/targets/$host/hold
+		replicating=yes
+		[[ -e $sendfile ]] && read snap chunks_sent byte_address <$sendfile 2>/dev/null || replicating=
+		echo "    Last Cycle:" `stat -c %y $holdfile`
+		if [[ -z $replicating ]]; then
+			if [[ -e $holdfile ]]; then
+				read hold <$holdfile
+				echo "    Status: holding $hold, replication cycle not in progress"
+			else
+				echo "    Status: not replicating"
+			fi
+		else
+			[[ -z $chunks_sent ]] && chunks_sent=0
+			chunks_total=${chunks_sent/*\//}
+			chunks_sent=${chunks_sent/\/*/}
+			per=$(($chunks_sent*100/$chunks_total))
+			bper=$(($byte_address*100/$size))
+			echo "    Status: sending snapshot $snap: chunk $chunks_sent/$chunks_total ($per%), address $byte_address/$size ($bper%)"
+		fi
+	done
+done
+sleep 1
+done

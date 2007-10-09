@@ -1,0 +1,12 @@
+diff -puN fs/nfsd/nfssvc.c~remove_nfsd_throttle fs/nfsd/nfssvc.c
+--- linux-2.6.21.1/fs/nfsd/nfssvc.c~remove_nfsd_throttle	2007-07-19 16:50:51.000000000 -0700
++++ linux-2.6.21.1-root/fs/nfsd/nfssvc.c	2007-07-19 16:50:51.000000000 -0700
+@@ -431,7 +431,7 @@ nfsd(struct svc_rqst *rqstp)
+ 	 * localhost doesn't cause nfsd to lock up due to all the client's
+ 	 * dirty pages.
+ 	 */
+-	current->flags |= PF_LESS_THROTTLE;
++	//current->flags |= PF_LESS_THROTTLE;
+ 
+ 	/*
+ 	 * The main request loop

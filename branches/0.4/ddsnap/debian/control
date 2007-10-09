@@ -1,0 +1,11 @@
+Source: ddsnap
+Section: unknown
+Priority: optional
+Maintainer: Jane Chiu <jchiu@google.com>
+Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev
+Standards-Version: 0.1.0
+
+Package: ddsnap
+Architecture: any
+Depends: dmsetup, libpopt0, zlib1g
+Description: ddsnap userspace daemons for block level snapshot and replication

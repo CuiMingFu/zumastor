@@ -1,0 +1,14 @@
+diff -rup linux-2.6.19.1/mm/backing-dev.c linux-2.6.19.1.shapor/mm/backing-dev.c
+--- linux-2.6.19.1/mm/backing-dev.c	2006-12-11 11:32:53.000000000 -0800
++++ linux-2.6.19.1.shapor/mm/backing-dev.c	2007-03-15 14:49:46.597850000 -0700
+@@ -48,6 +48,10 @@ long congestion_wait(int rw, long timeou
+ 	DEFINE_WAIT(wait);
+ 	wait_queue_head_t *wqh = &congestion_wqh[rw];
+ 
++	if ((current->flags & PF_LESS_THROTTLE) && printk_ratelimit()) {
++		printk(KERN_WARNING "PF_LESS_THROTTLE process %s[%i] entered congestion_wait!\n", current->comm, current->pid);
++		dump_stack();
++	}
+ 	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
+ 	ret = io_schedule_timeout(timeout);
+ 	finish_wait(wqh, &wait);
