@@ -74,7 +74,7 @@ if [ -x ${mailto} ] ; then
 
 elif [ -x ${biabam} ] ; then
   bfiles=`echo $files | tr ' ' ','`
-  cat $summary | ${biabam} $bfiles -s "${subject}" ${email}
+  cat $files | ${biabam} $bfiles -s "${subject}" ${email}
 
 elif [ -x ${sendmail} ] ; then
   (

@@ -46,6 +46,11 @@ export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
 
 pushd ${BUILDDIR}
 
+# dereference template symlink so multiple templates may coexist
+if [ -L "${TEMPLATEIMG}" ] ; then
+  TEMPLATEIMG=`readlink "${TEMPLATEIMG}"`
+fi
+
 # build and test the current working directory packages
 installlog=`mktemp`
 installret=-1
@@ -91,7 +96,7 @@ if [ -x ${mailto} ] ; then
 
 elif [ -x ${biabam} ] ; then
   bfiles=`echo $files | tr ' ' ','`
-  cat $summary | ${biabam} $bfiles -s "${subject}" ${email}
+  cat $files | ${biabam} $bfiles -s "${subject}" ${email}
 
 elif [ -x ${sendmail} ] ; then
   (

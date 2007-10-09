@@ -76,30 +76,33 @@ if [ "x$TEMPLATEIMG" = "x" ] ; then
 
   TEMPLATEIMG=./dapper-i386.img
 
-  if [ ! -e ${TEMPLATEIMG} ] ; then
+  # dereference, so multiple templates may coexist simultaneously
+  if [ -L "${TEMPLATEIMG}" ] ; then
+    TEMPLATEIMG=`readlink ${TEMPLATEIMG}`
+  fi
 
+  if [ ! -f "${TEMPLATEIMG}" ] ; then
     echo "No template image ${TEMPLATEIMG} exists yet."
     echo "Run tunbr dapper-i386.sh first."
     exit 1
   fi
 fi
 
-if [ -f ${DISKIMG} ] ; then
+if [ -f "${DISKIMG}" ] ; then
   echo Zuma/dapper image already exists, remove if you wish to build a new one
-  echo rm ${DISKIMG}
+  echo rm "${DISKIMG}"
   exit 2
 fi
 
-templatedir=`dirname ${TEMPLATEIMG}`
-diskimgdir=`dirname ${TEMPLATEIMG}`
+templatedir=`dirname "${TEMPLATEIMG}"`
+diskimgdir=`dirname "${TEMPLATEIMG}"`
 if [ "x$templatedir" = "x$diskimgdir" ] ; then
   pushd $templatedir
-  ${qemu_img} create  -b `basename ${TEMPLATEIMG}` -f qcow2 `basename ${DISKIMG}`
+  ${qemu_img} create  -b `basename "${TEMPLATEIMG}"` -f qcow2 `basename "${DISKIMG}"`
   popd
 else
-  ${qemu_img} create  -b ${TEMPLATEIMG} -f qcow2 ${DISKIMG}
+  ${qemu_img} create  -b "${TEMPLATEIMG}" -f qcow2 "${DISKIMG}"
 fi
-ls -l ${DISKIMG}
 
 ${qemu_i386} -m 512 \
   -serial unix:${SERIAL},server,nowait \
@@ -107,9 +110,8 @@ ${qemu_i386} -m 512 \
   -vnc unix:${VNC} \
   -net nic,macaddr=${MACADDR},model=ne2k_pci \
   -net tap,ifname=${IFACE},script=no \
-  -boot c -hda ${DISKIMG} -no-reboot & qemu=$!
+  -boot c -hda "${DISKIMG}" -no-reboot & qemu=$!
   
-ls -l ${DISKIMG}
 
 # wait for ssh to work
 while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
@@ -119,6 +121,10 @@ do
 done
 
 date
+
+# strip the root password off the specific test image.
+# Makes it portable to anyone.
+${SSH} root@${IPADDR} 'sed -i s/^root:x:/root::/ /etc/passwd'
 
 # create a tmpfs /tmp on the instance to place the debs into
 ${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
