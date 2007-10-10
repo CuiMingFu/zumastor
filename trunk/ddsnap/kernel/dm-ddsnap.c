@@ -613,8 +613,10 @@ connect:
 			info->flags |= READY_FLAG;
 			info->chunksize_bits = chunksize_bits;
 			info->chunkshift     = chunksize_bits - SECTOR_SHIFT;
-			if (is_snapshot(info)) // multiple chunks should work ok for origin
-				target->split_io = 1 << info->chunkshift; // not yet implemented for snapshot!!!
+			// FIXME: get rid of .chunks = 1 to get rid of bio splitting for origin device
+			//if (is_snapshot(info))
+			// FIXME: rewrite ddsnapd pending code to get rid of bio splitting for snapshot device
+				target->split_io = 1 << info->chunkshift;
 
 			up(&info->server_out_sem);
 			if (outbead(info->control_socket, CONNECT_SERVER_OK, struct { }) < 0)
