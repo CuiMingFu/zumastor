@@ -24,5 +24,6 @@ in-target apt-get clean
 rm /target/etc/iftab
 
 # set noapic and noacpi on all grub kernel boot stanzas - qemu doesn't like
-in-target sed --in-place '/^# kopt=/s/$/ noapic noacpi/' /boot/grub/menu.lst
-in-target update-grub
+# kvm likes it less, commented out again but left for further reinstatements
+# in-target sed --in-place '/^# kopt=/s/$/ noapic noacpi/' /boot/grub/menu.lst
+# in-target update-grub
