@@ -51,6 +51,7 @@
 #define SB_BUSY 2
 #define SB_SELFCHECK 4
 #define SB_SECTOR 8			/* Sector where superblock lives.     */
+#define SB_SECTORS 8			/* Size of ddsnap super block in sectors */
 #define SB_MAGIC { 't', 'e', 's', 't', 0xdd, 0x07, 0x06, 0x04 } /* date of latest incompatible sb format */
 /*
  * Snapshot store format revision history
@@ -981,9 +982,18 @@ static u64 calc_bitmap_blocks(struct superblock *sb, u64 chunks)
 	return (chunks + (1 << (chunkshift + 3)) - 1) >> (chunkshift + 3);
 }
 
+/* 
+ * Disk layout for combined snapshot store:
+ *    4k unused
+ *    4k ddsnap superblock
+ *    bitmap blocks
+ *    journal blocks
+ *    btree and copied out blocks
+ */
+
 static int init_allocation(struct superblock *sb)
 {
-	unsigned meta_bitmap_base_chunk = (SB_SECTOR + 2*chunk_sectors(&sb->metadata) - 1) >> sb->metadata.chunk_sectors_bits;
+	unsigned meta_bitmap_base_chunk = (SB_SECTOR + SB_SECTORS + chunk_sectors(&sb->metadata) - 1) >> sb->metadata.chunk_sectors_bits;
 	
 	sb->metadata.asi->bitmap_blocks = calc_bitmap_blocks(sb, sb->metadata.asi->chunks); 
 	sb->metadata.asi->bitmap_base = meta_bitmap_base_chunk << sb->metadata.chunk_sectors_bits;
@@ -1013,7 +1023,7 @@ static int init_allocation(struct superblock *sb)
 		   << sb->metadata.chunk_sectors_bits);
 	
 	u64 chunks  = sb->metadata.asi->chunks  + (!combined(sb) ? sb->snapdata.asi->chunks  : 0);
-	unsigned bitmaps = sb->metadata.asi->bitmap_blocks + (!combined(sb) ? sb->snapdata.asi->bitmap_blocks : 0);
+	unsigned bitmaps = sb->metadata.asi->bitmap_blocks + (combined(sb) ? 0 : sb->snapdata.asi->bitmap_blocks);
 	if (!combined(sb))
 		warn("metadata store size: %Li chunks (%Li sectors)", 
 		     sb->metadata.asi->chunks, sb->metadata.asi->chunks << sb->metadata.chunk_sectors_bits);
@@ -1031,15 +1041,14 @@ static int init_allocation(struct superblock *sb)
 	 * so we don't have to worry about dealing with the partial byte in
 	 * alloc_chunk_from_range().
 	 */
-	unsigned i, sector = sb->metadata.asi->bitmap_base;
-	for (i = 0; i < bitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
+	unsigned sector = sb->metadata.asi->bitmap_base;
+	for (int i = 0; i < bitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
 		struct buffer *buffer = getblk(sb->metadev, sector, sb->metadata.allocsize);
 		memset(buffer->data, 0, sb->metadata.allocsize);
 		/* Reserve bitmaps and superblock */
-		if (i == 0) {
-			unsigned i; // !!! same index name, bad taste
-			for (i = 0; i < reserved; i++)
-				set_bitmap_bit(buffer->data, i);
+		if (i == 0) { // FIXME: this does not handle large enough bitmap and/or journal chunks
+			for (int j = 0; j < reserved; j++)
+				set_bitmap_bit(buffer->data, j);
 		}
 		/* Suppress overrun allocation in partial last byte */
 		if (i == bitmaps - 1 && (chunks & 7))
