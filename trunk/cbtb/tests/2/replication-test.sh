@@ -71,14 +71,14 @@ zumastor status --usage
 echo ok 6 - replication manually kicked off from master
 
 # reasonable wait for these small volumes to finish the initial replication
-${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol || true
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
 zumastor snapshot testvol hourly 
 sleep 2
 zumastor status --usage
-${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol
+${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol || true
 ${SSH} root@${slave} zumastor status --usage
 
 echo ok 7 - testfile written, synced, and snapshotted
