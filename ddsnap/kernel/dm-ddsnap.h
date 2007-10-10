@@ -82,7 +82,7 @@ enum csnap_error_codes
 	ERROR_OTHER,
 };
 
-#define ID_BITS 16
+#define RW_ID_BITS 32 /* the size of the rw_request id field */
 
 struct protocol_error { uint32_t err; uint32_t culprit; char msg[]; } PACKED;
 struct usecount_info { uint32_t snap; int32_t usecnt_dev; } PACKED;
