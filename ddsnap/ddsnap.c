@@ -2064,18 +2064,6 @@ int main(int argc, char *argv[])
 		POPT_TABLEEND
 	};
 
-	struct poptOption volOptions[] = {
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
-		  "Create volume file\n\t Function: Create a volume file\n\t Usage: vol create <sockname> <volfile> <vol_device>\n", NULL },
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
-		  "Apply volume file\n\t Function: Apply a volume file to a downstream volume\n\t Usage: vol apply <volfile> <vol_device>", NULL },
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
-		  "Send vol\n\t Function: Send a volume file to a downstream server\n\t Usage: vol send <sockname> <vol_device> <host>[:<port>]\n", NULL },
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &serverOptions, 0,
-		  "Listen\n\t Function: Listen for a volume file arriving from upstream\n\t Usage: vol listen [OPTION...] <vol_device> [<host>[:<port>]]", NULL },
-		POPT_TABLEEND
-	};
-
 	struct poptOption deltaOptions[] = {
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
 		  "Create changelist\n\t Function: Create a changelist given 2 snapshots\n\t Usage: delta changelist <sockname> <changelist> <snapshot1> <snapshot2>", NULL },
@@ -2110,8 +2098,6 @@ int main(int argc, char *argv[])
 		  "Usecount\n\t Function: Change the use count of a snapshot\n\t Usage: usecount <sockname> <snap_tag> <diff_amount>", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &stOptions, 0,
 		  "Get statistics\n\t Function: Report snapshot usage statistics\n\t Usage: status [OPTION...] <sockname> [<snapshot>]", NULL },
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &volOptions, 0,
-		  "Vol\n\t Usage: vol [OPTION...] <subcommand> ", NULL},
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &deltaOptions, 0,
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
 		{ "version", 'V', POPT_ARG_NONE, NULL, 0, "Show version", NULL },
@@ -2144,6 +2130,31 @@ int main(int argc, char *argv[])
 
 	if (strcmp(command, "--usage") == 0) {
 		mainUsage();
+		exit(0);
+	}
+
+	if (!strcmp(command, "dump")) {
+		int err = 1;
+		u64 start = 0, finish = -1; /* if not specified, the defaults dump the entire tree */
+		if (argc == 5) {
+			char *endptr;
+			start = strtoull(argv[3], &endptr, 10);
+			if (*endptr == '\0')
+				finish = strtoull(argv[4], &endptr, 10);
+			if (*endptr != '\0')
+				fprintf(stderr, "%s %s: invalid chunk specified\n", argv[0], argv[1]);
+			else
+				err = 0;
+		}
+		if ((argc != 3) && err) {
+			printf("Usage: %s dump <socket> [<start> <end>]\n", argv[0]);
+			exit(1);
+		}
+		int sock = create_socket(argv[2]);
+		if ((err = outbead(sock, DUMP_TREE_RANGE, struct dump_tree_range, start, finish))) {
+			warn("unable to send dump tree request: %s", strerror(-err));
+			exit(1);
+		}
 		exit(0);
 	}
 

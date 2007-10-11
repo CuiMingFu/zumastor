@@ -29,7 +29,7 @@ enum csnap_codes
 	DELETE_SNAPSHOT, 
 	DELETE_SNAPSHOT_OK,
 	DELETE_SNAPSHOT_ERROR,
-	DUMP_TREE,
+	DUMP_TREE_RANGE,
 	INITIALIZE_SNAPSTORE,
 	NEED_SERVER,
 	CONNECT_SERVER,
@@ -103,6 +103,7 @@ struct snapinfo { uint32_t snap; int8_t prio; uint16_t usecnt; uint64_t ctime; }
 struct snaplist { uint32_t count; struct snapinfo snapshots[]; } PACKED;
 struct stream_changelist { uint32_t snap1; uint32_t snap2; } PACKED;
 struct changelist_stream { uint64_t chunk_count; uint32_t chunksize_bits; } PACKED;
+struct dump_tree_range { chunk_t start; chunk_t finish; } PACKED;
 
 /* Status retrieval (!!! move me out of kernel !!!) */
 
