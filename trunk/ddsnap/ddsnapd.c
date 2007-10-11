@@ -1250,9 +1250,8 @@ static struct buffer *probe(struct superblock *sb, u64 chunk, struct etree_path 
  */
 
 static int traverse_tree_range(
-	struct superblock *sb, chunk_t start, unsigned int leaves,
+	struct superblock *sb, chunk_t start, chunk_t finish,
 	void (*visit_leaf)(struct superblock *sb, struct eleaf *leaf, void *data),
-	void (*visit_leaf_buffer)(struct superblock *sb, struct buffer *leafbuf, void *data),
 	void *data)
 {
 	int levels = sb->image.etree_levels, level = -1;
@@ -1261,7 +1260,7 @@ static int traverse_tree_range(
 	struct buffer *leafbuf;
 	struct enode *node;
 
-	if (leaves != 0) {
+	if (start) { /* FIXME TODO start at random chunk address (not tested!!!!) */
 		if (!(leafbuf = probe(sb, start, path)))
 			return -ENOMEM;
 		level = levels - 1;
@@ -1293,20 +1292,11 @@ static int traverse_tree_range(
 					level? path[level - 1].pnext++->sector: sb->image.etree_root);
 				return -EIO;
 			}
-
 start:
 			trace(printf("process leaf %Lx\n", leafbuf->sector););
 			visit_leaf(sb, buffer2leaf(leafbuf), data);
 
 			brelse(leafbuf);
-
-			if (visit_leaf_buffer)
-				visit_leaf_buffer(sb, leafbuf, data);
-
-			if (leaves != 0 && !--leaves) {
-				brelse_path(path, level + 1);
-				return 0;
-			}
 		}
 
 		do {
@@ -1320,79 +1310,53 @@ start:
 	}
 }
 
-static int traverse_tree_chunks(
-	struct superblock *sb,
-	void (*visit_leaf)(struct superblock *sb, struct eleaf *leaf, void *data),
-	void (*visit_leaf_buffer)(struct superblock *sb, struct buffer *leafbuf, void *data),
-	void *data)
-{
-	return traverse_tree_range(sb, 0, 0, visit_leaf, visit_leaf_buffer, data);
-}
-
 /*
  * btree debug dump
  */
 
-static void show_leaf(struct eleaf *leaf)
+static void show_leaf_range(struct eleaf *leaf, chunk_t start, chunk_t finish)
 {
-	struct exception const *p;
-	int i;
-
-	printf("base chunk: %Lx and %i chunks: ", leaf->base_chunk, leaf->count);
-	for (i = 0; i < leaf->count; i++) {
-		printf("%x=", leaf->map[i].rchunk);
-		printf("@offset:%i ", leaf->map[i].offset);
-		for (p = emap(leaf, i); p < emap(leaf, i+1); p++)
-			printf("%Lx/%08llx%s", p->chunk, p->share, p+1 < emap(leaf, i+1)? ",": " ");
+	for (int i = 0; i < leaf->count; i++) {
+		chunk_t addr = leaf->map[i].rchunk;
+		if (addr >= start && addr <= finish) {
+			printf("Addr %Lx: ", addr);
+			for (struct exception *p = emap(leaf, i); p < emap(leaf, i+1); p++)
+				printf("%Lx/%08llx, ", p->chunk, p->share);
+			printf("\n");
+		}
 	}
-	printf("top@%i free space calc: %d payload: %d",
-		leaf->map[i].offset, leaf_freespace(leaf), leaf_payload(leaf));
-	printf("\n");
 }
 
-static void show_subtree(struct superblock *sb, struct enode *node, int levels, int indent)
+#if 0
+static void show_leaf(struct eleaf *leaf)
+{
+	show_leaf_range(leaf, 0, -1);
+}
+#endif
+
+static void show_subtree_range(struct superblock *sb, struct enode *node, chunk_t start, chunk_t finish, int levels, int indent)
 {
 	int i;
 
-	printf("%*s", indent, "");
-	printf("%i nodes:\n", node->count);
 	for (i = 0; i < node->count; i++) {
 		struct buffer *buffer = snapread(sb, node->entries[i].sector);
-		if (!buffer)
-			return;
-		if (i)
-			printf("pivot = %Lx\n", (long long)node->entries[i].key);
-
 		if (levels)
-			show_subtree(sb, buffer2node(buffer), levels - 1, indent + 3);
+			show_subtree_range(sb, buffer2node(buffer), start, finish, levels - 1, indent + 3);
 		else {
-			printf("%*s", indent + 3, "");
-			show_leaf(buffer2leaf(buffer));
+			show_leaf_range(buffer2leaf(buffer), start, finish);
 		}
 		brelse(buffer);
 	}
 }
 
-static void show_tree(struct superblock *sb)
+static void show_tree_range(struct superblock *sb, chunk_t start, chunk_t finish)
 {
 	struct buffer *buffer = snapread(sb, sb->image.etree_root);
 	if (!buffer)
 		return;
-	show_subtree(sb, buffer2node(buffer), sb->image.etree_levels - 1, 0);
+	show_subtree_range(sb, buffer2node(buffer), start, finish, sb->image.etree_levels - 1, 0);
 	brelse(buffer);
 }
-
-#if 0
-static void show_tree_leaf(struct superblock *sb, struct eleaf *leaf, void *data)
-{
-	show_leaf(leaf);
-}
-
-static void show_tree_range(struct superblock *sb, chunk_t start, unsigned int leaves)
-{
-	traverse_tree_range(sb, start, leaves, show_tree_leaf, NULL, NULL);
-}
-#endif
 
 /* Remove btree entries */
 
@@ -1470,33 +1434,6 @@ static int delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *leaf,
 
 	return !!dinfo.any;
 }
-
-#if 0
-static void check_leaf_dirty(struct superblock *sb, struct buffer *leafbuf, void *data)
-{
-	struct delete_info *dinfo = data;
-
-	if (!!dinfo->any)
-		set_buffer_dirty(leafbuf);
-
-	if (dirty_buffer_count >= (sb->image.journal_size - 1)) {
-		commit_transaction(sb);
-		set_sb_dirty(sb);
-	}
-}
-
-static void delete_snapshots_from_tree(struct superblock *sb, u64 snapmask)
-{
-	struct delete_info dinfo;
-
-	dinfo.snapmask = snapmask;
-	dinfo.any = 0;
-
-	trace_on(printf("delete snapshot mask %Lx\n", snapmask););
-
-	traverse_tree_chunks(sb, _delete_snapshots_from_leaf, check_leaf_dirty, &dinfo);
-}
-#endif
 
 /*
  * Delete algorithm (flesh this out)
@@ -1873,7 +1810,7 @@ static struct change_list *gen_changelist_tree(struct superblock *sb, struct sna
 	if ((gcl.cl = init_change_list(sb->snapdata.asi->allocsize_bits, snapshot1->tag, snapshot2->tag)) == NULL)
 		return NULL;
 
-	traverse_tree_chunks(sb, gen_changelist_leaf, NULL, &gcl);
+	traverse_tree_range(sb, 0, -1, gen_changelist_leaf, &gcl);
 
 	return gcl.cl;
 }
@@ -3315,9 +3252,10 @@ static int incoming(struct superblock *sb, struct client *client)
 #endif
 		break;
 	}
-	case DUMP_TREE: // !!! use show_tree_range here, add start, count fields to message.
+	case DUMP_TREE_RANGE:
 	{
-		show_tree(sb);
+		struct dump_tree_range *dump = (void *)message.body;
+		show_tree_range(sb, dump->start, dump->finish);
 		break;
 	}
 	case START_SERVER:
@@ -3508,7 +3446,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		uint64_t share_array[MAX_SNAPSHOTS * MAX_SNAPSHOTS];
 		memset(share_array, 0, sizeof(share_array));
 
-		traverse_tree_chunks(sb, calc_sharing, NULL, share_array);
+		traverse_tree_range(sb, 0, -1, calc_sharing, share_array);
 		reply->ctime = sb->image.create_time;
 		reply->meta.chunksize_bits = sb->image.metadata.allocsize_bits;
 		reply->meta.total = sb->image.metadata.chunks;
