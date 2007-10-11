@@ -66,9 +66,12 @@ fi
 echo ok 9 - testvol\(0\)==testvol\(0\) snapshot stayed unchanged
   
 
+ddsnap create /tmp/server 2
+echo ok 10 - ddsnap create [snapshot 2]
+
 sleep $SLEEP
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test /tmp/control 2 | dmsetup create testvol\(2\)
-echo ok 10 - create testvol\(2\)
+echo ok 11 - create testvol\(2\)
 
 
 hash=`md5sum </dev/mapper/testvol`
@@ -77,7 +80,7 @@ if [ "$hash" != "$hash2" ] ; then
   echo -e "not "
   rc=11
 fi
-echo ok 11 - testvol==testvol\(2\) new snapshot correct
+echo ok 12 - testvol==testvol\(2\) new snapshot correct
 
 exit $rc
 
