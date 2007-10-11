@@ -24,8 +24,8 @@ echo "1..11"
 
 lvcreate --size 4m -n test sysvg
 lvcreate --size 8m -n test_snap sysvg
-dd if=/dev/zero bs=32k of=/dev/sysvg/test
-dd if=/dev/zero bs=32k of=/dev/sysvg/test_snap
+dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
+dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
 echo ok 1 - lvm set up
 
 ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
@@ -57,7 +57,7 @@ fi
 echo ok 8 - testvol==testvol\(0\)
 
 
-dd if=/dev/urandom bs=32k of=/dev/mapper/testvol  
+dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/testvol  
 hash02=`md5sum </dev/mapper/testvol\(0\)`
 if [ "$hash0" != "$hash02" ] ; then
   echo -e "not "
