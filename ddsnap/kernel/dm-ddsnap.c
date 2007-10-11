@@ -1131,11 +1131,11 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 
 	throttle(info, bio);
 	/* rob: check to see if the socket is connected, otherwise failed and don't place request on the queue */
+	pending = kmem_cache_alloc(pending_cache, GFP_NOIO|__GFP_NOFAIL);
+	spin_lock(&info->pending_lock);
 	id = info->nextid;
 	info->nextid = (id + 1) & ~(-1 << RW_ID_BITS);
-	pending = kmem_cache_alloc(pending_cache, GFP_NOIO|__GFP_NOFAIL);
 	*pending = (struct pending){ .id = id, .bio = bio, .chunk = chunk, .chunks = 1 };
-	spin_lock(&info->pending_lock);
 	if (!worker_ready(info)) {
 		spin_unlock(&info->pending_lock);
 		kmem_cache_free(pending_cache, pending);
