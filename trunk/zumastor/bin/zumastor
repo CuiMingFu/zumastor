@@ -1309,6 +1309,8 @@ receive)
 			2) log "hold snapshot $hold was squashed" $log && hold=-1 ;;
 			*) log "fail to obtain the state of snapshot $hold" $log && exit 2
 			esac
+		else
+			hold=-1
 		fi
 		[[ $hold = $send_snap ]] && { send_snap= send_addr=; }
 		echo $hold $send_snap $send_addr
