@@ -169,98 +169,6 @@ function run_remote  {
 	fi
 }
 
-#
-# Record a network hostname for the given "uname -n" host.
-#
-# If we've already recorded a network hostname, it's an error to use a
-# different one.  We want to allow use of the "uname -n" host regardless,
-# though, so if the given nethost is the same as the uname -n host, return
-# success.
-#
-function record_hostname {
-	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r hostfile=$1
-	local -r uhost=$2
-	local -r nethost=$3
-
-	if [ -f $hostfile ]; then
-		read oldhost <$hostfile
-		if [ "$oldhost" = "$nethost" -o "$nethost" = "$uhost" ]; then
-			return 0
-		fi
-		if [ "$oldhost" != "$nethost" ]; then
-			echo "Zumastor host \"$uhost\" already has the network name \"$oldhost,\" which"
-			echo "doesn't match the name you gave, \"$nethost!\""
-			exit 1
-		fi
-	fi
-	echo $host >$hostfile
-	return 0
-}
-
-function record_source_hostname {
-	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r vol=$1
-	local -r uhost=$2
-	local -r host=$3
-	local -r source_hostname=$VOLUMES/$vol/source/nethostname
-
-	return $(record_hostname $source_hostname $uhost $host)
-}
-
-function record_target_hostname {
-	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r vol=$1
-	local -r uhost=$2
-	local -r host=$3
-	local -r target_hostname=$VOLUMES/$vol/targets/$uhost/nethostname
-
-	return $(record_hostname $target_hostname $uhost $host)
-}
-
-#
-# Given a hostname, contacts the host and returns the "uname -n" version of
-# the hostname.
-#
-function resolve_uhost {
-	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r vol=$1
-	local -r host=$2
-
-	# Check the source to see if it's that host, otherwise check the
-	# target.  If both of those checks fail, contact the host directly
-	# to get its "uname -n".
-	if [ -f $VOLUMES/$vol/source/hostname ]; then
-		read uhost <$VOLUMES/$vol/source/hostname
-		if [ "$uhost" = "$host" ]; then
-			echo $host
-			return 0
-		fi
-	fi
-	if [ -d $VOLUMES/$vol/targets/$host ]; then
-		echo $host
-		return 0
-	fi
-	uhost=$(run_remote $host "uname -n")
-	[[ $uhost != "" ]] || { echo "$0: can't contact host $host"; exit 1; }
-	echo $uhost
-}
-
-#
-# Given the directory in which to look for the recorded real hostname, return
-# that.
-#
-function get_nethost {
-	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r dir=$1
-	local -r host=$2
-
-	[ -f $dir/nethostname ] || { echo "$0: Network hostname not defined for $host!"; exit 1; }
-	read nethost <$dir/nethostname
-	echo $nethost
-	return 0
-}
-
 #function usecount_increment {
 #	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 #	local -r vol=$1
@@ -273,7 +181,6 @@ function get_nethost {
 
 # replicate_snapshot
 # called from target zumastor daemon (run_target)
-# The passed hostname is resolved to the "uname -n" form by the caller.
 function replicate_snapshot {
 	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
@@ -291,12 +198,9 @@ function replicate_snapshot {
 
 	log "replication beginning from snapshot '$old_snap' to '$snap' on volume '$vol' for '$host'"
 
-	# Get the real hostname so we can contact him.
-	nethost=$(get_nethost $target_dir $host)
-
-	output=$(run_remote $nethost "cat $VOLUMES/$vol/source/hostname")
+	output=$(run_remote $host "cat $VOLUMES/$vol/source/hostname")
 	if [[ $? -ne 0 ]] || [[ $output != $MYHOSTNAME ]]; then
-		log "set this host as source for '$vol' on '$host' first!"
+		log "set '$MYHOSTNAME' as source for '$vol' on '$host' first!"
 		return 1
 	fi
 
@@ -308,7 +212,7 @@ function replicate_snapshot {
 
 	read port <$port_file || { log "error reading port from '$port_file'"; return 1; }
 
-	run_remote $nethost "zumastor receive start $vol $port" > $remote_file
+	run_remote $host "zumastor receive start $vol $port" > $remote_file
 	[[ $? -ne 0 ]] && { log "starting remote snapshot receive failed"; return 1; }
 	read remote_hold remote_send remote_addr < $remote_file
 
@@ -354,14 +258,14 @@ function replicate_snapshot {
 
 	log "remote listen started on port $port, transmitting snapshot $snap$resume"
 	# send the changes since the last snapshot via ddsnap transmit
-	ddsnap transmit $server $nethost:$port -r -g 6 $old_snap $snap$resume -p $send_file
+	ddsnap transmit $server $host:$port -r -g 6 $old_snap $snap$resume -p $send_file
 	if [[ $? -ne 0 ]]; then
-		log "transmit $server $nethost:$port $old_snap $snap$resume failed"
+		log "transmit $server $host:$port $old_snap $snap$resume failed"
 		return 1
 	fi
 
 	log "sending snapshot complete, notifying downstream host"
-	run_remote $nethost "zumastor receive done $vol $port"
+	run_remote $host "zumastor receive done $vol $port"
 	[[ $? -ne 0 ]] && { log "zumastor receive done $vol $port failed"; return 1; }
 
 	#[[ $snap -eq 5 ]] && restart_plug
@@ -425,11 +329,9 @@ function now {
 	date +%s
 }
 
-# The passed hostname is resolved to the "uname -n" form by the caller.
 function run_target {
 	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r vol=$1
-	local -r host=$2
+	local -r vol=$1 host=$2
 	local -t target_dir=$VOLUMES/$vol/targets/$host
 	local -r fifo=$target_dir/trigger
 	local -r period_file=$target_dir/period
@@ -539,15 +441,13 @@ function stop_nag {
 function stop_target {
 	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
-	local -r host=$(resolve_uhost $vol $2)
+	local -r host=$2
 	local -r log=${LOGS}/$vol/target-${host}.log
 
-	nethost=$(get_nethost $VOLUMES/$vol/targets/$host $host)
 	log "stopping target" $log
 	pkill -f "zumastor replicate $vol $host --delay"
-	pkill -f "zumastor replicate $vol $nethost --delay"
-	pkill -f "zumastor start target $vol $host$" || pkill -f "zumastor start target $vol $nethost$" || return 1
-	pkill -f "ddsnap transmit $SERVERS/$vol $nethost:" || return 1
+	pkill -f "zumastor start target $vol $host$" || return 1
+	pkill -f "ddsnap transmit $SERVERS/$vol $host:" || return 1
 }
 
 function init_define_volume {
@@ -628,13 +528,12 @@ function forget_volume {
 }
 
 function define_target {
-	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
-	local -r uhost=$3
-	local -r port=$4
-	local -r period=$5
-	local -r path=$VOLUMES/$vol/targets/$uhost
+	local -r port=$3
+	local -r period=$4
+	local -r path=$VOLUMES/$vol/targets/$host
 	local new=0
 
 	if [[ ! -e $path ]]; then
@@ -648,29 +547,26 @@ function define_target {
 	fi
 
 	echo $port > $path/port || return 1
-
-	record_target_hostname $vol $uhost $host
-	
 	if [[ -z $period ]]; then
 		rm $path/period 2> /dev/null
-		[[ $new == 0 ]] && pkill -f "zumastor replicate $vol $uhost --delay"
+		[[ $new == 0 ]] && pkill -f "zumastor replicate $vol $host --delay"
 	else
 		echo $period > $path/period || return 1
 		if [[ $new == 0 ]]; then
-			pkill -f "zumastor replicate $vol $uhost --delay"
-			zumastor replicate $vol $uhost --delay $period & # FIXME calculate delay based on last replication time
+			pkill -f "zumastor replicate $vol $host --delay"
+			zumastor replicate $vol $host --delay $period & # FIXME calculate delay based on last replication time
 		fi
 			
 	fi
 
 	[[ test_fullvolume -eq 1 ]] && echo 1 > $path/test_fullvolume
-	[[ $new -ne 1 ]] || zumastor start target $vol $uhost
+	[[ $new -ne 1 ]] || zumastor start target $vol $host
 }
 
 function forget_target {
 	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
-	local -r host=$(resolve_uhost $vol $2)
+	local -r host=$2
 	local -r path=$VOLUMES/$vol/targets/$host
 	local -r holdfile=$path/hold
 	local -r sendfile=$path/send
@@ -751,11 +647,10 @@ function forget_master {
 }
 
 function set_source {
-	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
-	local -r nethost=$3
-	local -r period=$4
+	local -r period=$3
 	local -r path=$VOLUMES/$vol
 	local -r mysize=$(ddsnap status $SERVERS/$vol --size) || return 1
 	local -r oldhost=$(cat $path/source/hostname 2>/dev/null)
@@ -765,8 +660,9 @@ function set_source {
 		prompt_continue "volume '$vol' is currently a master, convert to a downstream volume?"
 		forget_master $vol
 	fi
+
 	rempath=$VOLUMES/$vol/targets/$MYHOSTNAME/trigger
-	size=$(run_remote $nethost "ddsnap status $SERVERS/$vol --size")
+	size=$(run_remote $host "ddsnap status $SERVERS/$vol --size")
 	[[ $size -gt $mysize ]] && { echo "upstream volume ($size) is larger than local ($mysize), cannot set source" ; return 1; }
 
 	if [[ -e $path/source ]]; then
@@ -776,8 +672,6 @@ function set_source {
 
 	[[ $new == "yes" ]] && { mkdir -p $path/source || return 1; }
 	echo $host > $path/source/hostname || return 1
-
-	record_source_hostname $vol $host $nethost
 
 	if [[ -z $period ]]; then
 		rm $path/source/period 2>/dev/null || return 0
@@ -795,10 +689,6 @@ function trigger_snapshot {
 	send_to_fifo $fifo $kind || return 1
 }
 
-#
-# Called from "replicate" to start replication.  The host is already resolved
-# to the "uname -n" form by the caller.
-#
 function trigger_replication {
 	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
@@ -887,7 +777,6 @@ function nag_daemon {
 	local period
 	local kind
 	local host
-	local nethost
 
 	read host <$path/source/hostname
 	read period <$path/source/period 2>/dev/null
@@ -904,9 +793,8 @@ function nag_daemon {
 			log "nag daemon starting for volume '$vol'" $log
 		fi
 
-		read nethost <$path/source/nethostname
 		log "sending wakeup to $host:" $log
-		run_remote $nethost "echo target/$MYHOSTNAME > $VOLUMES/$vol/master/trigger" >> $log 2>&1
+		run_remote $host "echo target/$MYHOSTNAME > $VOLUMES/$vol/master/trigger" >> $log 2>&1
 		sleep $period
 	done &
 }
@@ -1009,12 +897,10 @@ define)
 			port=$DEFAULT_PORT
 		fi
 
-		uhost=$(resolve_uhost $vol $host)
-
 		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-		verify_valid_host $uhost || { echo "$0: invalid host '$uhost'"; exit 1; }
+		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
 
-		define_target $vol $host $uhost $port $period
+		define_target $vol $host $port $period
 		exit $? ;;
 	master)
 		declare args arg kind count delta=0
@@ -1108,12 +994,10 @@ define)
 		[[ $# -eq 2 ]] || { echo $usage; exit 6; }
 		declare vol=$1 host=$2
 
-		uhost=$(resolve_uhost $vol $host)
-
 		verify_managed_vol $vol || { echo "$name: volume '$vol' is not a managed volume"; exit 4; }
-		verify_valid_host $uhost || { echo "$name: invalid host '$host'"; exit 5; }
+		verify_valid_host $host || { echo "$name: invalid host '$host'"; exit 5; }
 
-		set_source $vol $uhost $host $period
+		set_source $vol $host $period
 		exit $? ;;
 	*)
 		echo "usage: $0 define volume|target|master|source"
@@ -1166,7 +1050,7 @@ start)
 	target)
 		[ $# -eq 4 ] || { echo "usage: $0 start target <vol> <host>"; exit 2; }
 		declare vol=$3
-		declare host=$(resolve_uhost $vol $4)
+		declare host=$4
 
 		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
@@ -1306,20 +1190,16 @@ replicate)
 	declare vol=$1
 	declare host=$2
 
-	uhost=$(resolve_uhost $vol $host)
-
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-	verify_existing_target $vol $uhost || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
+	verify_existing_target $vol $host || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
 	[[ -z $snap ]] || verify_existing_snap $vol $snap || { echo "$0: invalid snapshot '$snap' for volume '$vol'"; exit 1; }
 	if [[ ! -z $delay ]]; then
 		verify_valid_number $delay || { echo "$0: invalid delay '$delay' specified"; exit 1; }
 		sleep $delay
 	fi
 
-	record_target_hostname $vol $uhost $host
-
 	# <snap> is optional and a new snapshot is taken if omitted
-	trigger_replication $vol $uhost $snap
+	trigger_replication $vol $host $snap
 	exit $?
 	;;
 status)
@@ -1352,6 +1232,7 @@ status)
 		declare vol
 
 		# for debugging
+		#tree -Fx --noreport $opt $VOLUMES
 		pushd $VOLUMES >/dev/null
 		[[ `ls | wc -l` -gt 0 ]] && for vol in *; do
 			echo VOLUME $vol:
@@ -1367,12 +1248,12 @@ status)
 				echo Status: not running
 			fi
 			echo "Configuration:"
-			treeprint $showfull $VOLUMES/$vol
+			tree -Fx --noreport $showfull $VOLUMES/$vol
 			echo
 		done 2> /dev/null
 		popd >/dev/null
 		echo RUN STATUS:
-		treeprint $showfull $RUNPATH
+		tree -Fx --noreport $showfull $RUNPATH
 		exit $?
 	else
 		declare vol=$1
@@ -1388,7 +1269,7 @@ status)
 			ddsnap status $sock $snap
 		fi
 		if [ -z $snap ]; then
-			treeprint $showfull $VOLUMES/$vol
+			tree -Fx --noreport $showfull $VOLUMES/$vol
 		fi
 		exit $?
 	fi
@@ -1428,8 +1309,6 @@ receive)
 			2) log "hold snapshot $hold was squashed" $log && hold=-1 ;;
 			*) log "fail to obtain the state of snapshot $hold" $log && exit 2
 			esac
-		else
-			hold=-1
 		fi
 		[[ $hold = $send_snap ]] && { send_snap= send_addr=; }
 		echo $hold $send_snap $send_addr

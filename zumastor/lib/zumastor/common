@@ -376,22 +376,3 @@ function num_snapshots {
 	output=$(ddsnap status $SERVERS/$vol --list) || { echo "error getting snapshot list"; return 1; }
 	echo $output | wc -w
 }
-
-declare -r tree_indent="   "
-function treeprint {
-	local full=""
-	[[ $1 == "-f" ]] && full="-f" && shift
-	[[ $# -eq 1 ]] || [[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r path=$1 string=$2
-	local -r device=$(stat -c %d $path)
-	pushd $path >/dev/null
-	for file in *; do 
-		[[ ! -e $file ]] || [[ $file == "trigger" ]] && continue
-		[[ $full == "-f" ]] && echo -n "$string$PWD/$file" || echo -n "$string$file"
-		[[ -h $file ]] && echo " -> $(readlink $file)" && continue
-		[[ -f $file ]] && [[ -s $file ]] && echo ": $(cat $file)" && continue
-		[[ -d $file ]] && [[ $(stat -c %d $file) == $device ]] && echo && treeprint $full $file "$tree_indent$string" && continue
-		echo
-	done
-	popd >/dev/null
-}

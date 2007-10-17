@@ -632,7 +632,7 @@ static char *malloc_snapshot_name(const char *devstem, u32 id)
 	return snapshot_name;
 }
 
-static int generate_progress_file(const char *progress_file, char **tmpfilename)
+int generate_progress_file(const char *progress_file, char **tmpfilename)
 {
 	char *progress_tmpfile;
 	int progress_len = strlen(progress_file);
@@ -645,14 +645,14 @@ static int generate_progress_file(const char *progress_file, char **tmpfilename)
 	return 0;
 }
 
-static int write_progress(const char *progress_file, const char *progress_tmpfile, u64 chunk_num, u64 chunk_count, u64 extent_addr, u32 tgt_snap)
+int write_progress(const char *progress_file, const char *progress_tmpfile, u64 chunk_num, u64 chunk_count, u64 extent_addr, int tgt_snap)
 {
 	FILE *progress_fs;
 	if ((progress_fs = fopen(progress_tmpfile, "w")) == NULL) {
 		warn("unable to open progress temp file %s: %s", progress_tmpfile, strerror(errno));
 		return -1;
 	}
-	if (fprintf(progress_fs, "%u %Lu/%Lu %Lu\n", tgt_snap, chunk_num, chunk_count, extent_addr) < 0) {
+	if (fprintf(progress_fs, "%i %Lu/%Lu %Lu\n", tgt_snap, chunk_num, chunk_count, extent_addr) < 0) {
 		warn("unable write to progress temp file %s: %s", progress_tmpfile, strerror(errno));
 		fclose(progress_fs);
 		return -1;
@@ -665,7 +665,7 @@ static int write_progress(const char *progress_file, const char *progress_tmpfil
 	return 0;
 }
 
-static int generate_delta_extents(u32 mode, int level, struct change_list *cl, int deltafile, char const *devstem, u32 src_snap, u32 tgt_snap, char const *progress_file, u64 start_chunk)
+static int generate_delta_extents(u32 mode, int level, struct change_list *cl, int deltafile, char const *devstem, int src_snap, int tgt_snap, char const *progress_file, u64 start_chunk)
 {
 	int fullvolume = (src_snap == -1);
 	char *dev1name = NULL, *dev2name = NULL, *progress_tmpfile = NULL;
@@ -1093,7 +1093,7 @@ out:
 	return err;
 }
 
-static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, char const *dev1name, char const *dev2name, char const *progress_file, u32 tgt_snap)
+static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, char const *dev1name, char const *dev2name, char const *progress_file, int tgt_snap)
 {
 	int fullvolume = !dev1name;
 	int snapdev1, snapdev2;
@@ -1753,7 +1753,7 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 	return 0;
 }
 
-static u32 get_state(int serv_fd, u32 snaptag)
+static u32 get_state(int serv_fd, unsigned int snaptag)
 {
 	int err;
 

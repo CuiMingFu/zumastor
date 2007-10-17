@@ -7,6 +7,6 @@ Standards-Version: 3.6.2
 
 Package: zumastor
 Architecture: any
-Depends: ddsnap (>= 0.4), cron, dmsetup,  ${shlibs:Depends}, ${misc:Depends}
+Depends: ddsnap (>= 0.4), tree, cron, dmsetup,  ${shlibs:Depends}, ${misc:Depends}
 Description: Zumastor interface for ddsnap
 	Provides snapshot and replication management for the ddsnap package
