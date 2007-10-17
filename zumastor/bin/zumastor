@@ -1352,7 +1352,6 @@ status)
 		declare vol
 
 		# for debugging
-		#tree -Fx --noreport $opt $VOLUMES
 		pushd $VOLUMES >/dev/null
 		[[ `ls | wc -l` -gt 0 ]] && for vol in *; do
 			echo VOLUME $vol:
@@ -1368,12 +1367,12 @@ status)
 				echo Status: not running
 			fi
 			echo "Configuration:"
-			tree -Fx --noreport $showfull $VOLUMES/$vol
+			treeprint $showfull $VOLUMES/$vol
 			echo
 		done 2> /dev/null
 		popd >/dev/null
 		echo RUN STATUS:
-		tree -Fx --noreport $showfull $RUNPATH
+		treeprint $showfull $RUNPATH
 		exit $?
 	else
 		declare vol=$1
@@ -1389,7 +1388,7 @@ status)
 			ddsnap status $sock $snap
 		fi
 		if [ -z $snap ]; then
-			tree -Fx --noreport $showfull $VOLUMES/$vol
+			treeprint $showfull $VOLUMES/$vol
 		fi
 		exit $?
 	fi
