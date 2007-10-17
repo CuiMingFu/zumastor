@@ -1,0 +1,262 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=iso-8859-1">
+	<TITLE>Zumastor design and implementation notes</TITLE>
+	<META NAME="AUTHOR" CONTENT="Frank Mayhar">
+	<META NAME="CREATED" CONTENT="20070913;13250800">
+	<STYLE TYPE="text/css">
+	<!--
+		BODY { font-size: 10pt; font-family: "Verdana", sans-serif; }
+		H1 { font-size: 14pt; margin-top: 0.2in; text-align: center }
+		P { margin-bottom: 0.1in }
+		H2 { font-size: 13pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H3 { font-size: 12pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H4 { font-size: 11pt; margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
+		DIV.indent { margin-left: 2em; }
+	-->
+	</STYLE>
+</HEAD>
+<BODY>
+<H1>Zumastor design and implementation notes</H1>
+<H3>Snapshots versus the origin.</H3>
+<P>When a snapshot is taken, it is empty; all reads
+and writes get passed through to the origin. When an origin write
+happens, the affected chunk or chunks must be copied to any extant
+snapshots. (This chunk is referred to as an "exception" to
+the rule that all chunks belong to the origin.) The make_unique()
+function checks whether the chunk needs to be copied out, does so if
+necessary, and returns an indication of whether that happened.</P>
+<H3>Path of a bio request through dm-ddsnap and ddsnapd.</H3>
+<H4>The path a bio request takes as a result of a read from a snapshot device
+that goes to the origin (aka "snapshot origin read").</h4>
+<UL>
+	<LI><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<LI>Generic device handling (or in this case the device mapper) calls
+		ddsnap_map() with the initial bio. ddsnap_map() queues the bio on
+		the &quot;queries" queue of the dm_target private (devinfo)
+		structure.</li>
+		<li>worker() finds the bio on the "queries" queue. It
+		dequeues it from "queries" and queues it on the "pending"
+		queue, then sends a QUERY_SNAPSHOT_READ message to ddsnapd.</li>
+	</UL></li>
+	<li><B>Process space (ddsnapd):</B>
+	<UL>
+		<li>incoming() gets QUERY_SNAPSHOT_READ, vets it, performs
+		readlock_chunk() (to assert a snaplock) for each chunk shared with
+		origin, sends SNAPSHOT_READ_ORIGIN_OK message to kernel.</li>
+	</UL></li>
+	<li><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<li>incoming() gets SNAPSHOT_READ_ORIGIN_OK, calls replied_rw().</li>
+		<li>replied_rw() finds each chunk id in "pending" queue,
+		dequeues it. For a read from the origin (per
+		SNAPSHOT_READ_ORIGIN_OK), sets the bi_end_io callback to
+		snapshot_read_end_io() and queues the bio in the "locked"
+		queue. It then passes the request to lower layers via
+		generic_make_request().</li>
+		<li>When the request has completed, the lower level calls
+		snapshot_read_end_io(), which moves the bio from the "locked"
+		queue to the "releases" queue (and pings the worker that
+		there's more work). It also calls any chained end_io routine.</li><li>
+		worker() finds the bio on the "releases" queue. It
+		dequeues it from "releases" and sends a
+		FINISH_SNAPSHOT_READ message to ddsnapd.</li>
+	</ul></li>
+	<li><B>Process space (ddsnapd):</B> 
+	<UL>
+		<li>incoming() gets FINISH_SNAPSHOT_READ and calls
+		release_chunk() for each chunk, which finds the lock for that
+		chunk and calls release_lock().
+		<ul>
+			<li>release_lock() finds the client on the hold list for that
+			lock and frees that hold.</li>
+			<li>If there are still holds remaining (on behalf of other
+			clients), release_lock() terminates, leaving the snaplock and
+			any waiting writes pending.</li>
+			<li>If there are no more holds, release_lock() walks the
+			waitlist, freeing each wait as well as each "pending"
+			structure and transmitting the associated
+			ORIGIN_WRITE_OK message to permit each pending write to
+			continue.</li>
+		</ul></li>
+	</UL></li>
+</UL>
+<H4>The path a bio request takes as a result of a write to the origin device (aka "origin write").</H4>
+<UL>
+	<li><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<li>Generic device handling (or in this case the device mapper)
+		calls ddsnap_map() with the initial bio. ddsnap_map() queues
+		the bio on the "queries"
+		queue of the dm_target private (devinfo) structure.</li>
+		<li>worker() finds
+		the bio on the "queries" queue. It dequeues it from
+		"queries" and queues it on the "pending" queue,
+		then sends a QUERY_WRITE message to ddsnapd.</li>
+	</UL></li>
+	<li><B>Process space (ddsnapd):</B>
+	<UL>
+		<li>incoming() gets QUERY_WRITE for the origin (snaptag of -1).</li>
+		<li>Calls make_unique() to copy each chunk out to snapshot(s) if
+		necessary.</li>
+		<li>If chunk was copied out, calls waitfor_chunk(), which finds any
+		snaplock outstanding for the chunk. If one is found, it adds a
+		"pending" structure (allocated as needed) to the lock wait
+		list.</li>
+		<li>If no chunk was queued "pending," it sends an
+		ORIGIN_WRITE_OK message to the kernel.</li>
+		<li>If any chunk was queued "pending" it copies the
+		ORIGIN_WRITE_OK message to the message buffer on the "pending"
+		structure.  This message is transmitted as a side effect of
+		when ddsnapd receiving FINISH_SNAPSHOT_READ and removing all
+		holds and waiters on the associated lock, as outlined in the
+		description of snapshot origin read.</li>
+	</UL></li>
+	<li><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<li>incoming() gets ORIGIN_WRITE_OK, calls replied_rw().</li>
+		<li>replied_rw() finds each chunk id in "pending" queue,
+		dequeues it. For a write to the origin (per ORIGIN_WRITE_OK), it
+		passes the request to lower layers via generic_make_request().</li>
+	</UL></li>
+</UL>
+<H4>The path a bio request takes as a result of a write to a snapshot device (aka "snapshot write").</H4>
+<UL>
+	<li><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<li>Generic device
+		handling (or in this case the device mapper) calls ddsnap_map()
+		with the initial bio. ddsnap_map() queues the bio on the "queries"
+		queue of the dm_target private (devinfo) structure.</li>
+		<li>worker() finds
+		the bio on the "queries" queue. It dequeues it from
+		"queries" and queues it on the "pending" queue,
+		then sends a QUERY_WRITE message to ddsnapd.</li>
+	</UL></li>
+	<li><B>Process space (ddsnapd):</B>
+	<UL>
+		<li>incoming() gets QUERY_WRITE for a snapshot.</li>
+		<li>If snapshot not squashed, calls make_unique() to copy each chunk
+		from the origin out to snapshot(s) if necessary.</li>
+		<li>Sends a SNAPSHOT_WRITE_OK (SNAPSHOT_WRITE_ERROR if squashed or an
+		error on make_unique()) message to the kernel.</li>
+	</UL></li>
+	<li><B>Kernel (dm-ddsnap):</B>
+	<UL>
+		<li>incoming() gets SNAPSHOT_WRITE_OK, calls replied_rw().</li>
+		<li>replied_rw() finds each chunk id in "pending" queue,
+		dequeues it. For a write to a snapshot (per SNAPSHOT_WRITE_OK), it
+		fills in the appropriate device and computes the physical block for
+		each chunk, then passes the request to lower layers via
+		generic_make_request().</li>
+	</UL></li>
+</UL>
+<H2>Startup.</H2>
+<p>The Zumastor system of processes is started as a side effect of creating a
+Zumastor volume by use of the "zumastor define volume" command.  Zumastor starts
+the user-space daemons (ddsnap agent and ddsnap server), then commands the
+devmapper to create the actual devices; this eventually results in a call
+to the kernel function ddsnap-create() through the constructor call from the
+devmapper.  This function creates the control, client and worker threads,
+which proceed as outlined below.</p>
+<p>Generally, when it is started the ddsnap agent just waits for connections;
+it sends no messages and all further operations are performed on behalf of
+clients.  During processing it gets a new connection, accepts it, allocates
+a client structure and adds it to its client list.  It adds the fd for
+that client to the poll vector and uses the offset therein to locate
+the client information later.  After startup the ddsnap server (ddsnapd)
+operates the same way.</p>
+<UL>
+	<li>dm-ddsnap client ("incoming" thread) starts and initializes, sends
+	NEED_SERVER to agent, blocks on server_in_sem.</li>
+	<ul>
+		<li>Agent gets NEED_SERVER, calls have_address() (which unconditionally
+		returns true), then calls connect_clients():
+		<ul>
+			<li>Connects to client address.</li>
+			<li>Sends CONNECT_SERVER and fd to dm-ddsnap control.</li>
+		</ul>
+		</li>
+	</ul>
+	<li>ddsnapd starts and initializes, sends SERVER_READY to agent, then
+	waits for connections.</li>
+	<ul>
+		<li>Agent gets SERVER_READY, calls try_to_instantiate() to send
+		START_SERVER to ddsnapd (which initializes its superblock).</li>
+		<li>Agent calls connect_clients():
+		<ul>
+			<li>Connects to client address.</li>
+			<li>Sends CONNECT_SERVER and fd to dm-ddsnap control.</li>
+		</ul>
+		</li>
+	</ul>
+	<li>After agent sends CONNECT_SERVER (by either path):
+	<ul>
+		<li>dm-ddsnap control gets CONNECT_SERVER, gets fd, ups
+		server_in_sem (unblocking client), sends IDENTIFY over
+		just-received server fd, ups recover_sem (unblocking
+		worker).</li>
+		<li>ddsnapd gets IDENTIFY, sends IDENTIFY_OK to client, passing
+		"chunksize_bits." <i>(To "identify" a snapshot?  What does this
+		mean?)</i></li>
+		<li>dm-ddsnap client gets IDENTIFY_OK:</li>	
+		<UL>
+			<li>Sets READY_FLAG.</li>
+			<li>Sets chunksize_bits from message.</li>
+			<li>Sends CONNECT_SERVER_OK to agent.</li>
+			<li>ups identify_sem, which allows ddsnap_create() to return.</li>
+		</UL>
+		</li>
+		<li>Agent receives CONNECT_SERVER_OK, does nothing, is happy.</li>
+	</ul></li>
+	<li>dm-ddsnap worker starts, blocks on recover_sem.  When unblocked
+	by CONNECT_SERVER operation:
+	<ul>
+		<li>If the target is a snapshot, calls upload_locks() to clear
+		outstanding releases list entries, send UPLOAD_LOCK and
+		FINISH_UPLOAD_LOCK messages to ddsnapd (which does nothing
+		with them) and move any outstanding entries on the "locked"
+		list to the "releases" list.</li>
+		<li>Calls requeue_queries() to move any queries in the "pending"
+		queue back to the "queries" queue for reprocessing (since
+		ddsnapd has restarted and has therefore lost any "pending"
+		queries).</li>
+		<li>Clears RECOVER_FLAG, ups recover_sem (again??), starts
+		worker loop.</li>
+	</ul></li>
+</UL>
+<h2>Locking</h2>
+<div class="indent">
+<p>When a chunk is shared between the origin and one or more
+snapshots, any reads of that chunk must go to the origin device.  A write to
+that chunk on the origin, however, may change the shared data and must therefore
+be properly serialized with any outstanding reads.</p>
+<p>Locks are created when a read to a shared chunk takes place; a snaplock is
+allocated if necessary and a hold record added to its "hold" list.  When a
+write to such a chunk takes place, we first copy the chunk out to the snapshots
+with which it is shared so that future snapshot reads no longer must lock the
+chunk.  We then check whether the chunk has already been locked.  If it has,
+we create a "pending" structure and append it to the eponymous list on the
+snaplock, thereby queueing the write for later processing.  When all
+outstanding reads of that chunk have completed, the chunk will be unlocked and
+the queued writes allowed to complete.</p>
+</div>
+<a name="glossary"><H2>Glossary</H2></a>
+<UL>
+	<li><B>chunk</B>:
+	A unit of data in a Zumastor volume, measured in bytes, which may not
+	(and probably will not) correspond to sector, block or page sizes;
+	Zumastor manipulates the contents of a volume in "chunk"-sized units.</li>
+	<li><B>exception</B>:
+	A chunk that no longer exists solely on the origin, but has been
+	modified after a snapshot was taken, so that a copy of the old
+	contents has been made in the affected snapshot(s).</li>
+	<li><B>snaplock</B>:
+	A data structure that describes a list of read locks associated with
+	a chunk associated with a snapshot but actually shared with the origin
+	for which there is a read outstanding.</li>
+</UL>
+</BODY>
+</HTML>

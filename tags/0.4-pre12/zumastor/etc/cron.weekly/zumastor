@@ -1,0 +1,4 @@
+#!/bin/bash
+for vol in $(ls /var/run/zumastor/cron) ; do
+	zumastor snapshot $vol weekly
+done
