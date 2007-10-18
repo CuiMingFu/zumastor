@@ -4,6 +4,8 @@
 #
 # Install build dependencies if they are missing on the qemu build machine
 
+apt-get update
+
 # I wish these worked
 pushd zumastor
 apt-get build-dep zumastor
