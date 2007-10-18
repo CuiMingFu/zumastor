@@ -42,14 +42,14 @@ echo ok 2 - slave network set up
 
 lvcreate --size 4m -n test sysvg
 lvcreate --size 8m -n test_snap sysvg
-dd if=/dev/zero bs=32k of=/dev/sysvg/test
-dd if=/dev/zero bs=32k of=/dev/sysvg/test_snap
+dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
+dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
 echo ok 3 - master lvm set up
 
 ${SSH} root@${slave} lvcreate --size 4m -n test sysvg
 ${SSH} root@${slave} lvcreate --size 8m -n test_snap sysvg
-${SSH} root@${slave} dd if=/dev/zero bs=32k of=/dev/sysvg/test
-${SSH} root@${slave} dd if=/dev/zero bs=32k of=/dev/sysvg/test_snap
+${SSH} root@${slave} dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
+${SSH} root@${slave} dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
 echo ok 4 - slave lvm set up
 
 ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
@@ -119,7 +119,7 @@ fi
 echo ok 17 - master testvol\($fromsnap\) == slave testvol\($tosnap\)
 
 
-dd if=/dev/urandom bs=32k of=/dev/mapper/testvol  
+dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/testvol  
 echo 18 - copy random data onto master testvol
 
 fromsnap=2
