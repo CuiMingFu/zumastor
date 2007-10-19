@@ -58,23 +58,29 @@ echo ok 5 - master ddsnap initialize
 controlsocket="/tmp/control"
 ddsnap agent $controlsocket
 echo ok 6 - master ddsnap agent
+sleep $SLEEP
 
 ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket /tmp/server
 echo ok 7 - master ddsnap server
+sleep $SLEEP
 
 ${SSH} root@${slave} ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
 echo ok 8 - slave ddsnap initialize
+sleep $SLEEP
 
 ${SSH} root@${slave} ddsnap agent $controlsocket
 echo ok 9 - slave ddsnap agent
+sleep $SLEEP
 
 ${SSH} root@${slave} \
   ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket /tmp/server
 echo ok 10 - slave ddsnap server
+sleep $SLEEP
 
 size=`ddsnap status /tmp/server --size` 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create testvol
 echo ok 11 - master create testvol
+sleep $SLEEP
 
 volname=testvol
 listenport=3333
@@ -82,6 +88,7 @@ $SSH root@${slave} \
   ddsnap delta listen --foreground $volname ${slave}:${listenport} & \
   listenpid=$!
 echo ok 12 - slave ddsnap delta listening for snapshot deltas
+sleep $SLEEP
 
 
 fromsnap=0
@@ -93,6 +100,7 @@ echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $fromsnap | \
   dmsetup create testvol\($fromsnap\)
 echo ok 13 - create testvol\($fromsnap\) block device on master
+sleep $SLEEP
 
 hash=`md5sum </dev/mapper/testvol`
 hash0=`md5sum </dev/mapper/testvol\($fromsnap\)`
@@ -101,6 +109,7 @@ if [ "$hash" != "$hash0" ] ; then
   rc=14
 fi
 echo ok 14 - testvol==testvol\($fromsnap\)
+sleep $SLEEP
 
 tosnap=$fromsnap
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
