@@ -11,8 +11,8 @@
 		H1 { font-size: 14pt; margin-top: 0.2in; text-align: center }
 		P { margin-bottom: 0.1in }
 		H2 { font-size: 13pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
-		H3 { font-size: 12pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
-		H4 { font-size: 11pt; margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
+		H3 { font-size: 11pt; margin-top: 0.1in; margin-bottom: 0.1in; text-align: left }
+		H4 { font-size: 10pt; margin-top: 0.05in; margin-bottom: 0.1in; text-align: left }
 		DIV.indent { margin-left: 2em; }
 	-->
 	</STYLE>
@@ -172,8 +172,9 @@ operates the same way.</p>
 	<li>dm-ddsnap client ("incoming" thread) starts and initializes, sends
 	NEED_SERVER to agent, blocks on server_in_sem.</li>
 	<ul>
-		<li>Agent gets NEED_SERVER, calls have_address() (which unconditionally
-		returns true), then calls connect_clients():
+		<li>Agent gets NEED_SERVER, calls have_server() which returns
+		true if the server has connected; if that is so then it calls
+		connect_clients():
 		<ul>
 			<li>Connects to client address.</li>
 			<li>Sends CONNECT_SERVER and fd to dm-ddsnap control.</li>
@@ -243,16 +244,75 @@ snaplock, thereby queueing the write for later processing.  When all
 outstanding reads of that chunk have completed, the chunk will be unlocked and
 the queued writes allowed to complete.</p>
 </div>
+<h2>Replication and Hostnames</h2>
+<div class="indent">
+<H3>Configuration</H3>
+<p>Zumastor currently stores replication target information on the source host
+by volume name and the name of the target host.  For each volume, the
+replication targets are keyed by hostname, which is generated from the
+output of the "uname -n" command.  That is, for a volume "examplevol," the
+configuration for replication to a volume on the host "targethost.dom.ain.com"
+is stored in the directory
+<b>/var/lib/zumastor/volumes/examplevol/targethost.dom.ain.com/</b>.
+Files in this directory include files containing the progress of an ongoing
+replication as well as "port," which contains the port on which the target
+will listen for a snapshot to be transmitted, and "hold," which contains the
+name of the snapshot that was last successfully transmitted to the target and
+which is therefore being "held" as the basis for future replication.</p>
+<p>On the target host, replication source information is stored by volume name
+only, in the directory "source," e.g.
+<b>/var/lib/zumastor/volumes/examplevol/source/</b>.
+Files here include "hostname," which contains the name of the source host
+(which currently must be the output of "uname -n" on the source host), "hold,"
+which contains the name of the snapshot that was last successfully received
+from the source and directly corresponds to the source file of the same name,
+and "period," which contains the number of seconds between each automatic
+replication cycle.</p>
+<h3>Sanity checking</h3>
+<p>The zumastor command checks the host given in a "replicate" command against
+the actual output of "uname -n" on the source host.  The output of "uname -n"
+is also used when triggering replication via the "nag" daemon, by running
+a command on the source host to write the string "target/<i>&lt;hostname&gt;</i>" to the
+"trigger" named pipe.</p>
+<h3>Replication</h3>
+<p>When the "zumastor replicate" command is given (on the source host), it does
+an "ssh" to the target host (given on the command line) to get the contents
+of the "source/hostname" configuration file.  If the contents of that file
+don't match the output of "uname -n" on the source host, it logs an error and
+aborts.  Otherwise, after some setup it does another "ssh" to the target to
+run the command "zumastor receive start," giving the volume and the TCP port
+to which the data transmission process will connect.  The target host prepares
+to receive the replication data and starts a "ddsnap delta listen" process in
+the background, to wait for the data connection.  The source host, still
+running the "replicate" command, issues a "ddsnap transmit" command, giving
+in addition to other parameters the target hostname and port to which the
+data connection will be made.  When the "ddsnap transmit" command completes,
+the source host does yet another "ssh" to the target to run the command
+"zumastor receive done," also giving the volume and TCP port.</p>
+<h3>Other uses of "uname -n"</h3>
+<p>During configuration on a target host, when the administrator runs the
+"zumastor source" command, the script does an "ssh" to the given source host
+to retrieve the size of the volume to be replicated.  Also on the target host,
+the "nag" daemon (used to periodically force a replication) does an "ssh" to
+the source host to write the string "target/<i>&lt;uname -n output&gt;</i>" to the "trigger"
+named pipe to trigger replication on the source host to the target.</p>
+</div>
 <a name="glossary"><H2>Glossary</H2></a>
 <UL>
 	<li><B>chunk</B>:
 	A unit of data in a Zumastor volume, measured in bytes, which may not
 	(and probably will not) correspond to sector, block or page sizes;
-	Zumastor manipulates the contents of a volume in "chunk"-sized units.</li>
+	Zumastor manipulates the contents of a volume in "chunk"-sized units.
+	More specifically, the unit of storage granularity in the snapshot
+	store.</li>
 	<li><B>exception</B>:
 	A chunk that no longer exists solely on the origin, but has been
 	modified after a snapshot was taken, so that a copy of the old
 	contents has been made in the affected snapshot(s).</li>
+	<li><B>logical address</B>:
+	An address within a virtual volume mapped through the device mapper.</li>
+	<li><B>logical chunk</b>:
+	A chunk on a virtual device that is accessed through the device mapper.</li>
 	<li><B>snaplock</B>:
 	A data structure that describes a list of read locks associated with
 	a chunk associated with a snapshot but actually shared with the origin
