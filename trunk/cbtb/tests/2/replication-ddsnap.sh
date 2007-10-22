@@ -85,7 +85,7 @@ sleep $SLEEP
 volname=testvol
 listenport=3333
 $SSH root@${slave} \
-  ddsnap delta listen --foreground $volname ${slave}:${listenport} & \
+  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
   listenpid=$!
 echo ok 12 - slave ddsnap delta listening for snapshot deltas
 sleep $SLEEP
