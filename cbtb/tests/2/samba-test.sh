@@ -54,8 +54,10 @@ else
   echo "not ok 3 - testvol snapshotted"
   exit 3
 fi
-    
-aptitude install -y samba
+
+# update-inetd tries to do tricky things to /dev/tty
+rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd    
+DEBIAN_FRONTEND=noninteractive aptitude install -y samba
 cat > /etc/samba/smb.conf << EOF
 [global]
   workgroup = ZUMABUILD
