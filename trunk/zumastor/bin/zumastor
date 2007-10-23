@@ -110,18 +110,6 @@ function new_snapshot {
 	log "'$kind' snapshot list is now: ${snapshots[*]}"
 }
 
-function send_to_fifo {
-	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r fifo=$1
-	local -r data=$2
-
-	[[ -e $fifo ]] || { echo "$fifo does not exist"; return 1; }
-	[[ -p $fifo ]] || { echo "$fifo not a fifo"; return 1; }
-	[[ -w $fifo ]] || { echo "$fifo not writable"; return 1; }
-
-	echo $data > $fifo || { echo "error writing to $fifo"; return 1; }
-}
-
 # new_target_snapshot <volume> <hostname>
 #   Create a snapshot for <volume> for the replication to target <hostname> and
 #   send the new snapshot number to the target's pipe.  Called by the zumastor
@@ -147,10 +135,7 @@ function new_target_snapshot {
 	create_snapshot $vol $next
 	create_device $vol $next
 
-	# this will cause the blocking write to the target's fifo to get interrupted (timeout)
-	# FIXME TODO: this doesn't work in ptxdist
-	sleep 2 & # we want this to be short so we don't tie up the master
-	send_to_fifo $target_fifo $next && return 0
+	send_to_fifo -n $target_fifo $next && return 0
 	drop_snapshot $vol $next && return 1
 }
 
