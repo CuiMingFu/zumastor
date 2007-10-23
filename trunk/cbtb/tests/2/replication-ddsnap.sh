@@ -94,29 +94,28 @@ echo ok 13 - slave ddsnap delta listening for snapshot deltas
 sleep $SLEEP
 
 
-fromsnap=0
-ddsnap create /tmp/server $fromsnap
-echo ok 13 - ddsnap create $fromsnap
+tosnap=0
+ddsnap create /tmp/server $tosnap
+echo ok 13 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $fromsnap | \
-  dmsetup create testvol\($fromsnap\)
-echo ok 14 - create testvol\($fromsnap\) block device on master
+  dmsetup create testvol\($tosnap\)
+echo ok 14 - create testvol\($tosnap\) block device on master
 sleep $SLEEP
 
 hash=`md5sum </dev/mapper/testvol`
-hash0=`md5sum </dev/mapper/testvol\($fromsnap\)`
+hash0=`md5sum </dev/mapper/testvol\($tosnap\)`
 if [ "$hash" != "$hash0" ] ; then
   echo -e "not "
   rc=15
 fi
-echo ok 15 - testvol==testvol\($fromsnap\)
+echo ok 15 - testvol==testvol\($tosnap\)
 sleep $SLEEP
 
-tosnap=$fromsnap
-ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
-echo ok 16 - snapshot $fromsnap transmitting to slave
+ddsnap transmit $controlsocket ${slave}:$listenport $tosnap
+echo ok 16 - snapshot $tosnap transmitting to slave
 sleep $SLEEP
 
 $SSH root@$slave \
@@ -128,33 +127,33 @@ if [ "$hash0" != "$hash0slave" ] ; then
   echo -e "not "
   rc=18
 fi
-echo ok 18 - master testvol\($fromsnap\) == slave testvol\($tosnap\)
+echo ok 18 - master testvol\($tosnap\) == slave testvol\($tosnap\)
 
 
 dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/testvol  
 echo 19 - copy random data onto master testvol
 
-fromsnap=2
-ddsnap create /tmp/server $fromsnap
-echo ok 20 - ddsnap create $fromsnap
+fromsnap=0
+tosnap=2
+ddsnap create /tmp/server $tosnap
+echo ok 20 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
-  $controlsocket $fromsnap | \
-  dmsetup create testvol\($fromsnap\)
-echo ok 21 - create testvol\($fromsnap\) block device on master
+  $controlsocket $tosnap | \
+  dmsetup create testvol\($tosnap\)
+echo ok 21 - create testvol\($tosnap\) block device on master
 
 hash=`md5sum </dev/mapper/testvol`
-hash2=`md5sum </dev/mapper/testvol\($fromsnap\)`
+hash2=`md5sum </dev/mapper/testvol\($tosnap\)`
 if [ "$hash" != "$hash2" ] ; then
   echo -e "not "
   rc=22
 fi
-echo ok 22 - testvol==testvol\($fromsnap\)
+echo ok 22 - testvol==testvol\($tosnap\)
 
-tosnap=$fromsnap
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
-echo ok 23 - snapshot $fromsnap transmitting to slave
+echo ok 23 - snapshot $tosnap transmitting to slave, delta from $fromsnap
 sleep $SLEEP
 
 $SSH root@$slave \
@@ -166,7 +165,7 @@ if [ "$hash2" != "$hash2slave" ] ; then
   echo -e "not "
   rc=25
 fi
-echo ok 25 - master testvol\($fromsnap\) == slave testvol\($tosnap\)
+echo ok 25 - master testvol\($tosnap\) == slave testvol\($tosnap\)
 
 
 exit $rc
