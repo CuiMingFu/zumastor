@@ -100,7 +100,7 @@ echo ok 13 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
-  $controlsocket $fromsnap | \
+  $controlsocket $tosnap | \
   dmsetup create testvol\($tosnap\)
 echo ok 14 - create testvol\($tosnap\) block device on master
 sleep $SLEEP
