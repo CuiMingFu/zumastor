@@ -60,7 +60,8 @@ ddsnap agent $controlsocket
 echo ok 6 - master ddsnap agent
 sleep $SLEEP
 
-ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket /tmp/server
+serversocket="/tmp/server"
+ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
 echo ok 7 - master ddsnap server
 sleep $SLEEP
 
@@ -95,7 +96,7 @@ sleep $SLEEP
 
 
 tosnap=0
-ddsnap create /tmp/server $tosnap
+ddsnap create $serversocket $tosnap
 echo ok 13 - ddsnap create $tosnap
 sleep $SLEEP
 
@@ -114,7 +115,7 @@ fi
 echo ok 15 - testvol==testvol\($tosnap\)
 sleep $SLEEP
 
-ddsnap transmit $controlsocket ${slave}:$listenport $tosnap
+ddsnap transmit $serversocket ${slave}:$listenport $tosnap
 echo ok 16 - snapshot $tosnap transmitting to slave
 sleep $SLEEP
 
