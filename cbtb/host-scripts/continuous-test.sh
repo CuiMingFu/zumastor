@@ -7,13 +7,16 @@
 # Whenever the last successful test revision differs from the last successful
 # install revision, fire off a new round of tests.
 
+top="${PWD}"
+branch=`cat $top/zumastor/Version`
+
 installrev=''
 if [ -L ${HOME}/installrev ] ; then
-  installrev=`readlink ${HOME}/installrev`
+  installrev=`readlink ${top}/installrev`
 fi
   
 testrev=''
-if [ -L ${HOME}/testrev ] ; then
+if [ -L ${top}/testrev ] ; then
   testrev=`readlink ${HOME}/testrev`
 fi
     
@@ -42,9 +45,9 @@ biabam=/usr/bin/biabam
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
-repo="${HOME}/zumastor-tests"
-export DISKIMG="${HOME}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
-export LOGDIR="${HOME}/zumastor/build/logs-r$installrev"
+repo="${top}/zumastor-tests"
+export DISKIMG="${top}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
+export LOGDIR="${top}/zumastor/build/logs-r$installrev"
 [ -d $LOGDIR ] || mkdir $LOGDIR
 
 summary=${LOGDIR}/summary
@@ -113,7 +116,7 @@ popd
 # send summary, logs, and a success or failure subject to the
 # success or failure mailing lists
 if [ $testret -eq 0 ]; then
-  subject="zumastor r$installrev test success"
+  subject="zumastor b$branch r$installrev test success"
   email="${email_success}"
 
   # creating this symlink only on success will cause the test step to
@@ -123,7 +126,7 @@ if [ $testret -eq 0 ]; then
   ln -sf $installrev ${HOME}/testrev
 
 else
-  subject="zumastor r$installrev test failure $testret"
+  subject="zumastor b$branch r$installrev test failure $testret"
   email="${email_failure}"
   export FAILED_TEST_REV=$installrev
 fi

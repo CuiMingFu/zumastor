@@ -2,7 +2,7 @@
 #
 # $Id$
 #
-
+#
 # Continuously svn update, run the encapsulated build
 # Create symlinks to the new debs each time a new build is successful,
 # so other continuous-* scripts can tell at a glance that a new one
@@ -16,6 +16,8 @@ email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
 repo="${PWD}/zumastor"
 top="${PWD}"
+
+branch=`cat $repo/Version`
 
 diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
@@ -47,14 +49,14 @@ echo continuous dapper-build returned $buildret
 
 
 if [ $buildret -eq 0 ]; then
-  subject="zumastor r$revision build success"
+  subject="zumastor b$branch r$revision build success"
   files="$buildlog"
   email="${email_success}"
   # store the revision just built in a symlink for use by readlink
   # in the installer stage running in a separate loop
   ln -sf $revision ${top}/buildrev
 else
-  subject="zumastor r$revision build failure $buildret"
+  subject="zumastor b$branch r$revision build failure $buildret"
   files="$buildlog"
   email="${email_failure}"
 fi
@@ -89,13 +91,24 @@ fi
 
 # loop waiting for a new update
 oldrevision=${revision}
+diff=`mktemp`
 while true
 do
   svn update
   revision=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+
+  # the diff between the old revision and the current one
+  svn diff -r$oldrevision >$diff
+
+  # wait and loop if the revision number is the same
   if [ "x$revision" = "x$oldrevision" ]
   then
     sleep 300
+
+  # wait and loop if the diff is zero length
+  elif [ ! -s "$diff" ]
+    sleep 300
+
   else
     # restart continuous.sh, beginning a new build
     popd

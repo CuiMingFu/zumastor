@@ -29,16 +29,29 @@ nodes, and has a tftpboot directory.  eg.
 
   b) check out a read-only copy of the zumastor repository 
     svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
+    svn checkout http://zumastor.googlecode.com/svn/trunk/cbtb/tests zumastor-tests
+      or a specific branch
+    mkdir 0.4
+    cd 0.4
+    svn checkout http://zumastor.googlecode.com/svn/branches/0.4/ zumastor
+    svn checkout http://zumastor.googlecode.com/svn/branches/0.4/cbtb/tests zumastor
 
-  c) copy and examine as required the scripts this directory to the home
-     directory, to prevent directly running scripts from this repository on
-     the host system without supervision.
+  c) copy and examine as required the scripts this directory to the top level
+     directory (~ or ~/0.4), to prevent directly running scripts from
+     this repository on the host system without supervision.
     cp zumastor/cbtb/host-scripts/*.sh ~
+      or
+    cp zumastor/cbtb/host-scripts/*.sh ~/0.4/
 
   d) Create a dapper-i386 template image
     cd zumastor/cbtb/host-setup/
     tunbr ./dapper-i386.sh
+    mv dapper-i386.img zumastor/build/dapper-i386-r`svnversion`.img
+    (TODO: not current, need to update.  Both build and install use existing
+     dapper images, and not the same one due to development changes)
 
   e) Launch the continuous build
-    cd ~
-    ./continuous.sh >continuous.log 2>&1 </dev/null &
+    cd ~   or  cd ~/0.4
+    ./continuous-build.sh >continuous-build.log 2>&1 </dev/null &
+    ./continuous-install.sh >continuous-install.log 2>&1 </dev/null &
+    ./continuous-test.sh >continuous-test.log 2>&1 </dev/null &
