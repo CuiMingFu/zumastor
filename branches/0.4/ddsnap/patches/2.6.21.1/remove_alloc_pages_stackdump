@@ -1,0 +1,12 @@
+diff -puN mm/page_alloc.c~remove_alloc_pages_stackdump mm/page_alloc.c
+--- linux-2.6.21.1/mm/page_alloc.c~remove_alloc_pages_stackdump	2007-07-19 16:50:12.000000000 -0700
++++ linux-2.6.21.1-root/mm/page_alloc.c	2007-07-19 16:50:12.000000000 -0700
+@@ -1389,7 +1389,7 @@ nofail_alloc:
+ 	}
+ 
+ nopage:
+-	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
++	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+ 			" order:%d, mode:0x%x\n",
+ 			p->comm, order, gfp_mask);

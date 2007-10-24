@@ -1,0 +1,80 @@
+
+Content
+  * config_uml is the configuration file for setting up uml
+  * config_replication is the configuration file for setting up replication
+  * build_uml.sh builds uml linux executable with the KERNEL_VERSION specified 
+    in config_uml
+  * build_fs.sh builds a root file system image based on the image downloaded from 
+    uml website used by uml and installs all the required libraries and utilities 
+  * setup_network.sh configures uml network
+  * update_zuma.sh takes the root file system image as input and installs ddnsap 
+    and zumastor from the ZUMA_REPOSITORY specified in config_uml
+  * setup_replication.sh loads source and target umls, sets up ssh keys for source 
+    and target umls to access each other, and sets up source and target volumes 
+    according to the configuratiosn in config_replication
+  * replication_cleanup.sh removes volumes on source&target and shutdowns the umls
+  * test_fullreplication.sh starts full volume replication test and monitors the 
+    replicaiton progress
+  * test_replication_unplug.sh tests replication in case of network failures
+  * test_source_stop.sh tests occasionally stopping zumastor on source host 
+    in the middle of replicaiton
+  * test_target_stop.sh tests occasionally stopping zumastor on target host 
+    in the middle of replicaiton
+  * run_all.sh runs all test scripts included in the current directory one by one. 
+    The generated results are "test_name PASS/FAIL/UNRESOLVED" and a log file of 
+    output for each test
+
+Usage
+  * The host machine must be running a 32 bit kernel, and a libc compatible with Debian 
+    Etch (such as Ubuntu Dapper)
+  * Have a look at config_replication and modify it as necessary for replication tests
+    - Create 4 logical volumes on the host, and point config_replication at these volumes
+  * Copy all of the files included in this directory to where you want to run the test
+  * Have a look at config_uml and modify it as necessary
+  * To run a test, simply start the corresponding test_XXX.sh script. It will automatically 
+    build everything required at the first time. After that, it re-uses the existing kernel 
+    and file system images. If you have a file system image built from a previous test, 
+    you can first copy it to the directory where you want to run the test and names it 
+    as $source_uml_fs as specified in config_replicaiton. In this way, build_fs.sh will 
+    re-use this image instead of building a new one.
+
+Troubleshooting
+  uml kernel build)
+    * Watch out for oldconfig ARCH=um gratuitously changing your config to 64bit 
+      if you are building under a 64 bit host
+    * Please check the gcc version if you got any error during compiling 
+      (gcc-4.0 may cause some problems).
+
+  host iptable setup)
+    * The kernel config options Networking -> Network Options -> 
+      Network packet filtering framework -> Core Netfilter Configuration -> 
+      Netfilter connection tracking support and Networking -> Network Options -> 
+      Network packet filtering framework -> IP: Netfilter Configuration -> 
+      IPv4 connection tracking support && Full NAT && MASQUERADE target support 
+      need to be set on host machine for iptable to work.
+
+  access from another host)
+    * Add route on a host that wants to access the uml: 
+      route add -host $uml_ip gw $hostname dev eth0
+    * Add hostname matching on a host that wants to access the uml: 
+      echo "$uml_ip $uml_host" >> /etc/hosts
+
+  running)
+    * The default memory that the test scripts assign to uml is 64M. 
+      You can change this by changing the value of mem option that linux takes 
+      in the corresponding test script
+    * The current ddsnap code sets buffer cache size as 128M. This causes problems 
+      when running any uml whose assigned memory is limited. Please change it to 
+      smaller value in ddsnapd.c:start_server.
+    * If syslogd or ssh are extremely slow, check if your DNS server responds to 
+      queries from the assigned uml names. Append your domain name to those uml
+      names to see if that solves the problem.
+    * The built root file system image contains only basic packages required to run 
+      the test. You usually want to install the following packages and checkout the 
+      current zumastor code from svn if you want to debug zumastor or ddsnap on uml:
+         apt-get install subversion
+         apt-get install make
+         apt-get install gcc
+         apt-get install zlib1g-dev
+         apt-get install libpopt-dev
+         svn co http://zumastor.googlecode.com/svn/trunk/ zumastor

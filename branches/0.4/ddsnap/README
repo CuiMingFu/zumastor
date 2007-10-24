@@ -1,0 +1,225 @@
+A few main points:
+
+  * The main Makefile has some tests in it, but they are old and crufty. Check
+    out the documentation below on how to get things running.
+
+  * The scripts/ directory offers some helpful tools for using ddsnap.
+
+  * Join the zumastor irc channel for support:
+
+       /server irc.oftc.net
+       /join #zumastor
+
+  * Email us and volunteer to help with things!  Our gmail names are on the
+    main project page -- http://code.google.com/p/zumastor/
+
+
+Get started!
+
+Check out the source (if you haven't already!):
+
+  - svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
+
+Set up Linux 2.6.19.1:
+
+  - Get a 2.6.19.1 or other kernel.org tree, it already has device mapper
+
+  - Apply the ddsnap-2.6.XX patch. From the root of the 2.6 tree:
+
+      patch -p1 < /path/to/zumastor/ddsnap/patches/zumastor-2.6.XX
+
+  - Make sure that device mapper and the dm_dd* are selected to be installed 
+    as modules. In addition, device-mapper should be enabled too.
+
+      CONFIG_DM_DDRAID=m
+      CONFIG_DM_DDSNAP=m
+
+  - Rebuild the kernel on your test machine, install and reboot
+
+Build the dd-tools:
+
+  - Before you build, check the Makefile to make sure that the 'kernel' line 
+    at the location of the Linux md drivers
+
+      ex: kernel=/usr/src/linux-2.6/drivers/md
+
+  - Now it is time to build!
+
+      make
+
+Starting the agent, server, and origin volume:
+
+  - In order to get started you will need two block devices. 
+
+  - Find the "README test value" comment in the Makefile and update the next
+    two lines so it will correctly link /dev/test-snapstore and
+    /dev/test-origin to the two block devices.
+
+       ex: change /dev/sda8 and /dev/sda7 to be your devices
+
+		# README test values
+		origindev=/dev/sda7
+		snapstoredev=/dev/sda8
+    - cat /proc/partitions will assist you in the process of determining which one are your devices.
+
+  - The following command will setup the symlinks, load modules,  and get you
+    ready to start the ddsnap-agent and ddsnapd server.
+
+	sudo make dd-init
+
+  - Now, we must start the ddsnap-agent. This command will continue to run in
+    the foreground for the duration of this test.
+
+        sudo make dd-agent
+
+  - Next, we start the ddsnapd server. This command will continue to run in the
+    foreground for the duration of this test.
+
+        sudo make dd-server
+
+  - At this point you should see some debug messages, but everything should 
+    appear to be happy. Now that we have the server up it is time to create 
+    the logical volume for the origin.
+
+        sudo make origin
+
+  - And viola! You should have /dev/mapper/vol to use as a test volume.
+    Time to put a file system on there.
+
+       sudo mkfs.ext3 /dev/mapper/vol # ext3, but you can use any file system
+
+    You should now be able to use /dev/mapper/vol just like any other
+    partition.
+
+Creating a snapshot, changelist, and delta:
+
+  - We will first create a test snapshot.
+
+       sudo ./ddsnap create /tmp/server 0 
+
+       echo 0 29302496 ddsnap /dev/test-snapstore /dev/test-origin \
+          /tmp/control 0 | sudo dmsetup create snapshot0
+
+    Note: 29302496 is the apparent size of the snapshot, the same size as the
+    origin.  It can be derived by taking the number of blocks from
+    /proc/partitions and multiplying by two. For example, if your origin device
+    is named sda7, you can use this to derive the number:
+
+       echo $((2 * `grep sda7 /proc/partitions | awk '{print $3}'`))
+
+       or
+ 
+       echo 0 $$((2 * $$(egrep $$(echo $(origindev) | sed -e 's@^.*/@@')'$$' /proc/partitions | awk '{print $$3}'))) ddsnap /dev/test-snapstore /dev/test-origin /tmp/control 0 | sudo /sbin/dmsetup create snapshot0
+
+    There should now be a /dev/mapper/snapshot0 device that reflects the newly 
+    made snapshot. 
+
+    - You can double check with 
+
+      sudo dmsetup ls
+
+  - In order for snapshots to be helpful, we have to change the disk in some
+    way. Write a few files to disk or use the devspam utility included with
+    this distribution to add some random data to the device.
+
+       ex: sudo mount /dev/mapper/vol /mnt
+       ex: sudo cp /etc/passwd /mnt
+       ex: sudo umount /mnt
+
+  - Create another snapshot!
+
+       sudo ./ddsnap create-snap /tmp/server 1
+
+       echo 0 29302496 ddsnap /dev/test-snapstore /dev/test-origin \
+          /tmp/control 1 | sudo dmsetup create snapshot1
+
+       or
+
+       echo 0 $$((2 * $$(egrep $$(echo $(origindev) | sed -e 's@^.*/@@')'$$' /proc/partitions | awk '{print $$3}'))) ddsnap /dev/test-snapstore /dev/test-origin /tmp/control 1 | sudo /sbin/dmsetup create snapshot1
+
+  - To create a delta, we will first create a changelist for the snapshots.
+
+       sudo ./ddsnap create-cl /tmp/server changelist0-1 0 1
+
+    There should now be a file called changelist0-1 in your working directory.
+
+       sudo ./ddsnap create-delta -r changelist0-1 deltafile0-1 \ 
+            /dev/mapper/snapshot0 /dev/mapper/snapshot1
+
+    There deltafile0-1 should now exist in your working directory. This file
+    can be used to replicate the differences between snapshot0 and snapshot1.
+    See "Applying a delta file" for details on accomplishing this. In order for
+    this to work, there must some remote block device that has the exact, block
+    by block, layout as snapshot0. In the next section we will discuss some
+    strategies for accomplishing this.
+
+Initial local and remote block device replication:
+
+    In order to start using snapshot replication there the two devices, local
+    and remote, must be identical at a block level. This document offers two
+    strategies for doing this, but they are not necessarily the only way.
+
+    Note: These steps should be performed on the physical device, before ddsnap
+    is in use.
+
+  Bootstrap strategy 1: Low bandwidth (recommended)
+
+    This strategy involves zeroing upstream and downstream, then using snapshot
+    delta files to bootstrap the file system. 
+
+  - Initialize the origin block device.
+
+        sudo dd if=/dev/zero of=/dev/test-origin bs=1M
+
+      This should be ran on upstream and downstream.
+
+  - Enable ddsnap and create the origin volume as described in "Testing ddsnap"
+    on upstream and downstream.
+
+  - Create snapshot0 on upstream as found in "Creating a snapshot...".
+
+  - Make the file system on the upstream origin volume, this can be any
+    file system of your liking.
+
+       ex: sudo mkfs.ext3 /dev/mapper/vol
+
+  - Create snapshot1 on upstream.
+
+  - Create a delta file (you will have to make a changelist first) using
+    snapshot0 and snapshot1 as described in "Creating a snapshot...".
+
+  - Apply the delta file to the downstream device (see "Applying a delta
+    file").
+
+  Bootstrap strategy 2: No zeroing required
+
+    This details using dd and netcat to replicate a disk without having to zero
+    the disk first. The caveat to this is you will have to copy the entire
+    block device over the network. 
+
+  - Prepare the downstream device for writing:
+
+      nc -l -p 20049 | sudo dd of=/dev/test-origin bs=1M
+
+    Note: You can use any port, not just 20049.
+
+  - Send data from upstream to downstream
+
+      sudo dd if=/dev/test-origin bs=1M | nc <downstream-host> 20049
+
+    This will replicate the entire disk! 
+
+Applying a delta file:
+
+   Prerequisites are copying a deltafile made from upstream to downstream (using
+   rsync, scp, etc) and ensuring that the origin volume on the downstream
+   matches the snapshot that the delta was generated against.
+
+   - Pretty straight forward, apply the delta using ddsnap
+
+      sudo ./ddsnap apply-delta /path/to/deltafile0-1 /dev/mapper/vol
+
+   - Create the snapshot and device snapshot1.
+
+   Upstream and downstream snapshot1 should not be identical!
+
