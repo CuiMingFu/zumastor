@@ -60,7 +60,10 @@ ddsnap agent $controlsocket
 echo ok 6 - master ddsnap agent
 sleep $SLEEP
 
-serversocket="/tmp/server"
+mkdir /tmp/server
+# TODO: when b/892805 is fixed, last element of socket may be something
+# other than $volname
+serversocket="/tmp/server/$volname"
 ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
 echo ok 7 - master ddsnap server
 sleep $SLEEP
@@ -79,14 +82,14 @@ echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
 size=`ddsnap status /tmp/server --size` 
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create testvol
-echo ok 11 - master create testvol
+echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname
+echo ok 11 - master create $volname
 sleep $SLEEP
 
-$SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create testvol"
-echo ok 12 - slave create testvol
-
 volname=testvol
+$SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname"
+echo ok 12 - slave create $volname
+
 listenport=3333
 $SSH root@${slave} \
   ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
@@ -102,17 +105,17 @@ sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $tosnap | \
-  dmsetup create testvol\($tosnap\)
-echo ok 14 - create testvol\($tosnap\) block device on master
+  dmsetup create $volname\($tosnap\)
+echo ok 14 - create $volname\($tosnap\) block device on master
 sleep $SLEEP
 
-hash=`md5sum </dev/mapper/testvol`
-hash0=`md5sum </dev/mapper/testvol\($tosnap\)`
+hash=`md5sum </dev/mapper/$volname`
+hash0=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash0" ] ; then
   echo -e "not "
   rc=15
 fi
-echo ok 15 - testvol==testvol\($tosnap\)
+echo ok 15 - $volname==$volname\($tosnap\)
 sleep $SLEEP
 
 ddsnap transmit $serversocket ${slave}:$listenport $tosnap
@@ -120,19 +123,19 @@ echo ok 16 - snapshot $tosnap transmitting to slave
 sleep $SLEEP
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create testvol\($tosnap\)"
-echo ok 17 - create testvol\($tosnap\) block device on slave
+  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+echo ok 17 - create $volname\($tosnap\) block device on slave
 
-hash0slave=`$SSH root@$slave "md5sum </dev/mapper/testvol\($tosnap\)"`
+hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash0" != "$hash0slave" ] ; then
   echo -e "not "
   rc=18
 fi
-echo ok 18 - master testvol\($tosnap\) == slave testvol\($tosnap\)
+echo ok 18 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 
-dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/testvol  
-echo 19 - copy random data onto master testvol
+dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/$volname  
+echo 19 - copy random data onto master $volname
 
 fromsnap=0
 tosnap=2
@@ -142,31 +145,31 @@ sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $tosnap | \
-  dmsetup create testvol\($tosnap\)
-echo ok 21 - create testvol\($tosnap\) block device on master
+  dmsetup create $volname\($tosnap\)
+echo ok 21 - create $volname\($tosnap\) block device on master
 
-hash=`md5sum </dev/mapper/testvol`
-hash2=`md5sum </dev/mapper/testvol\($tosnap\)`
+hash=`md5sum </dev/mapper/$volname`
+hash2=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash2" ] ; then
   echo -e "not "
   rc=22
 fi
-echo ok 22 - testvol==testvol\($tosnap\)
+echo ok 22 - $volname==$volname\($tosnap\)
 
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
 echo ok 23 - snapshot $tosnap transmitting to slave, delta from $fromsnap
 sleep $SLEEP
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create testvol\($tosnap\)"
-echo ok 24 - create testvol\($tosnap\) block device on slave
+  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+echo ok 24 - create $volname\($tosnap\) block device on slave
 
-hash2slave=`$SSH root@$slave "md5sum </dev/mapper/testvol\($tosnap\)"`
+hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash2" != "$hash2slave" ] ; then
   echo -e "not "
   rc=25
 fi
-echo ok 25 - master testvol\($tosnap\) == slave testvol\($tosnap\)
+echo ok 25 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 
 exit $rc
