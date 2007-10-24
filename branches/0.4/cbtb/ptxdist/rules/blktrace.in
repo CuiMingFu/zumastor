@@ -1,8 +1,0 @@
-# Copyright 2007 Google Inc.
-# Author: cklin@google.com (Chuan-kai Lin)
-
-config BLKTRACE
-	bool "blktrace"
-	select GLIBC_PTHREAD
-	help
-	  Install Linux block I/O tracer.
