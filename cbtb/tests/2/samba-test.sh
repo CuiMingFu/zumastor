@@ -84,6 +84,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
+${SSH} root@${slave} aptitude install -y smbfs
 ${SSH} root@${slave} modprobe cifs
 ${SSH} root@${slave} mount //master/testvol /mnt -t cifs -o user=root,pass=password
 ${SSH} root@${slave} mount
