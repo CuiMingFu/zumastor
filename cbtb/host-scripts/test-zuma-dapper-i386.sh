@@ -75,7 +75,6 @@ ${qemu_i386} -snapshot \
   -boot c -hda ${diskimg} -no-reboot & qemu_pid=$!
 
 if [ "x$MACADDR2" != "x" ] ; then
-  SERIAL2=${tmpdir}/serial2
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
   ${qemu_i386} -snapshot \
