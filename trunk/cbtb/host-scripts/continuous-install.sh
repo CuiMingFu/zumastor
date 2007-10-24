@@ -8,14 +8,18 @@
 # the new image for the continuous-test script to notice and launch tests
 # against.
 
+repo="${PWD}/zumastor"
+top="${PWD}"
+branch=`cat $repo/Version`
+
 buildrev=''
-if [ -L ${HOME}/buildrev ] ; then
-  buildrev=`readlink ${HOME}/buildrev`
+if [ -L ${top}/buildrev ] ; then
+  buildrev=`readlink ${top}/buildrev`
 fi
 
 installrev=''
-if [ -L ${HOME}/installrev ] ; then
-  installrev=`readlink ${HOME}/installrev`
+if [ -L ${top}/installrev ] ; then
+  installrev=`readlink ${top}/installrev`
 fi
 
 if [ "x$buildrev" = "x$installrev" ] ; then
@@ -33,12 +37,12 @@ biabam=/usr/bin/biabam
 TUNBR=tunbr
 email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
-repo="${HOME}/zumastor"
+repo="${top}/zumastor"
 
 diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-export BUILDDIR="${HOME}/zumastor/build"
+export BUILDDIR="${top}/zumastor/build"
 export SVNREV=$buildrev
 export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
 export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
@@ -65,7 +69,7 @@ echo continuous zuma-dapper-i386 returned $installret
 popd
 
 if [ $installret -eq 0 ]; then
-  subject="zumastor r$buildrev install success"
+  subject="zumastor b$branch r$buildrev install success"
   files="$installlog"
   email="${email_success}"
 
@@ -73,10 +77,10 @@ if [ $installret -eq 0 ]; then
   # keep repeating on failure.  For the moment, while the continuous build
   # is maturing, this is desired.  Modify the logic later to not loop over
   # installation attempts.
-  ln -sf $buildrev ${HOME}/installrev
+  ln -sf $buildrev ${top}/installrev
 
 else
-  subject="zumastor r$revision install failure $installret"
+  subject="zumastor b$branch r$revision install failure $installret"
   files="$installlog"
   email="${email_failure}"
 fi
