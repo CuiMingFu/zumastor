@@ -60,6 +60,7 @@ ddsnap agent $controlsocket
 echo ok 6 - master ddsnap agent
 sleep $SLEEP
 
+volname=testvol
 mkdir /tmp/server
 # TODO: when b/892805 is fixed, last element of socket may be something
 # other than $volname
@@ -86,7 +87,6 @@ echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dms
 echo ok 11 - master create $volname
 sleep $SLEEP
 
-volname=testvol
 $SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname"
 echo ok 12 - slave create $volname
 
