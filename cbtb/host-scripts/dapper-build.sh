@@ -132,8 +132,8 @@ for kconf in \
   kernel/config/full \
   kernel/config/qemu \
   kernel/config/default \
-  kernel/config/${KERNEL_VERSION}-${ARCH}-full \
   kernel/config/${KERNEL_VERSION}-${ARCH}-qemu \
+  kernel/config/${KERNEL_VERSION}-${ARCH}-full \
   kernel/config/${KERNEL_VERSION}-${ARCH}
 do
   if [ -e ${kconf} ] ; then
@@ -144,7 +144,7 @@ done
 time ${CMDTIMEOUT} \
   ${SSH} build@${IPADDR} "echo $SVNREV >zumastor/SVNREV" || rc=$?
 
-# give the build 3 hours, then kill it.
+# give the build 10 hours, then kill it.
 time ${BUILDTIMEOUT} \
   ${SSH} build@${IPADDR} "cd zumastor && ./buildcurrent.sh $KERNEL_CONFIG" || \
   rc=$?
