@@ -107,6 +107,7 @@ do
 
   # wait and loop if the diff is zero length
   elif [ ! -s "$diff" ]
+  then
     sleep 300
 
   else
