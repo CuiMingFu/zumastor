@@ -77,6 +77,7 @@ ${SSH} root@${slave} ddsnap agent $controlsocket
 echo ok 9 - slave ddsnap agent
 sleep $SLEEP
 
+${SSH} root@${slave} mkdir /tmp/server
 ${SSH} root@${slave} \
   ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
 echo ok 10 - slave ddsnap server
