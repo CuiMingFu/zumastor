@@ -14,8 +14,8 @@ set -e
 rc=0
 
 
-# Terminate test in 10 minutes.  Read by test harness.
-TIMEOUT=2400
+# Terminate test in 20 minutes.  Read by test harness.
+TIMEOUT=1200
 
 slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
@@ -78,7 +78,7 @@ echo ok 9 - slave ddsnap agent
 sleep $SLEEP
 
 ${SSH} root@${slave} \
-  ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket /tmp/server
+  ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
 echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
@@ -139,7 +139,7 @@ echo 19 - copy random data onto master $volname
 
 fromsnap=0
 tosnap=2
-ddsnap create /tmp/server $tosnap
+ddsnap create $serversocket $tosnap
 echo ok 20 - ddsnap create $tosnap
 sleep $SLEEP
 
