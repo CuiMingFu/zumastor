@@ -11,13 +11,13 @@ top="${PWD}"
 branch=`cat $top/zumastor/Version`
 
 installrev=''
-if [ -L ${HOME}/installrev ] ; then
+if [ -L ${top}/installrev ] ; then
   installrev=`readlink ${top}/installrev`
 fi
   
 testrev=''
 if [ -L ${top}/testrev ] ; then
-  testrev=`readlink ${HOME}/testrev`
+  testrev=`readlink ${top}/testrev`
 fi
     
 if [ "x$installrev" = "x$testrev" ] ; then
@@ -123,7 +123,7 @@ if [ $testret -eq 0 ]; then
   # keep repeating on failure.  For the moment, while the continuous build
   # is maturing, this is desired.  Modify the logic later to not loop over
   # test attempts.
-  ln -sf $installrev ${HOME}/testrev
+  ln -sf $installrev ${top}/testrev
 
 else
   subject="zumastor b$branch r$installrev test failure $testret"
