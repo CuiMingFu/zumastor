@@ -78,7 +78,7 @@ do
   # timeout any test that runs for more than an hour
   export LOGPREFIX="$f."
   testlog="${LOGDIR}/${LOGPREFIX}log"
-  ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  ${TUNBR} timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
   if [ $testrc -eq 0 ]
@@ -97,7 +97,7 @@ for f in *.sh
 do
   export LOGPREFIX="$f."
   testlog="${LOGDIR}/${LOGPREFIX}log"
-  ${TUNBR} ${TUNBR} timeout -14 3600 ${HOME}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  ${TUNBR} ${TUNBR} timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
   if  [ $testrc -eq 0 ]
