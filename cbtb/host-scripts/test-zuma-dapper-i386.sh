@@ -37,7 +37,7 @@ VIRTHOST=192.168.23.1
 
 IMAGE=zuma-dapper-i386
 IMAGEDIR=${diskimgdir}/${IMAGE}
-BUILDSRC=${HOME}/zumastor/build
+BUILDSRC=${top}/zumastor/build
 if [ "x$DISKIMG" = "x" ] ; then
   diskimg=${IMAGEDIR}/hda.img
 else
