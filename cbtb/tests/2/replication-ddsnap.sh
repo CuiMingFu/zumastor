@@ -83,7 +83,7 @@ ${SSH} root@${slave} \
 echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
-size=`ddsnap status /tmp/server --size` 
+size=`ddsnap status $serversocket --size` 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname
 echo ok 11 - master create $volname
 sleep $SLEEP
