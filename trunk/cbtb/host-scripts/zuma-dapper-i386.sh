@@ -89,9 +89,8 @@ if [ "x$TEMPLATEIMG" = "x" ] ; then
 fi
 
 if [ -f "${DISKIMG}" ] ; then
-  echo Zuma/dapper image already exists, remove if you wish to build a new one
-  echo rm "${DISKIMG}"
-  exit 2
+  echo Zuma/dapper image already existed, renaming
+  savelog -l -c 2 "${DISKIMG}"
 fi
 
 templatedir=`dirname "${TEMPLATEIMG}"`

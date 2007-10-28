@@ -80,7 +80,7 @@ if [ $installret -eq 0 ]; then
   ln -sf $buildrev ${top}/installrev
 
 else
-  subject="zumastor b$branch r$revision install failure $installret"
+  subject="zumastor b$branch r$buildrev install failure $installret"
   files="$installlog"
   email="${email_failure}"
 fi
