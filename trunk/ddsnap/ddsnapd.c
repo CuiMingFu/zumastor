@@ -255,8 +255,8 @@ struct allocspace { // everything bogus here!!!
 	struct allocspace_img *asi;	/* Points at image.metadata/snapdata. */
 	u32 allocsize;			/* Size of a chunk in bytes.          */
 	u32 chunk_sectors_bits;	     /* Bits of number of sectors in a chunk. */
-	u32 alloc_per_node;		/* Number of entries per tree node.   */
-					/* (metadata only).                   */
+	u32 alloc_per_node;		/* Number of enode index entries per  */
+					/* tree node. (metadata only).        */
 };
 
 struct superblock
@@ -864,9 +864,14 @@ insert:
 }
 
 /*
- * split_leaf: Split one leaf into two approximately in the middle.  Copy
- * the upper half of entries to the new leaf and move the lower half of
- * entries to the top of the original block.
+ * Split a leaf.
+ *
+ * This routine splits a b-tree leaf at the middle chunk.  It copies that
+ * and later map entries along with the associated lists of exceptions to
+ * the new leaf.  It moves the remaining exception lists to the end of the
+ * original block then adjusts the offsets for those map entries and the
+ * counts for each leaf.  It returns the chunk at which the leaf was split
+ * (which is now the first chunk in the new leaf).
  */
 static u64 split_leaf(struct eleaf *leaf, struct eleaf *leaf2)
 {
@@ -1217,6 +1222,12 @@ static void brelse_path(struct etree_path *path, unsigned levels)
 		brelse(path[i].buffer);
 }
 
+/*
+ * Find the b-tree leaf for the passed chunk.  Record the chain of enodes
+ * leading from the root to that leaf in the passed etree_path.  Each element
+ * of that path gets a buffer containing the enode at that level of the path
+ * and a pointer to the next index entry in that enode.
+ */
 static struct buffer *probe(struct superblock *sb, u64 chunk, struct etree_path *path)
 {
 	unsigned i, levels = sb->image.etree_levels;
@@ -1385,15 +1396,18 @@ struct delete_info
 };
 
 /*
- * delete_snapshot: remove all exceptions from a given snapshot from a leaf
- * working from top to bottom of the exception list clearing snapshot bits
- * and packing the nonzero exceptions into the top of the block.  Then work
- * from bottom to top in the directory map packing nonempty entries into the
- * bottom of the map.
+ * Remove all exceptions belonging to a given snapshot from the passed leaf.
+ *
+ * This clears the "share" bits on each chunk for the snapshot mask passed
+ * in the delete_info structure.  In the process, it compresses out any
+ * exception entries that are entirely unshared and/or unused.  In a second
+ * pass, it compresses out any map entries for which there are no exception
+ * entries remaining.
  */
 static void _delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *leaf, void *data)
 {
 	struct delete_info *dinfo = data;
+	/* p points just past the last map[] entry in the leaf. */
 	struct exception *p = emap(leaf, leaf->count), *dest = p;
 	struct etree_map *pmap, *dmap;
 	unsigned i;
@@ -1402,11 +1416,26 @@ static void _delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *lea
 
 	/* Scan top to bottom clearing snapshot bit and moving
 	 * non-zero entries to top of block */
+	/*
+	 * p points at each original exception; dest points at the location
+	 * to receive an exception that is being moved down in the leaf.
+	 * Exceptions that are unshared after clearing the share bit for
+	 * the passed snapshot mask are skipped and the associated "exception"
+	 * chunk is freed.  This operates on the exceptions for one map entry
+	 * at a time; when the beginning of a list of exceptions is reached,
+	 * the associated map entry offset is adjusted.
+	 */
 	for (i = leaf->count; i--;) {
+		/*
+		 * False the first time through, since i is leaf->count and p
+		 * was set to emap(leaf, leaf->count) above.
+		 */
 		while (p != emap(leaf, i)) {
 			u64 share = (--p)->share;
 			dinfo->any |= share & dinfo->snapmask;
-			if ((p->share &= ~dinfo->snapmask))
+					/* Unshare with given snapshot(s).    */
+			p->share &= ~dinfo->snapmask;
+			if (p->share)	/* If still used, keep chunk.         */
 				*--dest = *p;
 			else
 				free_exception(sb, p->chunk);
@@ -1414,10 +1443,20 @@ static void _delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *lea
 		leaf->map[i].offset = (char *)dest - (char *)leaf;
 	}
 	/* Remove empties from map */
+	/*
+	 * This runs through the map entries themselves, skipping entries
+	 * with matching offsets.  If all the exceptions for a given map
+	 * entry are skipped, its offset will be set to that of the following
+	 * map entry (since the dest pointer will not have moved).
+	 */
 	dmap = pmap = &leaf->map[0];
 	for (i = 0; i < leaf->count; i++, pmap++)
 		if (pmap->offset != (pmap + 1)->offset)
 			*dmap++ = *pmap;
+	/*
+	 * There is always a phantom map entry after the last, that has the
+	 * offset of the end of the leaf and, of course, no chunk number.
+	 */
 	dmap->offset = pmap->offset;
 	dmap->rchunk = 0; // tidy up
 	leaf->count = dmap - &leaf->map[0];
@@ -1518,7 +1557,10 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 
 	for (i = 0; i < levels; i++) // can be initializer if not dynamic array (change it?)
 		hold[i] = (struct etree_path){ };
-
+	/*
+	 * Find the B-tree leaf with the chunk we were passed.  Often this
+	 * will be chunk 0.
+	 */
 	if (!(leafbuf = probe(sb, resume, path)))
 		return -ENOMEM;
 
@@ -1660,6 +1702,9 @@ static struct snapshot *find_victim(struct superblock *sb)
 	return best;
 }
 
+/*
+ * Delete the passed snapshot.
+ */
 static int delete_snap(struct superblock *sb, struct snapshot *snap)
 {
 	trace_on(warn("Delete snaptag %u (snapnum %i)", snap->tag, snap->bit););
@@ -1670,12 +1715,14 @@ static int delete_snap(struct superblock *sb, struct snapshot *snap)
 		mask = 1ULL << snap->bit;
 		sb->usecount[snap->bit] = 0; // reset transient usecount for this bit during auto-deletion
 	}
+	/* Compress the snapshot entry out of the list. */
 	memmove(snap, snap + 1, (char *)(sb->image.snaplist + --sb->image.snapshots) - (char *)snap);
 	set_sb_dirty(sb);
 	if (!mask) {
 		trace_on(warn("snapshot squashed, skipping tree delete"););
 		return 0;
 	}
+	/* Remove entries for this snapshot from the B-tree. */
 	return delete_tree_range(sb, mask, 0);
 }
 
@@ -1838,6 +1885,13 @@ static struct change_list *gen_changelist_tree(struct superblock *sb, struct sna
  * a node to contain an esthetically pleasing binary number of pointers.
  * (Not done yet.)
  */
+/*
+ * Insert a child into an enode.
+ *
+ * Move all entries from here to the end of the index entries down one entry,
+ * thereby freeing the current entry.  Fill that with the information for our
+ * new child.
+ */
 static void insert_child(struct enode *node, struct index_entry *p, sector_t child, u64 childkey)
 {
 	memmove(p + 1, p, (char *)(&node->entries[0] + node->count) - (char *)p);
@@ -1846,14 +1900,31 @@ static void insert_child(struct enode *node, struct index_entry *p, sector_t chi
 	node->count++;
 }
 
-/* returns 0 on sucess and -errno on failure */
+/*
+ * Add an exception to the B-tree.
+ *
+ * This routine calls add_exception_to_leaf() to add the passed exception to
+ * the leaf.  If that fails, we split the leaf and add the exception to the
+ * appropriate leaf of the pair.  We then add the new leaf to the enode,
+ * splitting it (and any parents) if necessary.  In the degenerate case, we
+ * split enodes all the way up the etree path until we create a new root at
+ * the top.
+ *
+ * Returns 0 on success and -errno on failure.
+ */
 static int add_exception_to_tree(struct superblock *sb, struct buffer *leafbuf, u64 target, u64 exception, int snapbit, struct etree_path path[], unsigned levels)
 {
+	/*
+	 * Try to add the exception to the leaf we already have in hand.  If
+	 * that works, we're done.
+	 */
 	if (!add_exception_to_leaf(buffer2leaf(leafbuf), target, exception, snapbit, sb->snapmask)) {
 		brelse_dirty(leafbuf);
 		return 0;
 	}
-
+	/*
+	 * There wasn't room to add a new exception to the leaf.  Split it.
+	 */
 	trace(warn("adding a new leaf to the tree"););
 	struct buffer *childbuf = new_leaf(sb);
 	if (!childbuf) 
@@ -1861,7 +1932,10 @@ static int add_exception_to_tree(struct superblock *sb, struct buffer *leafbuf, 
 	
 	u64 childkey = split_leaf(buffer2leaf(leafbuf), buffer2leaf(childbuf));
 	sector_t childsector = childbuf->sector;
-
+	/*
+	 * Now add the exception to the appropriate leaf.  Childkey has the
+	 * first chunk in the new leaf we just created.
+	 */
 	if (add_exception_to_leaf(target < childkey ? buffer2leaf(leafbuf): buffer2leaf(childbuf), target, exception, snapbit, sb->snapmask)) {
 		warn("new leaf has no space");
 		return -ENOMEM;
@@ -1874,12 +1948,18 @@ static int add_exception_to_tree(struct superblock *sb, struct buffer *leafbuf, 
 		struct buffer *parentbuf = path[levels].buffer;
 		struct enode *parent = buffer2node(parentbuf);
 
+		/*
+		 * If there's room in this enode, insert the child and we're
+		 * done.
+		 */
 		if (parent->count < sb->metadata.alloc_per_node) {
 			insert_child(parent, pnext, childsector, childkey);
 			set_buffer_dirty(parentbuf);
 			return 0;
 		}
-
+		/*
+		 * Split the node.
+		 */
 		unsigned half = parent->count / 2;
 		u64 newkey = parent->entries[half].key;
 		struct buffer *newbuf = new_node(sb); 
@@ -1890,21 +1970,33 @@ static int add_exception_to_tree(struct superblock *sb, struct buffer *leafbuf, 
 		newnode->count = parent->count - half;
 		memcpy(&newnode->entries[0], &parent->entries[half], newnode->count * sizeof(struct index_entry));
 		parent->count = half;
-
+		/*
+		 * If the path entry is in the new node, use that as the
+		 * parent.
+		 */
 		if (pnext > &parent->entries[half]) {
 			pnext = pnext - &parent->entries[half] + newnode->entries;
 			set_buffer_dirty(parentbuf);
 			parentbuf = newbuf;
 			parent = newnode;
 		} else set_buffer_dirty(newbuf);
-
+		/*
+		 * Insert the child now that we have room in the parent, then
+		 * climb the path and insert the new child there.
+		 */
 		insert_child(parent, pnext, childsector, childkey);
 		set_buffer_dirty(parentbuf);
 		childkey = newkey;
 		childsector = newbuf->sector;
 		brelse(newbuf);
 	}
-
+	/*
+	 * If we get here, we've added a node at every level up the path to
+	 * the root.  This means that we have to add a new level and make a
+	 * new root.  Do so and point it at the pair of nodes that are now
+	 * at the second level (i.e. the old root and the new node).  Point
+	 * the superblock at the new root.
+	 */
 	trace(printf("add tree level\n"););
 	struct buffer *newrootbuf = new_node(sb);
 	if (!newrootbuf)
@@ -2050,7 +2142,8 @@ static chunk_t make_unique(struct superblock *sb, chunk_t chunk, int snapbit)
 	unsigned levels = sb->image.etree_levels;
 	struct etree_path path[levels + 1];
 	/*
-	 * Find the proper leaf for this chunk.
+	 * Find the proper leaf for this chunk.  The "path" gets the list of
+	 * B-tree nodes that lead to the returned leaf.
 	 */
 	struct buffer *leafbuf = probe(sb, chunk, path);
 	if (!leafbuf) 
@@ -2088,6 +2181,10 @@ out:
 	return exception;
 }
 
+/*
+ * Find the chunk in the b-tree corresponding to the passed chunk and return
+ * an indication of whether or not it is shared.
+ */
 static int test_unique(struct superblock *sb, chunk_t chunk, int snapbit, chunk_t *exception)
 {
 	unsigned levels = sb->image.etree_levels;
