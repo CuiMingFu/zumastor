@@ -900,6 +900,12 @@ static u64 split_leaf(struct eleaf *leaf, struct eleaf *leaf2)
 	return splitpoint;
 }
 
+/*
+ * Merge the contents of 'leaf2' into 'leaf.'  The leaves are contiguous and
+ * 'leaf2' follows 'leaf.'  Move the exception lists in 'leaf' up to make room
+ * for those of 'leaf2,' adjusting the offsets in the map entries, then copy
+ * the map entries and exception lists straight from 'leaf2.'
+ */
 static void merge_leaves(struct eleaf *leaf, struct eleaf *leaf2)
 {
 	unsigned nhead = leaf->count, ntail = leaf2->count, i;
@@ -919,6 +925,9 @@ static void merge_leaves(struct eleaf *leaf, struct eleaf *leaf2)
 	leaf->count += ntail;
 }
 
+/*
+ * Copy the index entries in 'node2' into 'node.'
+ */
 static void merge_nodes(struct enode *node, struct enode *node2)
 {
 	memcpy(&node->entries[node->count], &node2->entries[0], node2->count * sizeof(struct index_entry));
@@ -1257,9 +1266,8 @@ static struct buffer *probe(struct superblock *sb, u64 chunk, struct etree_path 
 }
 
 /*
- * generic btree traversal
+ * Stack-based inorder B-tree traversal.
  */
-
 static int traverse_tree_range(
 	struct superblock *sb, chunk_t start, chunk_t finish,
 	void (*visit_leaf)(struct superblock *sb, struct eleaf *leaf, void *data),
@@ -1281,6 +1289,12 @@ static int traverse_tree_range(
 	}
 
 	while (1) {
+		/*
+		 * Build the stack down to the leaf level of the tree.  If
+		 * this is the first time through we start at the root and
+		 * work down.  Otherwise we're sitting at the beginning or
+		 * middle of a non-leaf-level node and start from there.
+		 */
 		do {
 			level++;
 			nodebuf = snapread(sb, level? path[level - 1].pnext++->sector: sb->image.etree_root);
@@ -1296,6 +1310,10 @@ static int traverse_tree_range(
 		} while (level < levels - 1);
 
 		trace(printf("do %i leaf nodes, level = %i\n", node->count, level););
+		/*
+		 * Process the leaves in this node.  Call the passed function
+		 * for each.
+		 */
 		while (path[level].pnext < node->entries + node->count) {
 			leafbuf = snapread(sb, path[level].pnext++->sector);
 			if (!leafbuf) {
@@ -1309,7 +1327,11 @@ start:
 
 			brelse(leafbuf);
 		}
-
+		/*
+		 * We're finished with this node, pop the stack to the next
+		 * one.  Keep popping as long as we're at the end of a node.
+		 * If we get all the way to the root, we're done.
+		 */
 		do {
 			brelse(nodebuf);
 			if (!level)
@@ -1491,12 +1513,22 @@ static int delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *leaf,
  * Good luck understanding this.  It's complicated because it's complicated.
  */
 
+/*
+ * Return true if path[level].pnext points at the end of the list of index
+ * entries.
+ */
 static inline int finished_level(struct etree_path path[], int level)
 {
 	struct enode *node = path_node(path, level);
 	return path[level].pnext == node->entries + node->count;
 }
 
+/*
+ * Remove the index entry at path[level].pnext-1 by moving entries below it up
+ * into its place.  If it wasn't the last entry in the node but it _was_ the
+ * first entry (and we're not at the root), preserve the key by inserting it
+ * into the index entry of the parent node that refers to this node.
+ */
 static void remove_index(struct etree_path path[], int level)
 {
 	struct enode *node = path_node(path, level);
@@ -1518,9 +1550,14 @@ static void remove_index(struct etree_path path[], int level)
 	// what if index is now empty? (no deleted key)
 	// then some key above is going to be deleted and used to set pivot
 	if (path[level].pnext == node->entries && level) {
+		/* Keep going up the path if we're at the first index entry. */
 		for (i = level - 1; path[i].pnext - 1 == path_node(path, i)->entries; i--)
-			if (!i)
+			if (!i)		/* If we hit the root, we're done.    */
 				return;
+		/*
+		 * Found a node where we're not at the first entry.  Set the
+		 * key here to that of the deleted index entry.
+		 */
 		(path[i].pnext - 1)->key = pivot;
 		set_buffer_dirty(path[i].buffer);
 	}
@@ -1548,6 +1585,19 @@ static void set_buffer_dirty_check(struct buffer *buffer, struct superblock *sb)
 	}
 }
 
+/*
+ * Delete all chunks in the B-tree for the snapshot(s) indicated by the
+ * passed snapshot mask, beginning at the passed chunk.
+ *
+ * Walk the tree (a stack-based inorder traversal) starting with the passed
+ * chunk, calling delete_snapshots_from_leaf() on each leaf to remove chunks
+ * associated with the snapshot(s) we're removing.  As leaves and nodes become
+ * sparsely filled, merge them with their neighbors.  When we reach the root
+ * we've finished the traversal; if there are empty levels (that is, level(s)
+ * directly below the root that only contain a single node), remove those
+ * empty levels until either the second level is no longer empty or we only
+ * have one level remaining.
+ */
 static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume)
 {
 	int levels = sb->image.etree_levels, level = levels - 1;
@@ -1569,12 +1619,20 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 		trace_off(show_leaf(buffer2leaf(leafbuf)););
 		if (delete_snapshots_from_leaf(sb, buffer2leaf(leafbuf), snapmask))
 			set_buffer_dirty_check(leafbuf, sb);
-
+		/*
+		 * If we have a previous leaf (i.e. we're past the first),
+		 * try to merge the current leaf with it.
+		 */
 		if (prevleaf) { /* try to merge this leaf with prev */
 			struct eleaf *this = buffer2leaf(leafbuf);
 			struct eleaf *prev = buffer2leaf(prevleaf);
 			trace_off(warn("check leaf %p against %p", leafbuf, prevleaf););
 			trace_off(warn("need = %i, free = %i", leaf_payload(this), leaf_freespace(prev)););
+			/*
+			 * If there's room in the previous leaf for this leaf,
+			 * merge this leaf into the previous leaf and remove
+			 * the index entry that points to this leaf.
+			 */
 			if (leaf_payload(this) <= leaf_freespace(prev)) {
 				trace_off(warn(">>> can merge leaf %p into leaf %p", leafbuf, prevleaf););
 				merge_leaves(prev, this);
@@ -1585,16 +1643,38 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 			}
 			brelse(prevleaf);
 		}
-		prevleaf = leafbuf;
+		prevleaf = leafbuf;	/* Save leaf for next time through.   */
 keep_prev_leaf:
+		/*
+		 * If we've reached the end of the index entries in the B-tree
+		 * node at the current level, try to merge the node referred
+		 * to at this level of the path with a prior node.  Repeat
+		 * this process at successively higher levels up the path; if
+		 * we reach the root, clean up and exit.  If we don't reach
+		 * the root, we've reached a node with multiple entries;
+		 * rebuild the path from the next index entry to the next
+		 * leaf.
+		 */
 		if (finished_level(path, level)) {
 			do { /* pop and try to merge finished nodes */
+				/*
+				 * If we have a previous node at this level
+				 * (again, we're past the first node), try to
+				 * merge the current node with it.
+				 */
 				if (hold[level].buffer) {
 					assert(level); /* root node can't have any prev */
 					struct enode *this = path_node(path, level);
 					struct enode *prev = path_node(hold, level);
 					trace_off(warn("check node %p against %p", this, prev););
 					trace_off(warn("this count = %i prev count = %i", this->count, prev->count););
+					/*
+					 * If there's room in the previous node
+					 * for the entries in this node, merge
+					 * this node into the previous node and
+					 * remove the index entry that points
+					 * to this node.
+					 */
 					if (this->count <= sb->metadata.alloc_per_node - prev->count) {
 						trace(warn(">>> can merge node %p into node %p", this, prev););
 						merge_nodes(prev, this);
@@ -1605,11 +1685,30 @@ keep_prev_leaf:
 					}
 					brelse(hold[level].buffer);
 				}
+				/* Save the node for the next time through.   */
 				hold[level].buffer = path[level].buffer;
 keep_prev_node:
+				/*
+				 * If we're at the root, we need to clean up
+				 * and return.  First, though, try to reduce
+				 * the number of levels.  If the tree at the
+				 * root has been reduced to only the nodes in
+				 * our path, eliminate nodes with only one
+				 * entry until we either have a new root node
+				 * with multiple entries or we have only one
+				 * level remaining in the B-tree.
+				 */
 				if (!level) { /* remove levels if possible */
+					/*
+					 * While above the first level and the
+					 * root only has one entry, point the
+					 * root at the (only) first-level node,
+					 * reduce the number of levels and
+					 * shift the path up one level.
+					 */
 					while (levels > 1 && path_node(hold, 0)->count == 1) {
 						trace_off(warn("drop btree level"););
+						/* Point root at the first level. */
 						sb->image.etree_root = hold[1].buffer->sector;
 						brelse_free(sb, hold[0].buffer);
 						levels = --sb->image.etree_levels;
@@ -1629,7 +1728,12 @@ keep_prev_node:
 				level--;
 				trace_off(printf("pop to level %i, %i of %i nodes\n", level, path[level].pnext - path_node(path, level)->entries, path_node(path, level)->count););
 			} while (finished_level(path, level));
-
+			/*
+			 * Now rebuild the path from where we are (one entry
+			 * past the last leaf we processed, which may have
+			 * been adjusted in operations above) down to the node
+			 * above the next leaf.
+			 */
 			do { /* push back down to leaf level */
 				struct buffer *nodebuf = snapread(sb, path[level++].pnext++->sector);
 				if (!nodebuf) {
@@ -1648,6 +1752,10 @@ keep_prev_node:
 			trace_off(warn("flushing dirty buffers to disk"););
 			commit_transaction(sb);
 		}
+		/*
+		 * Get the leaf indicated in the next index entry in the node
+		 * at this level.
+		 */
 		if (!(leafbuf = snapread(sb, path[level].pnext++->sector))) {
 			brelse_path(path, level);
 			return -ENOMEM;		
@@ -1754,16 +1862,16 @@ static chunk_t alloc_chunk(struct superblock *sb, struct allocspace *as)
 }
 
 /*
- * Both alloc_metablock and alloc_snapblock call alloc_chunk to allocate
- * a chunk.  The new_block function calls alloc_metablock to allocate a
- * block from the metadata allocation, then calls getblk to allocate a
- * buffer for that block.  Both new_leaf and new_node call new_block
+ * Both alloc_metablock() and alloc_snapblock() call alloc_chunk() to allocate
+ * a chunk.  The new_block() function calls alloc_metablock() to allocate a
+ * block from the metadata allocation, then calls getblk() to allocate a
+ * buffer for that block.  Both new_leaf() and new_node() call new_block()
  * for their buffer.  The chunk allocation functions here return either the
  * newly-allocated chunk number or -1 if the allocation failed.
- * new_block returns NULL for failure.
+ * new_block() returns NULL for failure.
  *
- * Note that alloc_metablock is only called here.  alloc_snapblock is
- * called elsewhere (make_unique) to allocate snapshot blocks.
+ * Note that alloc_metablock() is only called here.  alloc_snapblock() is
+ * called elsewhere (make_unique()) to allocate snapshot blocks.
  */
 static chunk_t alloc_metablock(struct superblock *sb)
 {
