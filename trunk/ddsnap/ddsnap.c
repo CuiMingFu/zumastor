@@ -2737,7 +2737,7 @@ int main(int argc, char *argv[])
 		snaptag1str   = poptGetArg(cdCon);
 		snaptag2str   = poptGetArg(cdCon);
 
-		if (hoststr == NULL)
+		if ((sockname == NULL) || (hoststr == NULL) || (snaptag1str == NULL))
 			cdUsage(cdCon, 1, argv[0], "Not enough arguments to send-delta\n");
 		if (poptPeekArg(cdCon) != NULL)
 			cdUsage(cdCon, 1, argv[0], "Too many arguments to send-delta\n");
