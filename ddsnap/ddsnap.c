@@ -21,6 +21,7 @@
 #include <sys/un.h>
 #include <linux/fs.h> // for BLKGETSIZE
 #include <poll.h>
+#include <sys/prctl.h>
 #include "dm-ddsnap.h"
 #include "buffer.h"
 #include "daemonize.h"
@@ -2133,6 +2134,9 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
+	char process_name[16];
+	snprintf(process_name, 16, "ddsnap_%s", command);
+	prctl(PR_SET_NAME, process_name);
 	if (!strcmp(command, "dump")) {
 		int err = 1;
 		u64 start = 0, finish = -1; /* if not specified, the defaults dump the entire tree */
