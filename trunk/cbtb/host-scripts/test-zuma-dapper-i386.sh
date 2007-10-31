@@ -153,7 +153,6 @@ then
     else
       timeout="timeout -14 $timelimit"
     fi
-    timeout=""
     if ${timeout} ${SSH} root@${IPADDR} ${params} ./${f}
     then
       echo ${f} ok

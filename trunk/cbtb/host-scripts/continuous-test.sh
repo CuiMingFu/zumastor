@@ -85,9 +85,10 @@ do
   then
     echo PASS $f >>$summary
   else
-    echo runtests $f testrc=${testrc}
     echo FAIL $f >>$summary
-    testret=$testrc
+    if [ ! egrep '^EXPECT_FAIL=1' ./${f} ] ; then
+      testret=$testrc
+    fi
   fi
 done
 popd
@@ -104,9 +105,10 @@ do
   then
     echo PASS $f >>$summary
   else
-    testret=$testrc
-    echo runtests $f testrc=${testrc}
     echo FAIL $f >>$summary
+    if [ ! egrep '^EXPECT_FAIL=1' ./${f} ] ; then
+      testret=$testrc
+    fi
   fi
 done
 popd
