@@ -170,8 +170,6 @@ elif [ -x ${sendmail} ] ; then
   ) | ${sendmail} ${email}
 fi
 
-rm -f $summary $files
-
 # loop and reload the script
 sleep 300
 exec $0
