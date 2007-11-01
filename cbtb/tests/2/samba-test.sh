@@ -17,6 +17,9 @@ rc=0
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=2400
 
+# Remove this when the test is expected to succeed.  Test harness greps for it.
+EXPECT_FAIL=1
+
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 

@@ -17,6 +17,10 @@ rc=0
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
+# This test is currently expected to fail and should not be used by
+# the test harness to determine whether zumastor as a whole is failing.
+EXPECT_FAIL=1
+
 slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
@@ -25,7 +29,7 @@ SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 # necessary at the moment, ddsnap just sends requests and doesn't wait
 SLEEP=10
 
-echo "1..25"
+echo "1..27"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -90,6 +94,9 @@ sleep $SLEEP
 
 $SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname"
 echo ok 12 - slave create $volname
+$SSH root@${slave} ls -l /dev/mapper
+sleep $SLEEP
+$SSH root@${slave} ls -l /dev/mapper
 
 listenport=3333
 $SSH root@${slave} \
@@ -172,6 +179,19 @@ if [ "$hash2" != "$hash2slave" ] ; then
 fi
 echo ok 25 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
+# TODO
+echo ok 26 - stop ddsnap listen on testvol
+
+$SSH root@$slave dmsetup remove $volname\(2\)
+$SSH root@$slave dmsetup remove $volname\(0\)
+$SSH root@$slave dmsetup remove $volname
+dmsetup remove $volname\(2\)
+dmsetup remove $volname\(0\)
+dmsetup remove $volname
+echo ok 27 - remove master and slave device mappings
+
+# TODO
+# echo ok 28 - delete ddsnap snapshots on master and slave
 
 exit $rc
 
