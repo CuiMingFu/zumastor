@@ -85,9 +85,11 @@ do
   then
     echo PASS $f >>$summary
   else
-    echo FAIL $f >>$summary
-    if [ ! egrep '^EXPECT_FAIL=1' ./${f} ] ; then
+    if egrep '^EXPECT_FAIL=1' ./${f} ; then
+      echo FAIL "$f*" >>$summary
+    else
       testret=$testrc
+      echo FAIL $f >>$summary
     fi
   fi
 done
@@ -105,9 +107,11 @@ do
   then
     echo PASS $f >>$summary
   else
-    echo FAIL $f >>$summary
-    if [ ! egrep '^EXPECT_FAIL=1' ./${f} ] ; then
+    if egrep '^EXPECT_FAIL=1' ./${f} ; then
+      echo FAIL "$f*" >>$summary
+    else
       testret=$testrc
+      echo FAIL $f >>$summary
     fi
   fi
 done
