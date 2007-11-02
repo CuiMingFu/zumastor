@@ -1411,10 +1411,11 @@ static void check_leaf(struct eleaf *leaf, u64 snapmask)
 	// printf("top@%i", leaf->map[i].offset);
 }
 
+/* FIXME: the structure is only used to pass info between two functions */
 struct delete_info
 {
 	u64 snapmask;
-	int any;
+	u64 any;
 };
 
 /*
