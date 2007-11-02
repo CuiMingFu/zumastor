@@ -2,7 +2,8 @@
 
 # Set up the initial Ubuntu/dapper template image, for use when duplicating
 # the install to multiple server/client tests.  Makes use of tunbr and
-# a presetup br1, squid, and dnsmasq.
+# a presetup br1, squid, and dnsmasq.  Must run from the cbtb/host-setup/
+# directory to use other scripts and data.
 
 # $Id$
 # Copyright 2007 Google Inc.
@@ -22,6 +23,11 @@ if [ "x$MACFILE" = "x" -o "x$MACADDR" = "x" -o "x$IFACE" = "x" \
   exit 1
 fi
 
+if [ "x$SVNREV" = "x" ] ; then
+  SVNREV=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+fi
+      
+
 # Remove the any existing ssh hostkey for this IPADDR since generating a
 # new one
 if [ -f ~/.ssh/known_hosts ] ; then
@@ -39,10 +45,12 @@ rqemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
 VIRTHOST=192.168.23.1
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
+# default to dapper-i386-rN.img in the current directory if DISKIMG is
+# unspecified.
 IMAGE=dapper-i386
-IMAGEDIR=${diskimgdir}/${IMAGE}
+IMAGEDIR='.'
 if [ "x$DISKIMG" = "x" ] ; then
-  diskimg=${IMAGEDIR}/hda.img
+  diskimg=${IMAGE}-r${SVNREV}.img
 else
   # eg. DISKIMG=../../build/${IMAGE-r`svnversion`.img
   if [ -e "$DISKIMG" ] ; then
@@ -50,9 +58,9 @@ else
   fi
   diskimg="$DISKIMG"
 fi
-SERIAL=${IMAGEDIR}/serial
-MONITOR=${IMAGEDIR}/monitor
-VNC=${IMAGEDIR}/vnc
+SERIAL=${IMAGEDIR}/dapper-i386-serial
+MONITOR=${IMAGEDIR}/dapper-i386-monitor
+VNC=${IMAGEDIR}/dapper-i386-vnc
 
 if [ ! -e ${IMAGEDIR} ]; then
   mkdir -p ${IMAGEDIR}
@@ -69,9 +77,6 @@ if [ ! -f ${diskimg} ] ; then
   cp dapper-early.sh ${tmpdir}/initrd/early.sh
   cp dapper-late.sh ${tmpdir}/initrd/late.sh
   passwd=`pwgen 8 1`
-  touch ${IMAGEDIR}/root
-  chmod 600 ${IMAGEDIR}/root
-  echo $passwd > ${IMAGEDIR}/root
   pwhash=`echo ${passwd} | mkpasswd -s --hash=md5`
   cat >>${tmpdir}/initrd/preseed.cfg <<EOF
 d-i     mirror/http/hostname    string ${VIRTHOST}
@@ -112,18 +117,24 @@ EOF
     -vnc unix:${VNC} \
     -net nic,macaddr=${MACADDR},model=ne2k_pci -net tap,ifname=${IFACE},script=no \
     -boot n -hda ${diskimg} -no-reboot & qemu_pid=$!
-    
+ 
+  # kill the emulator if any abort-like signal is received
+  trap "kill -9 ${qemu_pid} ; exit 1" 1 2 3 6 14 15
+
   # TODO: timeout and screencapture if first boot failed
   wait $qemu_pid
 
 
 
-  ${qemu_i386} \
+  ${rqemu_i386} \
     -serial unix:${SERIAL},server,nowait \
     -monitor unix:${MONITOR},server,nowait \
     -vnc unix:${VNC} \
     -net nic,macaddr=${MACADDR},model=ne2k_pci -net tap,ifname=${IFACE},script=no \
     -boot c -hda ${diskimg} -no-reboot & qemu_pid=$!
+
+  # kill the emulator if any abort-like signal is received
+  trap "kill -9 ${qemu_pid} ; exit 1" 1 2 3 6 14 15
 
   count=0
   while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR} hostname 2>/dev/null
@@ -142,6 +153,9 @@ EOF
     ${SCP} swap2sysvg.sh root@${IPADDR}:
     ${SSH} root@${IPADDR} './swap2sysvg.sh && rm swap2sysvg.sh'
 
+    # remove the root password from the template image
+    ${SSH} root@${IPADDR} "sed -i 's/^root:[^:]*:/root::/' /etc/passwd"
+
     # generate and authorize an passwordless ssh key that can log in to
     # any other image with this as its base template
     ${SSH} root@${IPADDR} "ssh-keygen -q -P '' -t dsa -f .ssh/id_dsa ; cat .ssh/id_dsa.pub >> .ssh/authorized_keys"
@@ -150,7 +164,9 @@ EOF
 
     wait $qemu_pid
 
-    echo "${diskimg} installed.  root and ${USER} passwords are: ${passwd}"
+    echo "${diskimg} installed."
+    echo "mv ${diskimg} ../../build/ and symlink from dapper-i386.img if you wish to use this as a template."
+
   fi
 
   rm -rf ${tmpdir}

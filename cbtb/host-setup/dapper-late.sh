@@ -27,3 +27,15 @@ rm /target/etc/iftab
 # kvm likes it less, commented out again but left for further reinstatements
 # in-target sed --in-place '/^# kopt=/s/$/ noapic noacpi/' /boot/grub/menu.lst
 # in-target update-grub
+
+# bring back the VC consoles
+sed -i 's/^#1:/1:/' /etc/inittab
+sed -i 's/^#2:/2:/' /etc/inittab
+sed -i 's/^#3:/3:/' /etc/inittab
+sed -i 's/^#4:/4:/' /etc/inittab
+sed -i 's/^#5:/5:/' /etc/inittab
+sed -i 's/^#6:/6:/' /etc/inittab
+
+# redirect logging to VC1, so an image can be taken if necessary
+echo "*.*	/dev/tty1" >> /etc/syslog.conf
+
