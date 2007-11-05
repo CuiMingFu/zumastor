@@ -103,7 +103,7 @@ else
   ${qemu_img} create  -b "${TEMPLATEIMG}" -f qcow2 "${DISKIMG}"
 fi
 
-${qemu_i386} -m 512 \
+${rqemu_i386} -m 512 \
   -serial unix:${SERIAL},server,nowait \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
