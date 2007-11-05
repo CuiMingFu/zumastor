@@ -116,12 +116,10 @@ fi
 
   
 rm /var/run/zumastor/mount/testvol/masterfile
-ls -l /var/run/zumastor/mount/testvol
+$SSH root@${slave} ls -l /mnt/ || true
 if $SSH root@${slave} test -f /mnt/masterfile ; then
   rc=7
   echo not ok 7 - rm on master did not show up on CIFS client
-  $SSH root@${slave} ls -l /mnt/
-  cat /mnt/masterfile
 else
   echo ok 7 - rm on master did show up on CIFS client
 fi
