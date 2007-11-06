@@ -31,6 +31,7 @@ fi
 diskimgdir=${HOME}/testenv
 tftpdir=/tftpboot
 qemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
+rqemu_i386=qemu # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
 
 VIRTHOST=192.168.23.1
 [ -x /etc/default/testenv ] && . /etc/default/testenv
@@ -66,7 +67,7 @@ fi
 echo IPADDR=${IPADDR}
 echo control/tmp dir=${tmpdir}
 
-${qemu_i386} -snapshot \
+${rqemu_i386} -snapshot \
   -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
