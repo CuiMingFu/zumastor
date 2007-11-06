@@ -14,11 +14,6 @@ To build ddsnap from source:
 
   * cd to ddsnap and make; sudo make install
 
-  * cd to ../zumastor and sudo make install
-
-This will set up everything except the SysV init scripts (rc2.d, rc3.d
-etc) and the kernel.
-
 Now it gets a little ugly because we haven't cleaned up the kernel install
 from tarball procedure yet.
 
@@ -40,14 +35,22 @@ Run make menuconfig, config drivers -> md -> dm-ddsnap to build as a
 module, or preferably as a built-in for better debugging.  While in there,
 turning on debugging -> include debug symbols would be a good idea, plus
 stack frame for more accurate traceback.  Build and install.
+	Required config options are:
+		CONFIG_DM_DDSNAP
+	Recommended options are:
+		CONFIG_IKCONFIG_PROC
+		CONFIG_MAGIC_SYSRQ
+		CONFIG_DEBUG_INFO
 
     make
     sudo make install
 
 2. Install Zumastor
 
-   cd zumastor/zumastor
-   sudo scripts/install
+  * cd to ../zumastor and sudo make install
+
+This will set up everything except the SysV init scripts (rc2.d, rc3.d
+etc) and the kernel.
 
 Reboot to the new kernel.  Manually try zumastor start and zumastor stop,
 verifying there are no error messages.  If that is fine, then add zumastor
