@@ -1,5 +1,0 @@
-config TREE
-	bool "tree"
-	help
-	  Show directory tree structure and contents in ASCII art.
-
