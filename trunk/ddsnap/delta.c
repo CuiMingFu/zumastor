@@ -2,8 +2,6 @@
 #include <unistd.h>
 #include "delta.h"
 #include "xdelta/xdelta3.h"
-#include "ddsnap.h"
-#include "trace.h"
 
 int delta_chunk_helper(int (*func) (xd3_stream *), 
 		       const uint8_t *input1, 
