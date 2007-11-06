@@ -22,7 +22,7 @@ etc) and the kernel.
 Now it gets a little ugly because we haven't cleaned up the kernel install
 from tarball procedure yet.
 
-  * Generate the kernel patches, leaving the one we need in ddsnap/patches/2.6.21.1/00_dm-ddsnap.AUTO
+  * Generate the kernel patches, leaving the ddsnap files in ddsnap/patches/2.6.21.1/00_dm-ddsnap.AUTO
 
        make genpatches
 
@@ -31,10 +31,10 @@ from tarball procedure yet.
        wget http://kernel.org/pub/linux/kernel/v2.6/linux-2.6.21.1.tar.bz2
        tar -xjf linux-2.6.21.1.tar.bz2
 
-  * Apply the kernel patch to the 2.6.21.1 kernel:
+  * Apply all the kernel patches to the 2.6.21.1 kernel:
 
        cd <root of the 2.6.21.1 kernel tree>
-       patch -p1 <ddsnap/patches/2.6.21.1/00_dm-ddsnap.AUTO
+       for patchfile in ddsnap/patches/2.6.21.1/*; do patch -p1 <$patchfile; done
 
 Run make menuconfig, config drivers -> md -> dm-ddsnap to build as a
 module, or preferably as a built-in for better debugging.  While in there,
