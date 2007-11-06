@@ -19,5 +19,5 @@ popd
 aptitude -y install \
   fakeroot kernel-package devscripts subversion \
   debhelper libpopt-dev zlib1g-dev \
-  debhelper
+  debhelper bzip2
 
