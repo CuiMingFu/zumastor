@@ -1,0 +1,180 @@
+Release 0.4-pre7:
+
+There is much stability and cleanup work in this release, including major
+reworking of the automatic snapshot deletion model to support automatic
+deletion of snapshots even if they are still mounted (geewhiz).  Also lots
+of work aimed at being able to operate reasonably well with a snapshot
+store smaller than the origin volume.  The dominating item for this cycle
+was fixing the congestion_wait deathtrap on recursive memory writeout, a
+longstanding bug we inherited from core kernel.
+
+New features:
+
+  * Progress interface added to ddsnap transmit, suitable for use by shell
+    scripts, or interpreted or compiled programs.
+
+  * Extended functionality of zumastor snapshot to allow the admin to create
+    and arbitrary snapshot that is not part of the regular snapshot schedule
+    and will not be automatically deleted
+
+  * ddsnap magic number format improved to incorporate the date of most
+    recent incompatible change
+
+  * A nascent automated test harness, not yet functional has appeared
+
+  * Incremental used chunk statistics are now recorded in the journal
+    commit block so that they are always correct on journal replay, which
+    avoids a full scan of the btree on unclean restart
+
+  * A snapshots that is in use or even mounted may now be automatically
+    deleted if the snapshot store is full and somebody is trying to write
+    to the origin.  Much better than failing the origin write.  This is
+    termed "quashing" a snapshot, and the snapshot so abused will cause an
+    IO error if read or written to by the unfortunate filesystem mount,
+    but will not cause any system code to fault, oops, hang or otherwise
+    behave.  Probably.
+
+  * We now have an automated script to build debian packages
+
+  * Concept of "full volume delta" introduced so that an entire volume may
+    be sent downstream using the streaming delta format, which includes
+    compression of the volume data
+
+  * Initial replication is now possible even when downstream snapshot store
+    is (much) smaller than the origin volume.  This is accomplished using
+    a full volume replication cycle without any snapshot set downstream,
+    after which normal, snapshot-based incremental replication begins
+
+  * Quota support mount option is now enabled by default.  (Later this will
+    turn into arbitrary per-volume mount option support)
+
+  * Default chunk size changed from 64K to 16K to improve because 64K wastes
+    too much snapshot store space due to preserving unchanged origin data
+
+  * No longer any need to keep the primordial snapshot 0 around forever,
+    which saves the snapshot store from eventually inhaling the entire
+    origin volume under less than extreme churn patterns
+
+  * If replication fails we now retry in case it was just a transient error.
+    Next prerelease we will add functionality to distinguish between
+    transient and serious replication errors, to decide whether to initiate
+    a full volume replication cycle or just to retry the replication as now.
+
+  * we have put the snapshot priorities to use for the first
+    time.  If a snapshot priority is set to "127" it will be unquashable,
+    causing origin writes to fail rather than have it quashed.  This is
+    used to weigh the preference of origin write failures rather than
+    snapshot quashing downstream where we prefer to keep exporting rather
+    than getting up to date.  This should become optional for 0.5.
+
+  * Added options to a number of commands
+
+  * "noinit" made default for "zumastor define volume".  optional parameter
+    parsing for this command has been switched to getopt.  "nosnap" option
+    has been removed due to support full volume replication (now the only
+    way)
+
+  * Added a proc interface under /proc/fs/ddsnap so we can see immediately
+    how many IOs are in flight for each client.
+
+Bug fixes:
+
+  * Added throttling of IO submitters in order to place a bound on IOs
+    in flight, and thus place a bound on memory usage to service them,
+    which is required in order to do the proper fix to memory writeout
+    recursion to replace the broken kernel congestion_wait mechanism.
+    Side effect is improved latency of block device read operations.
+
+  * lockups to the nasty kernel vm congestion_wait mechanism now have
+    workarounds involving the semi-functional PF_LESS_THROTTLE mechanism.
+    Much more to do here.
+
+  * ddsnap virtual devices used to allow hundreds of thousands of write
+    operations to be in flight to the snapshot server at the same time,
+    causing severe latency problems under some conditions, and leaving
+    the door open to low memory deadlock.  Our virtual devices now
+    throttle themselves to allow a maximum of a thousand non-vm-driven
+    writes to be in flight at once
+
+  * Much useless server and client log output that was creating huge log
+    files is removed, keeping the log output that proved useful.
+
+  * Rationalized the algorithms for checking consistency of upstream and
+    downstream database at replication initiation time
+
+  * zumastor stop in the middle of replication failed to remove the
+    associated snapshot devmapper device, fixed.
+
+  * "zumastor stop source" now stops the ddsnap listen daemon as it should
+
+  * ddsnap now checks for a superblock magic before doing any operation on
+    the snapshot store.  Before this, ddsnap would happily try to allocate
+    a silly amount of buffer memory if trying to initialize on an obsolete
+    snapshot store.
+
+  * Much cleanup and refactoring of functions, files and interfaces so we
+    can leave that brown paper bag in the cupboard when new visitors come
+    to look at the code
+
+  * Zumastor status now does a scan of the freespace bitmaps to see if they
+    match the incremental free chunk statistics
+
+  * Bugs in free chunk counting fixed so that used and free counts match
+    each other, and match the actual free space from scanning the bitmaps
+
+  * Fixed many bugs related to automatic deletion of snapshots on snapshot
+    store full
+
+  * Fixed dangling pointers bug on snapshot delete causes by relocating
+    some elements of the superblock memory image snapshot array
+
+  * Cleaned up bugs in automatically mounting snapshots on zumastor start
+
+  * Device mapper remove of a snapshot device does not wait for the server
+    to complete decrementing the associated snapshot use count, so this
+    raced with ddsnap delete.  Temporary fix waits keeps checking the
+    snapshot use count until it decreases (fix this better next
+    prerelease.)
+
+  * Deleting a snapshot can dirty more buffers than there is room in the
+    journal.  Temporary hack in place to not journal the excess dirty
+    buffers, which means we had better not crash during a delete.  Need
+    to fix this properly before 0.5 by implementing incremental delete.
+
+  * kernel daemonize fixed to avoid bogus process file sharing, which
+    was causing remote commands via ssh to fail to exit due to files
+    being left open on parent process
+
+  * Much misbehaviour in all zumastor/ddsnap components on snapshot store
+    full is now rationalized, cleaned up and behaving better
+
+  * Adapted kernel PF_LESS_THROTTLE (mis)feature to work around congestion_wait
+    deadlock issue
+
+  * Now log with O_SYNC in order to have bounded memory and dirty page
+    guarantee for snapshot server
+
+  * Now preallocate buffers for snapshot server as part of bounded memory
+    use guarantee
+
+  * zumastor will now retry a ddsnap transmit that gets connection
+    refused from the downstream ddsnap listen
+
+  * part of the work necessary to ensure bounded ddsnapd memory utilization
+    is now done
+
+  * Automatic replication fixups:  Automatic replication now starts
+    when it should and allows for making changes to the replication
+    interval on the fly, including setting manual mode, without restarting
+    the target daemon.  The code has been largely re-written to make it
+    much more robust. 
+
+  * Code cleanup: separated ddraid into its own build directory
+
+  * ddsnap man page updated with new simplified syntax for ddsnap transmit
+    options, but they have not been updated in the code (raw vs overwrite,
+    xdelta vs difference, gzip vs zip)
+
+  * Fixed isses on start/stop zumastor where under some conditions, not all
+    daemons were being started/stopped and some runtime files were not being
+    properly created/deleted.

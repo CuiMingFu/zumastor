@@ -1,0 +1,10 @@
+#!/bin/bash
+
+uml_ip=192.168.100.5
+uml_host=uml_5
+uml_fs=uml_fs5
+ubdb_dev=$PWD/ubdb
+ubdc_dev=$PWD/ubdc
+
+vol="test"
+VOLUMES=/var/lib/zumastor/volumes

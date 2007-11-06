@@ -1,0 +1,7 @@
+Zumastor kernel patches live in two places:
+
+  ddsnap/patches ... patches for ddsnap
+  zumastor/patches ... zumastor patches for nfs, stability and miscellaneous
+
+Normally there would be roll-up patches for zumastor containing all of the
+above in this directory.

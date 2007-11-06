@@ -1,0 +1,30 @@
+Open issues for release 0.4:
+
+  * Automated test harness not yet functional
+
+  * ddsnap transmit sometimes gets connection refused from downstream listen
+
+  * Clean up ddsnap log output
+
+  * Get rid of redundant used vs free accounting fields
+
+  * Accounting fields are still thought to get out of sync under certain
+    conditions involving unexpected restart
+
+  * unmount of origin device sometimes fails due to mountpoint busy for
+    unexplained reasons, a possible nfs kernel bug
+
+  * Need a cleaner fix for the dmsetup remove/ddsnap delete use count race
+
+  * In theory, retrieving the chunk changelist from ddsnapd can trigger a
+    memory deadlock.  Need to make this impossible.
+
+  * More work remains to be done to prevent low memory vm deadlock
+
+  * Is the congestion_wait bugbear really dead and buried?  Try some more
+    to make it manifest
+
+  * upgrading packages is not properly supported yet because the old packages
+    we distributed were broken and need to be purged from the system before
+    we can reliably remove old packages without forcing recreation of the
+    snapshot store and/or volume database

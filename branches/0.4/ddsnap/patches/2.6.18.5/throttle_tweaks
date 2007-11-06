@@ -1,0 +1,38 @@
+diff -urp 2.6.18.5.clean/block/ll_rw_blk.c 2.6.18.5/block/ll_rw_blk.c
+--- 2.6.18.5.clean/block/ll_rw_blk.c	2006-12-01 16:13:05.000000000 -0800
++++ 2.6.18.5/block/ll_rw_blk.c	2007-03-16 15:03:11.000000000 -0700
+@@ -2726,6 +2726,10 @@ long blk_congestion_wait(int rw, long ti
+ 	DEFINE_WAIT(wait);
+ 	wait_queue_head_t *wqh = &congestion_wqh[rw];
+ 
++	if ((current->flags & PF_LESS_THROTTLE) && printk_ratelimit()) {
++		printk(KERN_WARNING "PF_LESS_THROTTLE process %s[%i] entered congestion_wait!\n", current->comm, current->pid);
++		dump_stack();
++	}
+ 	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
+ 	ret = io_schedule_timeout(timeout);
+ 	finish_wait(wqh, &wait);
+diff -urp 2.6.18.5.clean/fs/nfsd/nfssvc.c 2.6.18.5/fs/nfsd/nfssvc.c
+--- 2.6.18.5.clean/fs/nfsd/nfssvc.c	2006-12-01 16:13:05.000000000 -0800
++++ 2.6.18.5/fs/nfsd/nfssvc.c	2007-03-16 15:03:11.000000000 -0700
+@@ -309,7 +309,7 @@ nfsd(struct svc_rqst *rqstp)
+ 	 * localhost doesn't cause nfsd to lock up due to all the client's
+ 	 * dirty pages.
+ 	 */
+-	current->flags |= PF_LESS_THROTTLE;
++	//current->flags |= PF_LESS_THROTTLE;
+ 
+ 	/*
+ 	 * The main request loop
+diff -urp 2.6.18.5.clean/mm/page_alloc.c 2.6.18.5/mm/page_alloc.c
+--- 2.6.18.5.clean/mm/page_alloc.c	2006-12-01 16:13:05.000000000 -0800
++++ 2.6.18.5/mm/page_alloc.c	2007-03-16 15:03:11.000000000 -0700
+@@ -1048,7 +1048,7 @@ rebalance:
+ 	}
+ 
+ nopage:
+-	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
++	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+ 			" order:%d, mode:0x%x\n",
+ 			p->comm, order, gfp_mask);
