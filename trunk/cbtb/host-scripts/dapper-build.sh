@@ -114,7 +114,7 @@ cp ~/.ssh/authorized_keys ~build/.ssh/
 chown -R build ~build
 EOF
 
-tar cf - --exclude build * | \
+tar cf - --exclude build --exclude .svn * | \
   ${SETUPTIMEOUT} ${SSH} build@${IPADDR} tar xf - -C zumastor
 ${SCP} build/linux-${KERNEL_VERSION}.tar.bz2 build@${IPADDR}:zumastor/build/
 
