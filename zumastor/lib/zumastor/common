@@ -235,13 +235,10 @@ function create_snapshot {
 	# only create snapshot for non-origin
 	[[ $id -eq -1 ]] && echo should not be creating device for origin && return 1
 
-	# suspend origin device first to prevent the race between origin writes and snapshot create
-	echo `date` suspending $vol
-	dmsetup suspend --nolockfs $vol
 	ddsnap create $server $id >/dev/null 2>/dev/null
 	status=$?
-	dmsetup resume $vol
-	echo `date` resumed $vol
+	# flush origin device to prevent the race between origin writes and snapshot create
+	blockdev --flushbufs /dev/mapper/$vol
 	return $status
 }
 
