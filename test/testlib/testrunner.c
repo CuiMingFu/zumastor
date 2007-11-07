@@ -40,7 +40,7 @@ struct _results {
 };
 
 typedef enum { SETUP = 1, TEST, TEARDOWN } stage;
-static const char* STAGE_NAMES[] = { "SETUP", "TEST", "TEARDOWN" };
+static const char* STAGE_NAMES[] = { "UNDEFINED", "SETUP", "TEST", "TEARDOWN" };
 static stage current_stage;
 static volatile results* test_results;
 static sigjmp_buf recovery_buffer;
