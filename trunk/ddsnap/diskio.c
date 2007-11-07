@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include "trace.h"
+#include "diskio.h"
 
 #undef DEBUG_FDIO_FAIL
 #undef DEBUG_FDIO_SHORT
