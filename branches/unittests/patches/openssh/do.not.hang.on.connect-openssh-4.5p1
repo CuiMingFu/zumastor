@@ -1,0 +1,53 @@
+--- sshconnect.c~old	2007-07-25 16:59:36.000000000 -0700
++++ sshconnect.c	2007-07-26 15:38:53.000000000 -0700
+@@ -390,6 +390,32 @@ ssh_connect(const char *host, struct soc
+ 	return 0;
+ }
+ 
++static void ssh_exchange_identification_wait(int fd, int read)
++{
++	fd_set fds;
++	struct timeval timeo;
++	int timeouts = 0, ret;
++
++	while (1) {
++		FD_SET(fd, &fds);
++		timeo.tv_sec = options.server_alive_interval;
++		timeo.tv_usec = 0;
++		if (read)
++			ret = select(fd+1, &fds, NULL, NULL, &timeo);
++		else
++			ret = select(fd+1, NULL, &fds, NULL, &timeo);
++		if (ret < 0) {
++			if (errno == EINTR)
++				continue;
++			fatal("ssh_exchange_identification: select read error: %.100s", strerror(errno));
++		} else if (ret == 0) {
++			if (++timeouts >= options.server_alive_count_max)
++				fatal("ssh_exchange_identification: Timeout, server not responding");
++		} else
++			break;
++	}
++}
++
+ /*
+  * Waits for the server identification string, and sends our own
+  * identification string.
+@@ -404,6 +430,8 @@ ssh_exchange_identification(void)
+ 	int minor1 = PROTOCOL_MINOR_1;
+ 	u_int i, n;
+ 
++	if (options.server_alive_interval)
++		ssh_exchange_identification_wait(connection_in, 1);
+ 	/* Read other side's version identification. */
+ 	for (n = 0;;) {
+ 		for (i = 0; i < sizeof(buf) - 1; i++) {
+@@ -488,6 +516,8 @@ ssh_exchange_identification(void)
+ 	    compat20 ? PROTOCOL_MAJOR_2 : PROTOCOL_MAJOR_1,
+ 	    compat20 ? PROTOCOL_MINOR_2 : minor1,
+ 	    SSH_VERSION);
++	if (options.server_alive_interval)
++		ssh_exchange_identification_wait(connection_out, 0);
+ 	if (atomicio(vwrite, connection_out, buf, strlen(buf)) != strlen(buf))
+ 		fatal("write: %.100s", strerror(errno));
+ 	client_version_string = xstrdup(buf);

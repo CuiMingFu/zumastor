@@ -1,0 +1,11 @@
+--- linux/mm/page_alloc.c~dump	2007-03-15 11:33:05.000000000 -0700
++++ linux/mm/page_alloc.c	2007-03-15 11:33:20.000000000 -0700
+@@ -1119,7 +1119,7 @@ rebalance:
+ 	}
+ 
+ nopage:
+-	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
++	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+ 			" order:%d, mode:0x%x\n",
+ 			p->comm, order, gfp_mask);

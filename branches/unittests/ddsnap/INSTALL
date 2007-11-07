@@ -1,0 +1,73 @@
+How to install Zumastor from a tarball in two easy steps
+
+1. Build and install ddsnap
+
+Additional packages ddsnap needs:
+
+  * development headers for libpopt (at build time)
+  * dmsetup command (at run time)
+
+To build ddsnap from source:
+
+  * check out the svn tree according using the instructions on
+    zumastor.googlepages.com
+
+  * cd to ddsnap and make; sudo make install
+
+Now it gets a little ugly because we haven't cleaned up the kernel install
+from tarball procedure yet.
+
+  * Generate the kernel patches, leaving the ddsnap files in ddsnap/patches/2.6.21.1/00_dm-ddsnap.AUTO
+
+       make genpatches
+
+  * Obtain a 2.6.21.1 kernel tarball from kernel.org and unpack it
+
+       wget http://kernel.org/pub/linux/kernel/v2.6/linux-2.6.21.1.tar.bz2
+       tar -xjf linux-2.6.21.1.tar.bz2
+
+  * Apply all the kernel patches to the 2.6.21.1 kernel:
+
+       cd <root of the 2.6.21.1 kernel tree>
+       for patchfile in ddsnap/patches/2.6.21.1/*; do patch -p1 <$patchfile; done
+
+Run make menuconfig, config drivers -> md -> dm-ddsnap to build as a
+module, or preferably as a built-in for better debugging.  While in there,
+turning on debugging -> include debug symbols would be a good idea, plus
+stack frame for more accurate traceback.  Build and install.
+	Required config options are:
+		CONFIG_DM_DDSNAP
+	Recommended options are:
+		CONFIG_IKCONFIG_PROC
+		CONFIG_MAGIC_SYSRQ
+		CONFIG_DEBUG_INFO
+
+    make
+    sudo make install
+
+2. Install Zumastor
+
+  * cd to ../zumastor and sudo make install
+
+This will set up everything except the SysV init scripts (rc2.d, rc3.d
+etc) and the kernel.
+
+Reboot to the new kernel.  Manually try zumastor start and zumastor stop,
+verifying there are no error messages.  If that is fine, then add zumastor
+start and zumastor stop to the appropriate SysV init directories.  Reboot
+and zumastor should be running.  It will not be doing anything, because
+you have not yet defined any volumes.  However you can confirm it started
+properly by doing:
+
+   tree /var/run/zumastor
+
+and you will see the skeleton zumastor database using:
+
+   tree /var/lib/zumastor
+
+At that point, our documentation for using zumastor itself should become
+useful.  If there are any bumps, or omissions in my quick instructions here,
+please let me know, or you can just wait for Nov 1 to roll around and we
+will take care of it.
+
+ -- Daniel Phillips, 2007-11-1

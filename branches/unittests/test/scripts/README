@@ -1,0 +1,84 @@
+Some documentation for the scripts in this directory.
+
+MakeCD
+	Usage: $0 [-b <base directory>] [-e <extras directory>] [-i <Ubuntu CD image>]
+	          [-o <CD name>] [-p <package list>] [-s <seed file>] [-u <usplash image>]
+	Where <base directory> is the directory where we will build the new CD image and
+	where by default other directories and files are located (default
+	${BASEDIR}), <extras directory> is a directory that contains files
+	to be copied directly to the new CD (default ${EXTRASDIR}),
+	<Ubuntu CD image> is an ISO image for an Ubuntu installation CD, preferably
+	for a server distribution, <CD name> is the name of the produced CD image
+	<package list> is a file containing the (possibly massaged) output of dpkg -l
+	on a running system, <seed file> is the name of a preseed file to preseed the
+	new installation CD.
+
+	MakeCD is used to build a preseeded CD installation image to be used to
+	create a qemu virtual machine.
+
+qemuinstall
+	Usage: $0 [-p <path>] [-i <image>] [-n <number of images>
+	Where <path> is a directory that contains the Zumastor .deb files,
+	<image> is the CD image from which to install the virtual images and
+	<number of images> is the number of images to create, by default one.
+
+	The qemuinstall script builds and installs a generic Ubuntu system on a
+	qemu virtual machine.  It uses a CD image (iso) built by the MakeCD.sh
+	script.  It can create more than one virtual machine; it leaves each
+	such machine running in its own qemu instance.
+
+volcreate
+	Usage: $0 [-n <vgname>] [-O <origsize>] [-S <snapsize>] [-o <origin name>] [-s <snapshot name>]
+	Where <vgname> is the name of the volume group to use for the volumes,
+	<origsize> is the desired size of the origin volume and <snapsize> is the
+	desired size of the snapshot store, both in megabytes, and <origin name>
+	and <snapshot name> are the names of the origin and snapshot volumes,
+	respectively.
+
+	The volcreate script builds a pair of volumes of the indicated sizes
+	and with the indicated names, for use as the origin and snapshot store
+	of a Zumastor volume.  It builds these volumes either from an existing
+	volume group, by extending an existing volume group with heretofore
+	unused space or by creating a new volume group.
+
+zinstalltet
+	The zinstalltet script fully installs the TET distribution from a
+	given tarfile.  It creates the tet user if it doesn't already exist,
+	then configures, builds and installs both TET itself and the tetreport
+	contributed script.  This script is generally intended to be run by the
+	ztester script but may be run by itself.  It takes no arguments.
+
+zruntet
+	Usage: $0 [-n <vgname>] [-o <origin name>] [-s <snapshot name>] [-v <test volume>]
+	Where <vgname> is the name of the volume group to use for the volumes,
+	<origin name> and <snapshot name> are the names of the origin and
+	snapshot volumes, respectively, and <test volume> is the name of
+	the volume that will be used for testing.
+
+	The zruntet script is used to run the actual TET test suite.  It
+	prepares the Zumastor volume then builds and runs each TET testset in
+	the TETtests directory.
+
+ztester
+	Usage: $0 [-s <script directory>] [-t <test directory>] [-d <TET directory>] [-v <test volume>] <hostname/IP address>
+	Where <script directory> is the directory that contains support scripts,
+	<test directory> is the directory that contains the TET-based tests,
+	<TET directory> is the directory that contains the TET distribution,
+	<test volume> is the name of the volume that will be used for testing and
+	<hostname/IP address> identifies the system or systems upon which to install
+	and run the tests.
+
+	The ztester script is used to configure and run tests on a Zumastor
+	test system.  It copies the TET distribution and test suite to the
+	system, then installs and run the test suite using the zinstalltet
+	and zruntet scripts.
+
+zuminstall
+	Usage: $0 [-p <path>] [-k <config file>] <hostname/IP address>
+	Where <path> is the directory that contains the Zumastor .deb files
+	and <config file> is a kernel config file to be used for the build.
+
+	The zuminstall script copies the Zumastor packages to each given system,
+	then installs those packages.  When it is finished, Zumastor is fully
+	installed on each target system; as a last act, the script reboots each
+	system into the just-installed Zumastor kernel.

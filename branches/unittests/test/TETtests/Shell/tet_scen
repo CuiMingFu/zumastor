@@ -1,0 +1,27 @@
+#	Zumastor test suite.
+all
+	"Starting Full Test Suite"
+	/ts/replicate/replicate
+	"Completed Full Test Suite"
+
+replicate
+	"Starting replicate Test Case"
+	/ts/replicate/replicate
+	"Finished replicate Test Case"
+
+small
+	"Starting small replicate Test Case"
+	/ts/replicate/replicate{1}
+	"Finished small replicate Test Case"
+
+medium
+	"Starting medium replicate Test Case"
+	/ts/replicate/replicate{2}
+	"Finished medium replicate Test Case"
+
+large
+	"Starting large replicate Test Case"
+	/ts/replicate/replicate{3}
+	"Finished large replicate Test Case"
+
+# EOF

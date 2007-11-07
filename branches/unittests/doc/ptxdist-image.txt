@@ -1,0 +1,54 @@
+Building Zumastor Testing Images with PTXdist
+---------------------------------------------
+
+This document describes how to build QEMU-bootable Zumastor test
+images with PTXdist.
+
+=== Pros ===
+
+ * The build process is lean, fast, and easy to set up.  There is no
+   need to set up DHCP, TFTP, and HTTP servers, and a complete build
+   from source (which needs to be done only once) takes 12 minutes.
+
+ * The resulting image is also lean and fast.  The image is 48MB in
+   size (32MB root filesystem, 16MB empty partition for testing) and
+   boots in about 20 seconds.
+
+=== Cons ===
+
+ * Everything is built from source, so adding new software to the
+   image requires more work than "apt-get install".
+
+ * PTXdist images target embedded systems and thus do not always
+   follow standard Linux system organization conventions.
+
+=== Build ===
+
+ 1. Download PTXdist 1.0.0 from the Pengutronix website.
+    http://www.pengutronix.de/software/ptxdist/index_en.html
+    Apply the patches in cbtb/ptxdist/patches.
+
+ 2. Download OSELAS Toolchain 1.1.0 from the Pengutronix website.
+    http://www.pengutronix.de/oselas/toolchain/index_en.html
+
+ 3. Install ptxdist; then build and install the
+    i586-unknown-linux-gnu_gcc-4.1.2_glibc-2.5_linux-2.6.18
+    OSELAS toolchain.
+
+ 4. Change to the Zumastor top-level trunk directory.
+
+ 5. Run "./buildcurrent.sh kernel/config/qemu".  If you do not use the
+    kernel/config/qemu file, make sure to includ all necessary
+    features and drivers in the kernel.  The kernel needs to be able
+    to boot without initrd.
+
+ 6. Run "cbtb/host-scripts/ptxdist-image.sh" which builds a ptxdist
+    image with Zumastor software from the .deb packages in the build/
+    directory.  You should rerun this script whenever you have built
+    new Zumastor software packages.  The first run takes 12 minutes,
+    and subsequent runs take less than 10 seconds.
+
+ 7. Boot build/zumastor.img with QEMU.  The login prompt will show up
+    on the serial console.  Use /dev/hda2 (16MB, partition type
+    already set to Linux LVM) for Zumastor testing.
+
