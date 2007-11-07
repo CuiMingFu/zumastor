@@ -2169,47 +2169,51 @@ static int copyout(struct superblock *sb, chunk_t chunk, chunk_t exception)
 	return 0;
 }
 
+/*
+ * Select a victim snapshot and delete/squash it. Called when the snapshot 
+ * store is full or when we reach the maximum number of snapshots.
+ */
+static int auto_delete_snapshot(struct superblock *sb)
+{
+	struct snapshot *victim = find_victim(sb);
+	int err;
+	if (is_squashed(victim) || victim->prio == 127) {
+		/* All snapshots deleted, check for lost chunks */
+		if (sb->image.snapdata.freechunks < sb->image.snapdata.chunks ) {
+			warn("%Li free data chunks after all snapshots deleted", sb->image.snapdata.freechunks);
+			sb->image.snapdata.freechunks = count_free(sb, &sb->snapdata);
+		}
+		if (!combined(sb)) {
+			/* reserved meta data + bitmap_blocks + super_block */
+			// !!! this is also used in initialization, make this a common function
+			unsigned meta_bitmap_base_chunk = (SB_SECTOR + 2*chunk_sectors(&sb->metadata) - 1) >> sb->metadata.chunk_sectors_bits;
+			unsigned reserved = meta_bitmap_base_chunk + sb->metadata.asi->bitmap_blocks + sb->image.journal_size
+				+ sb->metadata.asi->bitmap_blocks + 1
+				+ sb->snapdata.asi->bitmap_blocks;
+			if (sb->image.metadata.freechunks + reserved < sb->image.metadata.chunks) {
+				warn("%Li free metadata chunks after all snapshots deleted", sb->image.metadata.freechunks);
+				sb->image.metadata.freechunks = count_free(sb, &sb->metadata);
+			}
+		}
+		return -1;
+	}
+	warn("releasing snapshot %u", victim->tag);
+	if (usecount(sb, victim)) {
+		err = delete_tree_range(sb, 1ULL << victim->bit, 0);
+		victim->bit = SNAPSHOT_SQUASHED;
+	} else
+		err = delete_snap(sb, victim);
+	return err;
+}
+
 static int ensure_free_chunks(struct superblock *sb, struct allocspace *as, int chunks)
 {
 	do {
 		if (as->asi->freechunks >= chunks)
 			return 0;
-
-		struct snapshot *victim = find_victim(sb);
-		if (is_squashed(victim) || victim->prio == 127)
-			break;
-		warn("snapshot store full, releasing snapshot %u", victim->tag);
-		if (usecount(sb, victim)) {
-			if (delete_tree_range(sb, 1ULL << victim->bit, 0)) {
-				victim->bit = SNAPSHOT_SQUASHED;
-				goto fail_delete;
-			}
-			victim->bit = SNAPSHOT_SQUASHED;
-		} else
-			if (delete_snap(sb, victim))
-				goto fail_delete;
+		if (auto_delete_snapshot(sb))
+			goto fail_delete;
 	} while (sb->image.snapshots);
-
-	/* All snapshots deleted, check for lost chunks */
-
-	if (sb->image.snapdata.freechunks < sb->image.snapdata.chunks ) {
-		warn("%Li free data chunks after all snapshots deleted", sb->image.snapdata.freechunks);
-		sb->image.snapdata.freechunks = count_free(sb, &sb->snapdata);
-	}
-
-	if (!combined(sb)) {
-		/* reserved meta data + bitmap_blocks + super_block */
-		// !!! this is also used in initialization, make this a common function
-		unsigned meta_bitmap_base_chunk = (SB_SECTOR + 2*chunk_sectors(&sb->metadata) - 1) >> sb->metadata.chunk_sectors_bits;
-		unsigned reserved = meta_bitmap_base_chunk + sb->metadata.asi->bitmap_blocks + sb->image.journal_size
-			+ sb->metadata.asi->bitmap_blocks + 1
-			+ sb->snapdata.asi->bitmap_blocks;
-		if (sb->image.metadata.freechunks + reserved < sb->image.metadata.chunks) {
-			warn("%Li free metadata chunks after all snapshots deleted", sb->image.metadata.freechunks);
-			sb->image.metadata.freechunks = count_free(sb, &sb->metadata);
-		}
-	}
-	return -1;
 
 fail_delete:
 	warn("snapshot delete failed");
@@ -2352,7 +2356,7 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 	struct snapshot *snapshot;
 
 	/* check if we are out of snapshots */
-	if (snapshots >= MAX_SNAPSHOTS)
+	if ((snapshots >= MAX_SNAPSHOTS) && auto_delete_snapshot(sb))
 		return -EFULL;
 
 	/* tag already used? */
