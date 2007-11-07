@@ -409,7 +409,6 @@ function stop_master {
 	rm -f $cron
 	log "killing master daemon" $log
 	pkill -f "zumastor start master $vol$" || return 1
-	dmsetup resume $vol
 }
 
 function stop_nag {
@@ -419,7 +418,6 @@ function stop_nag {
 	pkill -f "ddsnap delta listen /dev/mapper/$vol 0.0.0.0"
 	pkill -f "zumastor start source $vol$"
 	pkill -f "zumastor receive done $vol "
-	dmsetup resume $vol
 	sync
 }
 
