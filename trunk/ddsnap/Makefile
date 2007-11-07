@@ -92,7 +92,7 @@ build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps)
 	@echo ' * This file is generated automatically by the Makefile.' >> $@
 	@echo ' */' >> $@
 	@echo '' >> $@
-	@echo '#define SVN_VERSION "'`svnversion .`'"' >> $@
+	@echo '#define SVN_VERSION "'`cat SVNREV || svnversion .`'"' >> $@
 	@echo '#define BUILD_DATE "'`date`'"' >> $@
 	@echo '#define BUILD_USER "'`whoami`'"' >> $@
 	@echo '#define BUILD_HOST "'`hostname`'"' >> $@
