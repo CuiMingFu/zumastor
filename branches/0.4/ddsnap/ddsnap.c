@@ -782,7 +782,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 		}
 		bytes_sent += deh.extents_delta_length + sizeof(deh);
 
-		if (progress_file && ((((current_time = now()) - last_update) > 0) || (chunk_num == cl->count))) {
+		if (progress_file && (((current_time = now()) - last_update) > 0)) {
 			if (write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) < 0)
 				goto out;
 			last_update = current_time;
@@ -798,7 +798,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	} else {
 		current_time = now();
 		warn("Total chunks %Lu (%Lu bytes), wrote %Lu bytes in %i seconds", chunk_num, bytes_total, bytes_sent, current_time - start_time);
-		err = 0;
+		err = progress_file ? write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) : 0;
 	}
 	goto out;
 
@@ -1190,7 +1190,7 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 		if ((err = diskwrite(snapdev2, updated, extent_size, extent_addr)) < 0)
 			goto apply_write_error;
 
-		if (progress_file && ((((current_time = now()) - last_update) > 0) || (chunk_num == chunk_count))) {
+		if (progress_file && (((current_time = now()) - last_update) > 0)) {
 			if (fsync(snapdev2))
 				goto out;
 			if (write_progress(progress_file, progress_tmpfile, chunk_num, chunk_count, extent_addr, tgt_snap) < 0)

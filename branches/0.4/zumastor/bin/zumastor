@@ -1062,6 +1062,7 @@ start)
 		declare vol=$3
 		declare progressfile=$VOLUMES/$vol/source/apply
 		declare holdfile=$VOLUMES/$vol/source/hold
+		declare server=$SERVERS/$vol
 		declare id
 
 		start_volume $vol
@@ -1069,6 +1070,10 @@ start)
 		declare list=$(get_managed_snapshots $vol) || exit 1
 		for id in $list; do
 			create_device $vol $id
+		done
+		for id in $(ddsnap status $server --list); do
+			usecount=$(ddsnap usecount $server $id)
+			[[ $usecount -eq 0 ]] && echo "warning: detected unreferenced snapshot: $id"
 		done
 		if [[ -x $VOLUMES/$vol/source ]] && [[ -e $progressfile ]] ; then
 			declare sent hold send_chunk send_addr
