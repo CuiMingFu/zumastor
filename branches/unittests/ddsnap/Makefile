@@ -54,7 +54,7 @@ diskio.o: diskio.c Makefile trace.h diskio.h
 buffer.o: buffer.c $(deps)
 	cc buffer.c -c $(CFLAGS)
 
-event.o: event.c
+event.o: event.c dm-ddsnap.h event.h trace.h
 	cc event.c -c $(CFLAGS)
 
 daemonize.o: daemonize.c $(deps)
