@@ -39,25 +39,18 @@ genpatches:
 xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
 
 delta.o: delta.c Makefile delta.h xdelta/xdelta3.h
-	cc delta.c -c $(CFLAGS)
 
 ddsnap.agent.o: ddsnap.agent.c $(ddsnap_agent_deps)
-	cc ddsnap.agent.c $(CPPFLAGS) -c $(CFLAGS)
 
 ddsnapd.o: ddsnapd.c $(ddsnapd_deps)
-	cc ddsnapd.c $(CPPFLAGS) -c $(CFLAGS)
 
 diskio.o: diskio.c Makefile trace.h diskio.h
-	cc diskio.c -c $(CFLAGS)
 
 buffer.o: buffer.c $(deps)
-	cc buffer.c -c $(CFLAGS)
 
 event.o: event.c $(kernel)/dm-ddsnap.h event.h trace.h
-	cc event.c -c $(CFLAGS)
 
 daemonize.o: daemonize.c $(deps)
-	cc daemonize.c -c $(CFLAGS)
 
 mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
 	cc -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
