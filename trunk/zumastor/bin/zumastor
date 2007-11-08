@@ -188,10 +188,13 @@ function replicate_snapshot {
 		log "set '$MYHOSTNAME' as source for '$vol' on '$host' first!"
 		return 1
 	fi
-
+	if ! verify_existing_snap $vol $snap; then
+		log "send snapshot '$snap' invalid, cycle failing"
+		return 3 # tells it not to retry sending
+	fi
 	# fallback to full volume if we lost the snapshot upstream (deleted manually or squash)
 	if [[ $old_snap ]] && ! verify_existing_snap $vol $old_snap; then
-		log "verify $old_snap returned $status, falling back to full volume"
+		log "verify $old_snap failed, falling back to full volume"
 		old_snap=
 	fi
 
@@ -362,8 +365,11 @@ function run_target {
 			snap=""
 		elif [[ $status -eq 13 ]]; then
 			log "successfully replicated resumed snapshot" $log
-			drop_snapshot $vol $snap >> $log 2>&1
 			snap=""
+		elif [[ $status -eq 3 ]]; then
+			log "replication error on snapshot $snap, not retrying" $log
+			drop_snapshot $vol $snap >>$log 2>&1
+			snap="" ;; # FIXME perhaps we should trigger a new replication cycle here
 		else
 			log "replicate error on snapshot $snap: $?" $log
 			# FIXME TODO add retry code here, for now we retry forever
