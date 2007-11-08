@@ -37,7 +37,6 @@ genpatches:
 	./scripts/genallpatches.sh
 
 xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
-	cd xdelta && cc xdelta3.c -c $(CFLAGS)
 
 delta.o: delta.c Makefile delta.h xdelta/xdelta3.h
 	cc delta.c -c $(CFLAGS)
