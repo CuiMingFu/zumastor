@@ -22,6 +22,7 @@ ddsnap_binaries = ddsnap
 binaries =  $(ddsnap_binaries) devspam
 
 all: $(binaries) ddsnap.8.gz
+	$(MAKE) -C $(testdir) all
 .PHONY: all
 
 clean:
