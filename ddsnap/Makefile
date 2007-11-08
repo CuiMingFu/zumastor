@@ -23,6 +23,19 @@ binaries =  $(ddsnap_binaries) devspam
 all: $(binaries) ddsnap.8.gz
 .PHONY: all
 
+clean:
+	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/00_dm-ddsnap.AUTO
+.PHONY: clean
+
+install:
+	mkdir -p $(INSTDIR) || true
+	cp $(binaries) $(INSTDIR)
+	gzip -c ./man/ddsnap.8 > $(PREFIX)/$(MANDIR)/man8/ddsnap.8.gz
+.PHONY: install
+
+genpatches:
+	./scripts/genallpatches.sh
+
 xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
 	cd xdelta && cc xdelta3.c -c $(CFLAGS)
 
@@ -64,19 +77,6 @@ devspam: tests/devspam.c trace.h
 
 ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
-
-clean:
-	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/00_dm-ddsnap.AUTO
-.PHONY: clean
-
-install:
-	mkdir -p $(INSTDIR) || true
-	cp $(binaries) $(INSTDIR)
-	gzip -c ./man/ddsnap.8 > $(PREFIX)/$(MANDIR)/man8/ddsnap.8.gz
-.PHONY: install
-
-genpatches:
-	./scripts/genallpatches.sh
 
 build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps) 
 	rm -f $@
