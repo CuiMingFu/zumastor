@@ -1,9 +1,9 @@
-prefix?=
-bindir?=sbin
-mandir?=usr/share/man
+PREFIX ?=
+BINDIR ?=sbin
+MANDIR ?=usr/share/man
 
 kernel=./kernel
-instdir=$(prefix)/$(bindir)
+INSTDIR=$(PREFIX)/$(BINDIR)
 deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
 ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h
 ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h
@@ -70,9 +70,9 @@ clean:
 .PHONY: clean
 
 install:
-	mkdir -p $(instdir) || true
-	cp $(binaries) $(instdir)
-	gzip -c ./man/ddsnap.8 > $(prefix)/$(mandir)/man8/ddsnap.8.gz
+	mkdir -p $(INSTDIR) || true
+	cp $(binaries) $(INSTDIR)
+	gzip -c ./man/ddsnap.8 > $(PREFIX)/$(MANDIR)/man8/ddsnap.8.gz
 .PHONY: install
 
 genpatches:
