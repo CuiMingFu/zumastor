@@ -65,7 +65,7 @@ ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delt
 	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
 
 devspam: tests/devspam.c trace.h
-	cd tests && $(CC) devspam.c $(CFLAGS) $(CPPFLAGS) -o ../devspam
+	$(CC) $< $(CFLAGS) $(CPPFLAGS) -o $@
 
 ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
