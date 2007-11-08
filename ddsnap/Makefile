@@ -13,6 +13,7 @@ ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
 ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h daemonize.h ddsnap.h
 ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
 ddraid_deps = $(deps) ddraid.h $(kernel)/dm-ddraid.h
+testdir =tests
 
 ddraid_binaries = mkddraid ddraidd ddraid-agent
 ddsnap_binaries = ddsnap
@@ -24,6 +25,7 @@ all: $(binaries) ddsnap.8.gz
 .PHONY: all
 
 clean:
+	$(MAKE) -C $(testdir) clean
 	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/00_dm-ddsnap.AUTO
 .PHONY: clean
 
@@ -35,6 +37,16 @@ install:
 
 genpatches:
 	./scripts/genallpatches.sh
+
+.PHONY: check-coverage check quickcheck check-leaks
+check-coverage: all
+	$(MAKE) -C $(testdir) check-coverage
+check: all
+	$(MAKE) -C $(testdir) check
+quickcheck: all
+	$(MAKE) -C $(testdir) quickcheck
+check-leaks: all
+	$(MAKE) -C $(testdir) check-leaks
 
 xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
 
