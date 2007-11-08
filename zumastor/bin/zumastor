@@ -369,7 +369,7 @@ function run_target {
 		elif [[ $status -eq 3 ]]; then
 			log "replication error on snapshot $snap, not retrying" $log
 			drop_snapshot $vol $snap >>$log 2>&1
-			snap="" ;; # FIXME perhaps we should trigger a new replication cycle here
+			snap="" # FIXME perhaps we should trigger a new replication cycle here
 		else
 			log "replicate error on snapshot $snap: $?" $log
 			# FIXME TODO add retry code here, for now we retry forever
