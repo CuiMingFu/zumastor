@@ -23,7 +23,7 @@ binaries =  $(ddsnap_binaries) devspam
 all: $(binaries) ddsnap.8.gz
 .PHONY: all
 
-xdelta/xdelta3.o:
+xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
 	cd xdelta && cc xdelta3.c -c $(CFLAGS)
 
 delta.o: delta.c Makefile delta.h xdelta/delta3.h
