@@ -35,7 +35,7 @@ ddsnap.agent.o: ddsnap.agent.c $(ddsnap_agent_deps)
 ddsnapd.o: ddsnapd.c $(ddsnapd_deps)
 	cc ddsnapd.c $(CPPFLAGS) -c $(CFLAGS)
 
-diskio.o: diskio.c $(deps)
+diskio.o: diskio.c Makefile trace.h diskio.h
 	cc diskio.c -c $(CFLAGS)
 
 buffer.o: buffer.c $(deps)
