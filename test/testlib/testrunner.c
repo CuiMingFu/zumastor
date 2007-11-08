@@ -28,7 +28,7 @@ void printUsage(const char* program_name)
 
 typedef enum { OK = 0, USAGE = 3, TEST_INIT, TEST_CLEANUP, TEST_NOT_FOUND } return_code;
 typedef enum { PASS = 0, FAIL, UNRESOLVED, INVALID } test_outcome;
-static const char* TEST_OUTCOMES[] = { "PASS", "FAIL", "UNRESOLVED" };
+static const char* TEST_OUTCOMES[] = { "UNDEFINED", "PASS", "FAIL", "UNRESOLVED" };
 
 typedef struct _results results;
 struct _results {
