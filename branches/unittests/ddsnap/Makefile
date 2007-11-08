@@ -53,19 +53,19 @@ event.o: event.c $(kernel)/dm-ddsnap.h event.h trace.h
 daemonize.o: daemonize.c $(deps)
 
 mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	cc -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
+	$(CC) -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
 
 ddraidd: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	cc -DSERVER ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o ddraidd
+	$(CC) -DSERVER ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o ddraidd
 
 ddraid-agent: ddraid.agent.c $(ddraid_deps)
-	cc ddraid.agent.c $(CFLAGS) $(CPPFLAGS) -lpthread -o ddraid-agent -lpopt
+	$(CC) ddraid.agent.c $(CFLAGS) $(CPPFLAGS) -lpthread -o ddraid-agent -lpopt
 
 ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
-	cc ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
+	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
 
 devspam: tests/devspam.c trace.h
-	cd tests && cc devspam.c $(CFLAGS) $(CPPFLAGS) -o ../devspam
+	cd tests && $(CC) devspam.c $(CFLAGS) $(CPPFLAGS) -o ../devspam
 
 ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
