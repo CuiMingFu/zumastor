@@ -1,14 +1,6 @@
-ifndef prefix
-prefix=
-endif
-
-ifndef bindir
-bindir=sbin
-endif
-
-ifndef mandir
-mandir=usr/share/man
-endif
+prefix?=
+bindir?=sbin
+mandir?=usr/share/man
 
 kernel=./kernel
 instdir=$(prefix)/$(bindir)
