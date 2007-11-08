@@ -26,7 +26,7 @@ all: $(binaries) ddsnap.8.gz
 xdelta/xdelta3.o:
 	cd xdelta && cc xdelta3.c -c $(CFLAGS)
 
-delta.o: delta.c
+delta.o: delta.c Makefile delta.h xdelta/delta3.h
 	cc delta.c -c $(CFLAGS)
 
 ddsnap.agent.o: ddsnap.agent.c $(ddsnap_agent_deps)
