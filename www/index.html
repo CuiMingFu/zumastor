@@ -1,0 +1,188 @@
+<html>
+<head>
+<meta name="description" content="Zumastor enterprise storage for Linux">
+<meta name="keywords" content="zumastor nfs snapshot snapshotting replication linux kernel samba">
+<link href="doxygen.css" rel="stylesheet" type="text/css">
+<title>Zumastor Linux Storage Project</title>
+</head>
+<body>
+
+<h1>Zumastor Linux Storage Project</h1>
+
+<div class="section">
+<img src="linux1.png" class="floatRight">
+<ul>
+ <li><a href="#overview">Overview</a> - Features, Status, Future</li>
+ <li><a href="#doc">Documentation</a> - Design, User, Installation, Developer</li>
+ <li>
+  <a href="#source">Source code</a>
+  <ul>
+   <li><a href="#source.dl">Downloads</a> - source archives and Debian packages</li>
+   <li><a href="#source.repo">Subversion repository</a></li>
+  </ul>
+ </li>
+ <li><a href="#license">License</a> - GNU General Public License 2.0 (GPLv2)</li>
+ <li><a href="#resources">Resources</a> - mailings list, IRC channel</li>
+ <li><a href="#contribute">Contributors</a></li>
+</ul>
+</div>
+
+<div class="section" id="overview">
+ <a name="overview"></a>
+ <h2>Overview</h2>
+Zumastor is a community project started by Google members to bring enterprise storage features to Linux. Currently, we offer a network storage server with enterprise features such as online volume backup, multiple volume snapshots, remote volume replication, integration with Kerberized CITI NFS and Samba, wrapped up with a simple command-line management interface.
+ <div class="subsection" id="features">
+ <h3>Features</h3>
+ <ul>
+ <li>Point-in-time Snapshots
+ <ul>
+  <li>Adds snapshotting to any Linux filesystem, without re-formating (ext3, xfs, reiser, etc)
+  <li><i>Near</i> zero-cost, atomic block-device snapshots
+  <li>Copy-on-write, sharing common data between multiple snapshots
+  <li>Performance does not degrade with multiple snapshots
+  <li>Provided via ddsnap kernel driver and userspace ddsnap_server daemon
+ </ul>
+ <li>Remote replication
+ <ul>
+  <li>Transmits delta between snapshots
+  <li>Optional zlib (gzip) compression
+  <li>Optional xdelta binary difference compression (experimental)
+ </ul>
+ <li>Simple command line interface - zumastor script
+ <li>Integration with kerberized NFS kernel server to support exporting a replicated volume with snapshot rollover.
+ </ul>
+ </div>
+ <div class="subsection" id="status">
+ <h3>Status</h3>
+ <ul><li>Updated 08 Nov 2007: We are working our 0.4 stability release and in the final stages of testing.</ul>
+ </div>
+ <div class="subsection" id="future">
+ <h3>Future</h3>
+ <ul>
+  <li>Online resize (extend) of volume and snapshot store
+  <li>Performance improvements - get write overhead down from 6x down to 2.5x
+  <li>Clusterize - ddraid
+ </ul>
+ </div>
+</div>
+
+<div class="section" id="doc">
+ <a name="doc"></a>
+ <h2>Documentation</h2>
+ <div class="subsection" id="doc.design">
+ <h3>Design Documents</h3>
+ <ul>
+  <li><a href="zumastor.whitepaper.pdf">Zumastor Whitepaper</a> - presented at SCaLE '07, 11 Feb 2007 <a href="http://www.socallinuxexpo.org/scale5x/conference+info/speakers/Daniel+Phillips/">link to slides and audio recording</a>
+  <li><a href="http://sourceware.org/cluster/csnap/csnap.ps">Cluster Snapshots Block Device</a> - Linux Kongress, 3 Sep 2004
+  <li><a href="http://sourceware.org/cluster/csnap/cluster.snapshot.design.html">Cluster Snapshot Design</a> - 8 May 2004
+  <li><a href="http://sourceware.org/cluster/ddraid/raid35.pdf">Cluster RAID</a> - Linux Kongress RAID 3.5, 27 Sep 2003
+ </ul>
+ </div>
+ <div class="subsection" id="doc.user">
+ <h3>User Documentation</h3>
+ These are still very much a work in progress.  Please report all documentation bugs! (see <a href="#resources">Resources</a> below)
+ <ul>
+  <li><a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL">Source Installation</a> - build from source installation instruction, tested in CentOS 5
+  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html">Debian Installation</a> - Debian/Ubuntu specific installation instruction
+  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html#user">User Guide</a> - How to set up snapshots and replication via the zumastor CLI
+ </ul>
+ </div>
+ <div class="subsection" id="doc.user"><h3>Developer Documentation</h3>
+ <ul>
+  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/desimplnotes.html">Design Notes</a>
+ </div>
+</div>
+
+<div class="section" id="source">
+ <a name="source"></a>
+ <h2>Source code</h2>
+ <div class="subsection" id="source.dl">
+ <h3>Tarballs and .deb's</h3>
+ Tarballs are available on this site via http at: <a href="/src">here</a>.  The latest versions are:
+ <table class="sources">
+  <tr><th>Release date</th><th>Revision</th><th>tar.gz</th><th>md5 checksum</th></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/src/zumastor_0.4-r880.tar.gz">zumastor_0.4-r880.tar.gz</a></td><td>6e91decf9514a3645f6b4cd8c60c3e39</td></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/src/ddsnap_0.4-r880.tar.gz">ddsnap_0.4-r880.tar.gz</a></td><td>ab2ce0108c04ed60a75d1073e7dbbd19</td></tr>
+ </table>
+ <p>  Debian packages are available <a href="/debs">here</a>.  The latest versions are:
+ <table class="sources">
+  <tr><th>Release date</th><th>Revision</th><th>Debian i386 binary package</th><th>md5 checksum</th></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/debs/0.4-r880/kernel-image-2.6.21.1-zumastor-r880_1.0_i386.deb">kernel-image-2.6.21.1-zumastor-r880_1.0_i386.deb</a></td><td>2bce50d14264fff0766589a9d887a66f</td></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/debs/0.4-r880/kernel-headers-2.6.21.1-zumastor-r880_1.0_i386.deb">kernel-headers-2.6.21.1-zumastor-r880_1.0_i386.deb</a></td><td>8cd06518c11b075ddef0e5d79f920016</td></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/debs/0.4-r880/zumastor_0.4-r880_i386.deb">zumastor_0.4-r880_i386.deb</a></td><td>ebe94d5ba36fe435c4bb563cb2f54a46</td></tr>
+  <tr><td>08 Nov 2007</td><td>880</td><td><a href="/debs/0.4-r880/ddsnap_0.4-r880_i386.deb">ddsnap_0.4-r880_i386.deb</a></td><td>dae5d054f9d48bb34d9bac6ae9283a42</td></tr>
+ </table>
+ </div>
+ <div class="subsection" id="source.repo">
+ <h3>Subversion Repository</h3>
+ Our subversion repository is hosted on Google code.
+ <div style="margin: 0pt 0pt 3em 2em;">
+ <p>Use this command to anonymously check out the latest project source code:</p>
+ <table><tbody><tr><td><tt style="margin: 1em; font-size: 120%;">
+ svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</tt></td></tr></tbody></table>
+ </div>
+ <ul>
+  <li><a href="http://zumastor.googlecode.com/svn/">Browse the development trunk</a> - 0.5 development
+  <li><a href="http://zumastor.googlecode.com/svn/">Browse the stable branch</a> - 0.4 stability release development
+ </div>
+</div>
+
+<div class="section" id="resources">
+ <a name="resources"></a>
+ <h2>Resources</h2>
+ <div class="subsection" id="resources.irc">
+ <h3>IRC</h3>
+ IRC is probably the quickest way to get help with installation, report bugs, or send flames.  Our IRC home is #zumastor on irc.oftc.net.
+ <ul>
+  <li><a href="irc://irc.oftc.net#zumastor">irc://irc.oftc.net#zumastor</a>
+  <li><a href="/irclogs">IRC logs</a> - realtime plus archives since 10 July 2007
+ </ul>
+ </div>
+ <div class="subsection" id="resources.mail">
+ <h3>Mailing List</h3>
+ Our mailing list is hosted on Google groups, which has a very nice email interface for traditionalists, as well a web interface (Google account required to post)
+ <ul>
+  <li><a href="http://groups.google.com/group/zumastor">Web-based Google group</a> - also serves as a mailing list archive
+  <li><a href="http://zumastor.googlepages.com/subscribetozumastormailinglist">Subscribe to mailing list</a> - pretty low volume, but don't let that stop you from posting
+ </ul>
+</div>
+
+<div class="section" id="license">
+ <a name="license"></a>
+ <h2>License</h2>
+ <a href="http://www.gnu.org/licenses/gpl.html">GNU General Public License 2.0</a>
+</div>
+
+
+<div class="section" id="contribute">
+ <a name="contribute"></a>
+ <h2>Contributors</h2>
+ <div class="subsection" id="contribute.you">
+ <h3>Want to Contribute?</h3>
+ We are currently looking for early adopters to try out zumastor and report bugs.  Patches are always welcome.  Feel free to post your ideas to our mailing to make sure they will integrate 
+ </div>
+ <div class="subsection" id="contribute.team">
+ <h3>Project Team</h3>
+ Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Dietrich, Frank Mayhar, Chris Smith
+ </div>
+ <div class="subsection" id="contribute.thanks">
+ <h3>Thanks To</h3>
+ <ul>
+  <li>Robert Nelson, Jane Chiu, Ross Combs, Alex Polvi, Chuan-kai Lin, Mark Roach
+  <li>Phil Dibowitz - ddsnap SIGHUP handling patch
+  <li>Jonathan Van Eenwyk - ddloop deltafile mount <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">patch</a> (tarball includes a paper)
+ </ul>
+ </div>
+</div>
+
+<div class="section" id="links">
+ <a name="links"></a>
+ <h2>External Links</h2>
+ <ul>
+  <li><a href="http://sourceware.org/cluster/csnap/">Cluster Snapshot Project</a> - Historic, out of date
+</div>
+
+<hr>
+<center>&copy; 2007</center>
+</body>
+</html>
