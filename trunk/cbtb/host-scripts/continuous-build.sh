@@ -63,9 +63,10 @@ if [ $buildret -eq 0 ]; then
   subject="zumastor b$branch r$revision build success"
   files="$buildlog"
   email="${email_success}"
-  # store the revision just built in a symlink for use by readlink
+  # store the revision just built in build/buildrev
   # in the installer stage running in a separate loop
-  ln -sf $revision ${top}/buildrev
+  echo $revision >${top}/zumastor/build/buildrev.new
+  mv ${top}/zumastor/build/buildrev.new ${top}/zumastor/build/buildrev
 else
   subject="zumastor b$branch r$revision build failure $buildret"
   files="$buildlog"
