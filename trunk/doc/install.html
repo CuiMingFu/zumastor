@@ -17,9 +17,11 @@
     The following sections are required for both master and slave
     nodes.
 
-    <h3>Partition and install OS</h3>
-    Install operating systems using custom partitioning, preferably
-    leaving a large LVM volume group names <b>sysvg</b> for use when
+    <h3>1. Partition and install OS</h3>
+    Zumastor requires some storage space for storing snapshot data (and for the volume
+    itself if you are creating a new filesystem).  If you are starting from scratch,
+    install operating systems using custom partitioning, preferably
+    leaving a large LVM volume group (named <i>sysvg</i> in this example) for use when
     creating origin and snapshot devices.
     Eg.<p>
     <code>
@@ -27,46 +29,36 @@
       vgcreate sysvg /dev/hda7
     </code>
 
-    <h3>Compile zumastor kernel</h3>
-
+    <h3>2. Build Debian packages</h3>
+    There are three required packages to build: the patched kernel package, ddsnap (snapshot device userspace), and zumastor (management cli) package.
     <ol>
+    <li> Make sure you have the necessary build tools install, including the following:<p>
+    <code>aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion</code><p>
 
-      <li><code>
-	  aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev
-	</code>
-      </li>
-      <li>
-	<i>TODO: describe patches and config options</i><br>
-	svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor<br>
-	wget http://kernel.org/...<br>
-	...
-      </li>
-      <li>
-	<code>
-	  dpkg -i kernel-image-2.6.21.1-zumastor-r596_1.0_i386.deb
-	</code>
-      <li>Reboot onto the zumastor kernel.</li>
+    <li> Get the latest code:<p>
+    <code>svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</code><p>
+
+    <li> Run the build script.  This will build all three required packages.<p>
+      <code>$ cd zumastor<br>
+      $ ./buildcurrent kernel/config/full
+      </code><p>
+<i>Note:</i> This will download the required kernel image from kernel.org (currently 2.6.21.1).  The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in <code>kernel/config/full</code>.  If you need to use a different config, make sure you enable <code>CONFIG_DM_DDSNAP</code> (y or m)
     </ol>
+    If you do not wish to use the build script, you can follow the "tarball" installation instructions in the ddsnap <a href="../ddsnap/INSTALL">INSTALL</a> file.  You can also use these instruction only for the kernel install, then build the ddsnap and zumastor packages by running <code>dpkg-buildpkg -rfakeroot</code> in both the <code>ddsnap</code> and <code>zumastor</code> subdirectories.
 
-    <h3>Build zumastor packages</h3>
+    <h3>3. Install packages</h3>
+    <ol>
+    <li>Install kernel packages.  If you have built the kernel packages about, install using dpkg:<p>
+    <code># dpkg -i kernel-image-2.6.21.1-zumastor-r880_1.0_i386.deb</code>
+    <li>Reboot on to the new kernel<p>
+    <code># shutdown -r now</code>
+    <li>Install ddsnap and zumastor packages.  First, ensure the dependcies are installed.<p>
+    <code># aptitude install dmsetup libpopt0 zlib1g util-linux cron<br>
+          # dpkg -i ddsnap_0.4-r596_i386.deb zumastor_0.4-r596_i386.deb</code>
 
-    See <a href="../ddsnap/README">README</a>.<p>
-
-    <code>
-      svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor <br>
-      cd zumastor
-      ./buildcurrent kernel/config/full
-    </code>
-    
-    <h2>Install zumastor packages</h2>
-    <code>
-      aptitude install tree dmsetup <br>
-      dpkg -i ddsnap_0.4-r596_i386.deb zumastor_0.4-r596_i386.deb
-    </code>
-
-    <p>
-    zumastor status --usage
+    <li>Ensure zumastor is installed
     <pre>
+# zumastor status --usage
       RUN STATUS:
 /var/run/zumastor
 |-- agents/
@@ -75,8 +67,10 @@
 |-- running
 `-- servers/
     </pre>
+    </ol>
+    Now you're ready to start using zumastor.
 
-    <h3>Create block devices for origin and snapshot stores</h3>
+    <h3>4. Create block devices for origin and snapshot stores</h3>
     <code>
       lvcreate --size 20g -n test sysvg <br>
       lvcreate --size 40g -n test_snap sysvg
@@ -88,6 +82,7 @@
     data with nothing shared between snapshots in most cases.  Choose
     sizes appropriate to your usage.
 
+<a name="user">
     <h2>Snapshot Management Steps</h2>
     
     <h3>define testvol</h3>
