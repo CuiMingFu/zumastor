@@ -89,7 +89,7 @@ ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} aptitude install -y smbfs
 ${SSH} root@${slave} modprobe cifs
-${SSH} root@${slave} mount //master/testvol /mnt -t cifs -o user=root,pass=password
+${SSH} root@${slave} mount //master/testvol /mnt -t cifs -o user=root,pass=password,directio
 ${SSH} root@${slave} mount
 echo ok 5 - slave set up
 
@@ -116,7 +116,7 @@ fi
 
   
 rm /var/run/zumastor/mount/testvol/masterfile
-$SSH root@${slave} ls -l /mnt/ || true
+#$SSH root@${slave} ls -l /mnt/ || true
 if $SSH root@${slave} test -f /mnt/masterfile ; then
   rc=7
   echo not ok 7 - rm on master did not show up on CIFS client
