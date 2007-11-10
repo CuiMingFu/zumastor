@@ -13,6 +13,8 @@
 #include <asm/bug.h>
 #include <linux/bio.h>
 #include <linux/proc_fs.h>
+#include <linux/sysrq.h>
+#include <linux/jiffies.h>
 #include "dm.h"
 #include "dm-ddsnap.h"
 
@@ -304,36 +306,67 @@ struct pending {
 	u64 chunk;
 	unsigned chunks;
 	struct bio *bio;
+	typeof(jiffies) timestamp;
 	struct list_head list;
 };
+
+struct ddsnap_pending_stats {
+	typeof(jiffies) max_time;
+	typeof(jiffies) min_time;
+	typeof(jiffies) avg_time;
+};
+
+static void ddsnap_stats_update(struct ddsnap_pending_stats *statp, typeof(jiffies) time)
+{
+	statp->max_time = (statp->max_time < time) ? time : statp->max_time;
+	statp->min_time = (statp->min_time > time) ? time : statp->min_time;
+	statp->avg_time += time;
+}
+
+static void ddsnap_stats_display(struct ddsnap_pending_stats *statp, unsigned total)
+{
+	printk("(%u)\n", total);
+	if (!total)
+		return;
+	printk("pending time max:min:avg "); 
+	printk("%u ", jiffies_to_msecs(statp->max_time));
+	printk("%u ", jiffies_to_msecs(statp->min_time));
+	printk("%u\n", jiffies_to_msecs(statp->avg_time) / total);
+}
+
+static void show_pending_requests(struct list_head *hlist, unsigned *total, struct ddsnap_pending_stats *pending_stats)
+{
+	struct list_head *list;
+	typeof(jiffies) now = jiffies;
+	list_for_each(list, hlist) {
+		struct pending *pending = list_entry(list, struct pending, list);
+		ddsnap_stats_update(pending_stats, (now - pending->timestamp));
+		printk("%u:%Lx:%u ", pending->id, pending->chunk, jiffies_to_msecs(now - pending->timestamp));
+		*total = *total + 1;
+	}
+}
 
 static void show_pending(struct devinfo *info)
 {
 	unsigned i, total = 0;
+	struct ddsnap_pending_stats pending_stats = { 0, ~0UL, 0 }, query_stats = { 0, ~0UL, 0 };
 
 	spin_lock(&info->pending_lock);
 	warn("Pending server queries...");
 	for (i = 0; i < NUM_BUCKETS; i++) {
-		struct list_head *list;
-		list_for_each(list, info->pending + i) {
-			struct pending *pending = list_entry(list, struct pending, list);
+		if (!list_empty(info->pending + i)) {
 			if (!total)
 				printk("[%u]: ", i);
-			printk("%u:%Lx ", pending->id, pending->chunk);
-			total++;
+			show_pending_requests(info->pending + i, &total, &pending_stats);
 		}
 	}
-	printk("(%u)\n", total);
+	ddsnap_stats_display(&pending_stats, total);
+
 	if (!list_empty(&info->queries)) {
-		struct list_head *list;
 		total = 0;
 		warn("Queued queries...");
-		list_for_each(list, &info->queries) {
-			struct pending *pending = list_entry(list, struct pending, list);
-			printk("%Lx ", pending->chunk);
-			total++;
-		}
-		printk("(%u)\n", total);
+		show_pending_requests(&info->queries, &total, &query_stats);
+		ddsnap_stats_display(&query_stats, total);
 	}
 	spin_unlock(&info->pending_lock);
 }
@@ -351,6 +384,7 @@ struct hook {
 	/* needed only for end_io, make it a union */
 	bio_end_io_t *old_end_io;
 	void *old_private;
+	typeof(jiffies) timestamp;
 	/* needed after end_io, for release, make it a union */
 	struct list_head list;
 };
@@ -374,6 +408,34 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 	up(&info->more_work_sem);
 
 	return bio->bi_end_io(bio, done, error);
+}
+
+static void show_lock_requests(struct list_head *hlist)
+{
+	struct list_head *list;
+	struct hook *hook;
+	unsigned total = 0;
+	typeof(jiffies) now = jiffies;
+	struct ddsnap_pending_stats lock_stats = { 0, ~0UL, 0 };
+
+	list_for_each(list, hlist) {
+		hook = list_entry(list, struct hook, list);
+		ddsnap_stats_update(&lock_stats, (now - hook->timestamp));
+		printk("%Lx:%u ", (long long)hook->sector, jiffies_to_msecs(now - hook->timestamp));
+		total++;
+	}
+	ddsnap_stats_display(&lock_stats, total);
+}
+
+static void show_locked(struct devinfo *info)
+{
+	unsigned long irqflags;
+	spin_lock_irqsave(&info->end_io_lock, irqflags);
+	warn("Locked read requests...");
+	show_lock_requests(&info->locked);
+	warn("Read requests to release...");
+	show_lock_requests(&info->releases);
+	spin_unlock_irqrestore(&info->end_io_lock, irqflags);
 }
 
 /* This is the part that does all the work. */
@@ -456,6 +518,7 @@ found:
 				.info = info,
 				.sector = bio->bi_sector,
 				.old_end_io = bio->bi_end_io,
+				.timestamp = jiffies,
 				.old_private = bio->bi_private };
 			bio->bi_end_io = snapshot_read_end_io;
 			bio->bi_private = hook;
@@ -1135,7 +1198,7 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 	spin_lock(&info->pending_lock);
 	id = info->nextid;
 	info->nextid = (id + 1) & ~(-1 << RW_ID_BITS);
-	*pending = (struct pending){ .id = id, .bio = bio, .chunk = chunk, .chunks = 1 };
+	*pending = (struct pending){ .id = id, .bio = bio, .chunk = chunk, .chunks = 1, .timestamp = jiffies };
 	if (!worker_ready(info)) {
 		spin_unlock(&info->pending_lock);
 		kmem_cache_free(pending_cache, pending);
@@ -1247,24 +1310,67 @@ static struct file_operations ddsnap_proc_fops = {
 };
 
 static struct proc_dir_entry *ddsnap_proc_root=NULL; // initialized in dm_ddsnap_init
+static struct semaphore ddsnap_proc_sem;
 
 static void ddsnap_add_proc(const char *name, struct dm_target *target)
 {
 	struct proc_dir_entry *info;
+	down(&ddsnap_proc_sem);
 	BUG_ON(!ddsnap_proc_root);
 	info = create_proc_entry(name, 0, ddsnap_proc_root);
 	BUG_ON(!info);
 	info->owner = THIS_MODULE;
 	info->data = target;
 	info->proc_fops = &ddsnap_proc_fops;
+	up(&ddsnap_proc_sem);
 }
 
 static void ddsnap_remove_proc(const char *name)
 {
+	down(&ddsnap_proc_sem);
 	remove_proc_entry(name, ddsnap_proc_root);
+	up(&ddsnap_proc_sem);
 }
 
 /* Jiaying: end of proc functions */
+
+/* start of sysrq-'z' operation */
+static void sysrq_handle_ddsnap(int key, struct tty_struct *tty)
+{
+	struct dm_target *target;
+	struct devinfo *info;
+	struct proc_dir_entry *de = ddsnap_proc_root;
+	struct mapped_device *md;
+
+	if (!ddsnap_proc_root) {
+		printk("NULL ddsnap proc directory\n");
+		return;
+	}
+	down(&ddsnap_proc_sem);
+	/* print out stat info for each entry under /proc/drivers/ddsnap */
+	for (de = de->subdir; de; de = de->next) {
+		target = (struct dm_target *) de->data;
+		info = (struct devinfo *) target->private;
+		printk("ddsnap device %s, ", de->name);
+		md = dm_table_get_md(target->table);
+		printk("state %s, ", dm_suspended(md) ? "SUSPENDED" : ((info->flags & READY_FLAG) ? "ACTIVE" : "NOT READY"));
+		dm_put(md);
+		printk("inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", atomic_read(&info->inflight), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
+		if (atomic_read(&info->inflight)) {
+			show_pending(info);
+			show_locked(info);
+		}
+	}
+	up(&ddsnap_proc_sem);
+}
+
+static struct sysrq_key_op sysrq_ddsnap_op = {
+	.handler	= sysrq_handle_ddsnap,
+	.help_msg	= "ddsnap",
+	.action_msg	= "DDSNAP",
+	.enable_mask	= SYSRQ_ENABLE_DUMP,
+};
+/* end of sysrq operation */
 
 static void ddsnap_destroy(struct dm_target *target)
 {
@@ -1538,6 +1644,9 @@ int __init dm_ddsnap_init(void)
 	}
 	ddsnap_proc_root->owner = THIS_MODULE;
 
+	register_sysrq_key('z', &sysrq_ddsnap_op);
+	sema_init(&ddsnap_proc_sem, 1);
+
 	return 0;
 
 #ifdef CACHE
@@ -1564,6 +1673,7 @@ void dm_ddsnap_exit(void)
 		kmem_cache_destroy(end_io_cache);
 	kfree(snapshot_super);
 	remove_proc_entry("ddsnap", proc_root_driver); //Jiaying: remove /proc/driver/ddsnap
+	unregister_sysrq_key('z', &sysrq_ddsnap_op);
 }
 
 module_init(dm_ddsnap_init);
