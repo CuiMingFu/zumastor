@@ -1761,3 +1761,21 @@ diff -puN net/socket.c~ddsnap-2.6.19.1 net/socket.c
  /* ABI emulation layers need these two */
  EXPORT_SYMBOL(move_addr_to_kernel);
  EXPORT_SYMBOL(move_addr_to_user);
+--- linux-2.6.21.1-root/drivers/md/dm.c	2007-11-09 17:16:15.000000000 -0800
++++ linux-2.6.21.1/drivers/md/dm.c	2007-11-12 10:24:57.000000000 -0800
+@@ -1236,6 +1236,7 @@ void dm_put(struct mapped_device *md)
+ 		free_dev(md);
+ 	}
+ }
++EXPORT_SYMBOL_GPL(dm_put);
+ 
+ /*
+  * Process the deferred bios
+@@ -1529,6 +1530,7 @@ int dm_suspended(struct mapped_device *m
+ {
+ 	return test_bit(DMF_SUSPENDED, &md->flags);
+ }
++EXPORT_SYMBOL_GPL(dm_suspended);
+ 
+ int dm_noflush_suspending(struct dm_target *ti)
+ {
