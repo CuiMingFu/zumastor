@@ -1,0 +1,46 @@
+<html>
+<head>
+<link href="doxygen.css" rel="stylesheet" type="text/css">
+<title>Zumastor Walkthroughs</title>
+</head>
+<body>
+
+<h1>Zumastor Walkthroughs</h1>
+
+<h2>Ubuntu walkthrough on VMWare Player</h2>
+First, install vmware player on your machine.  (If you're using Ubuntu,
+it might be as simple as <tt>apt-get install vmware-player</tt>.)
+<p>
+Second, download a vmware image with Ubuntu preinstalled.
+I'm not sure what the best is, but the oddly-named site 
+<a href="http://www.thoughtpolice.co.uk/vmware">www.thoughtpolice.co.uk/vmware</a>
+seems reasonable.  I chose the Ubuntu Server 7.10 download, clicked
+on the "fast torrent!" link, and told Firefox to open the torrent file;
+this popped up kTorrent, which downloaded the 189 megabyte image quickly.
+The image is several files zipped together, so I unpacked it with
+<pre>
+$ mkdir ~/vmubuntu
+$ cd ~/vmubuntu
+$ unzip ~/ubuntu-server-7.10-i386.zip
+</pre>
+<p>
+Third, start up vmware player (Applications / System Tools / VMWare Player)
+and tell it to load the .vmx file in the directory where you unpacked the vmware image.
+<p>
+Fourth, inside vmware, log in to the virtual ubuntu box (using the username and password
+from the site where you downloaded the image).
+<p>
+Fifth, inside vmware, download and install the Zumastor packages, e.g.
+<pre>
+$ sudo apt-get install links
+$ linkx zumastor.org
+[download the kernel image, zumastor, and ddsnap packages]
+$ sudo dpkg -i ddsnap<TAB> zumastor<TAB> kernel<TAB>
+</pre>
+This currently fails.
+<p>
+Sixth, send annoyed email to the zumastor developers, asking them to try this walkthrough :-)
+<hr>
+<center>&copy; 2007 Google</center>
+</body>
+</html>
