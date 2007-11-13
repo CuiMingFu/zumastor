@@ -14,14 +14,16 @@ it might be as simple as <tt>apt-get install vmware-player</tt>.)
 Second, download a vmware image with Ubuntu preinstalled.
 I'm not sure what the best is, but the oddly-named site 
 <a href="http://www.thoughtpolice.co.uk/vmware">www.thoughtpolice.co.uk/vmware</a>
-seems reasonable.  I chose the Ubuntu Server 7.10 download, clicked
-on the "fast torrent!" link, and told Firefox to open the torrent file;
-this popped up kTorrent, which downloaded the 189 megabyte image quickly.
-The image is several files zipped together, so I unpacked it with
+seems reasonable.  
+<p>
+Choose the Ubuntu Server 6.06 download, click
+on the "fast torrent!" link, and tell Firefox to open the torrent file;
+this should pop up kTorrent to download the 189 megabyte image.
+The image is several files zipped together, so unpack it with
 <pre>
 $ mkdir ~/vmubuntu
 $ cd ~/vmubuntu
-$ unzip ~/ubuntu-server-7.10-i386.zip
+$ unzip ~/ubuntu-server-6.06-i386.zip
 </pre>
 <p>
 Third, start up vmware player (Applications / System Tools / VMWare Player)
@@ -39,9 +41,17 @@ $ links zumastor.org
 [download the kernel image, zumastor, and ddsnap packages.  Don't forget to let the downloads finish!]
 $ sudo dpkg -i *.deb
 </pre>
-This currently fails.
+(This currently fails with Ubuntu 7.10, which is why this walkthrough uses 6.06.)
+Ignore the warnings about deleting symbolic links.
 <p>
-Sixth, send annoyed email to the zumastor developers, asking them to try this walkthrough :-)
+Sixth, reboot the virtual machine:
+<pre>
+$ sudo reboot
+</pre>
+Booting currently fails with the error "Unable to find volume group 'Ubuntu'"
+and drops you into an emergency shell after a minute.
+<p>
+Seventh, send annoyed email to the zumastor developers, asking them to try this walkthrough :-)
 <hr>
 <center>&copy; 2007 Google</center>
 </body>
