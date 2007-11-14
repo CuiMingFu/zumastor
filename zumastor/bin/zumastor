@@ -439,36 +439,6 @@ function stop_target {
 	pkill -f "ddsnap transmit $SERVERS/$vol $host:" || return 1
 }
 
-function init_define_volume {
-	[[ $# -eq 5 ]] || [[ $# -eq 6 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local -r vol=$1
-	local -r odev=$2
-	local -r sdev=$3
-	local -r blocksize=$4
-	local -r chunksize=$5
-	local -r mdev=$6
-	local -r path=$VOLUMES/$vol
-	local -r sock=${SERVERS}/$vol
-	local -r log=$LOGS/$vol/init.log
-
-	[[ -d $LOGS/$vol ]] || mkdir $LOGS/$vol || return 1
-	mkdir $path || return 1
-	mkdir $path/device || return 1
-	ln -sf $odev $path/device/origin  || return 1
-	ln -sf $sdev $path/device/snapstore || return 1
-	[ -z $mdev ] || ln -sf $mdev $path/device/meta || return 1
-	mkdir $path/targets || return 1
-
-	log "initializing volume '$vol', origindev '$odev', snapdev '$sdev'" $log
-	# FIXME TODO -b $blocksize is not passed because it requires metadev
-	ddsnap initialize --yes -c $chunksize $sdev $odev $mdev 2>>$log || { echo init failed; return 1; }
-
-	start_volume $vol || { echo start failed ;return 1; }
-
-	create_device $vol -1 || { echo create failed;return 1; }
-	# do not mount
-}
-
 function define_volume {
 	[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
@@ -478,7 +448,7 @@ function define_volume {
 	local -r path=$VOLUMES/$vol
 	local -r sock=${SERVERS}/$vol
 
-	mkdir $LOGS/$vol || return 1
+	[[ -d $LOGS/$vol ]] || mkdir $LOGS/$vol || return
 	mkdir $path || return 1
 	mkdir $path/device || return 1
 	ln -sf $odev $path/device/origin  || return 1
@@ -487,7 +457,6 @@ function define_volume {
 	mkdir $path/targets || return 1
 
 	start_volume $vol || { echo start failed; return 1; }
-
 	create_device $vol -1 || { echo create failed; return 1; }
 }
 
@@ -797,8 +766,7 @@ define)
 	case $2 in
 	volume)
 		declare name="$0 $1 $2"
-		declare noinit="noinit"
-		declare args metadev
+		declare args metadev init
 		declare blocksize=4k
 		declare chunksize=16k
 		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-h|--help]"
@@ -818,7 +786,7 @@ define)
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
 				exit;;
-			-i|--initialize) noinit="";;
+			-i|--initialize) init="yes";;
 			-m|--metadev) metadev=$2; shift 1;;
 			-b|--blocksize) blocksize=$2; shift 1;;
 			-c|--chunksize) chunksize=$2; shift 1;;
@@ -833,21 +801,13 @@ define)
 		declare snapstore=$3
 		
 		verify_valid_volname $vol || { echo "$0: invalid volume name '$vol'"; exit 1; }
+		verify_managed_vol $vol && { echo "$0: volume '$vol' is already configured"; exit 1; }
 		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
 		verify_valid_device $snapstore || { echo "$0: invalid device '$snapstore'"; exit 1; }
-		[ -z $meta ] || verify_valid_device $metadev || { echo "$0: invalid device '$meta'"; exit 1; }
-
-		if [[ $noinit = "noinit" ]]; then
-			define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
-		else
-			init_define_volume $vol $origin $snapstore $blocksize $chunksize $metadev \
-				|| { echo "$0: init volume '$vol' failed"; exit 1; }
-
-			echo "Successfully created and initialized volume '$vol'."
-			echo "You can now create a filesystem on /dev/mapper/$vol"
-		fi
-
-		exit $? ;;
+		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
+		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
+		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
+		exit ;;
 	target)
 		declare name="$0 $1 $2"
 		declare usage="usage: $name <vol> <host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
