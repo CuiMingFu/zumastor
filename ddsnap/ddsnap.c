@@ -694,7 +694,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 
 	u64 dev2_gzip_size;
 	struct delta_extent_header deh = { .magic_num = MAGIC_NUM };
-	u64 extent_addr, chunk_num, num_of_chunks;
+	u64 extent_addr, chunk_num, num_of_chunks, volume_size;
 	u64 extent_size, delta_size, gzip_size = MAX_MEM_SIZE, bytes_total = 0, bytes_sent = 0;
 	u32 chunk_size = 1 << cl->chunksize_bits;
 	struct delta_extent_header deh2 = { .magic_num = MAGIC_NUM, .mode = RAW };
@@ -703,6 +703,8 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	trace_off(printf("level: %d, chunksize bits: %u, chunk_count: "U64FMT"\n", level, cl->chunksize_bits, cl->count););
 	trace_off(printf("starting delta generation, mode %u, chunksize %u\n", mode, chunk_size););
 
+	if (fd_size(snapdev2, &volume_size) < 0)
+		goto failed_fdsize;
 	if (progress_file && (err = generate_progress_file(progress_file, &progress_tmpfile)))
 		goto out;
 
@@ -721,6 +723,8 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 				num_of_chunks = chunks_in_extent(cl, chunk_num, chunk_size);
 			extent_size = chunk_size * num_of_chunks;
 		}
+		if (extent_addr > volume_size - extent_size)
+			extent_size = volume_size - extent_addr;
 		bytes_total += extent_size;
 
 		/* read in extents from dev1 & dev2 */
@@ -801,7 +805,9 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 		err = progress_file ? write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) : 0;
 	}
 	goto out;
-
+failed_fdsize:
+	warn("unable to determine volume size for %s", dev2name);
+	goto out;
 error_source:
 	warn("for "U64FMT" chunk extent starting at offset "U64FMT": %s", num_of_chunks, extent_addr, strerror(-err));
 out:
@@ -1003,9 +1009,9 @@ static u64 get_origin_sectors(int serv_fd)
 
 static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char const *devstem, u32 mode, int level, int ds_fd, char const *progress_file, u64 start_addr)
 {
-	int fullvolume = (src_snap == -1), chunks = 0;
+	int fullvolume = (src_snap == -1), err = -ENOMEM;
+	u64 skip_chunks = 0;
 	struct change_list *cl = NULL;
-	int err = -ENOMEM;
 
 	/* setup changelist */
 	if (fullvolume) {
@@ -1023,13 +1029,13 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 		cl->chunksize_bits = reply->meta.chunksize_bits;
 		free(reply);
 
-		u64 vol_size_bytes = get_origin_sectors(serv_fd) * 512;
-		cl->count = vol_size_bytes >> cl->chunksize_bits;
+		u64 vol_size_bytes = get_origin_sectors(serv_fd) * 512, chunkmask = ~(-1 << cl->chunksize_bits);
+		cl->count = (vol_size_bytes >> cl->chunksize_bits) + !!(vol_size_bytes & chunkmask);
 		cl->length = CHUNK_ARRAY_INIT;
 		cl->src_snap = src_snap;
 		cl->tgt_snap = tgt_snap;
 		cl->chunks = NULL;
-		chunks = (vol_size_bytes - start_addr) >> cl->chunksize_bits;
+		skip_chunks = cl->count - ((vol_size_bytes - start_addr) >> cl->chunksize_bits);
 	} else {
 		trace_off(printf("requesting changelist from snapshot %u to %u\n", src_snap, tgt_snap););
 		if ((cl = stream_changelist(serv_fd, src_snap, tgt_snap)) == NULL) {
@@ -1037,15 +1043,13 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 			err = -EINVAL;
 			goto out;
 		}
-		if (start_addr) // if we are resuming, find the first entry in the changelist to send
-			for (chunks = 0; chunks < cl->count; chunks++)
-				if (cl->chunks[chunks] << cl->chunksize_bits >= start_addr)
-					break;
-		chunks = cl->count - chunks;
+		/* If resuming, find the first chunk that starts after the start_addr, TODO binary search */
+		while (skip_chunks < cl->count && cl->chunks[skip_chunks] << cl->chunksize_bits < start_addr)
+			skip_chunks++;
 	}
 
 	/* request approval for delta send */
-	if ((err = outbead(ds_fd, SEND_DELTA, struct delta_header, DELTA_MAGIC_ID, chunks, 1 << cl->chunksize_bits, src_snap, tgt_snap))) {
+	if ((err = outbead(ds_fd, SEND_DELTA, struct delta_header, DELTA_MAGIC_ID, cl->count - skip_chunks, 1 << cl->chunksize_bits, src_snap, tgt_snap))) {
 		warn("unable to send delta: %s", strerror(-err));
 		goto out;
 	}
@@ -1069,7 +1073,7 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 	warn("sending delta from %i to %i", src_snap, tgt_snap);
 
 	/* stream delta */
-	if ((err = generate_delta_extents(mode, level, cl, ds_fd, devstem, src_snap, tgt_snap, progress_file, cl->count - chunks)) < 0) {
+	if ((err = generate_delta_extents(mode, level, cl, ds_fd, devstem, src_snap, tgt_snap, progress_file, skip_chunks)) < 0) {
 		warn("could not send delta downstream for snapshots %i and %i", src_snap, tgt_snap);
 		goto out;
 	}
@@ -1129,9 +1133,12 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	}
 
 	struct delta_extent_header deh;
-	u64 uncomp_size, extent_size;
+	u64 uncomp_size, extent_size, volume_size;
 	u64 extent_addr = 0, chunk_num;
 	int current_time, last_update = 0;
+
+	if (fd_size(snapdev2, &volume_size) < 0)
+		goto failed_fdsize;
 
 	for (chunk_num = 0; chunk_num < chunk_count;) {
 		trace_off(printf("reading chunk "U64FMT" header\n", chunk_num););
@@ -1140,9 +1147,11 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 		if (deh.magic_num != MAGIC_NUM)
 			goto apply_magic_error;
 
-		extent_size = deh.num_of_chunks * chunk_size;
-		uncomp_size = extent_size;
 		extent_addr = deh.extent_addr;
+		extent_size = deh.num_of_chunks * chunk_size;
+		if (extent_addr > volume_size - extent_size) /* end chunk and volume not a multiple of chunksize */
+			extent_size = volume_size - extent_addr;
+		uncomp_size = extent_size;
 
 		if (!fullvolume && ((err = diskread(snapdev1, extent_data, extent_size, extent_addr)) < 0))
 			goto apply_devread_error;
@@ -1207,6 +1216,9 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	goto out;
 
 	/* error messages */
+failed_fdsize:
+	warn("unable to determine volume size for %s", dev2name);
+	goto out;
 apply_headerread_error:
 	warn("could not read header for extent starting at chunk "U64FMT" of "U64FMT" total chunks: %s", chunk_num, chunk_count, strerror(-err));
 	goto out;
