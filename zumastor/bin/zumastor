@@ -177,15 +177,17 @@ function replicate_snapshot {
 	local -r hold_file=$target_dir/hold
 	local -r server=$SERVERS/$vol
 	local -r port_file=$target_dir/port
-	local old_snap port status output remote_hold remote_send remote_addr resume ret=0
+	local -r volume_file=$target_dir/name
+	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol
 
 	read -d" " old_snap <$hold_file 2>/dev/null
+	read remote_vol <$volume_file || return 1
 
 	log "replication beginning from snapshot '$old_snap' to '$snap' on volume '$vol' for '$host'"
 
-	output=$(run_remote $host "cat $VOLUMES/$vol/source/hostname")
+	output=$(run_remote $host "cat $VOLUMES/$remote_vol/source/hostname")
 	if [[ $? -ne 0 ]] || [[ $output != $MYHOSTNAME ]]; then
-		log "set '$MYHOSTNAME' as source for '$vol' on '$host' first!"
+		log "set '$MYHOSTNAME' as source for '$remote_vol' on '$host' first!"
 		return 1
 	fi
 	if ! verify_existing_snap $vol $snap; then
@@ -200,7 +202,7 @@ function replicate_snapshot {
 
 	read port <$port_file || { log "error reading port from '$port_file'"; return 1; }
 
-	run_remote $host "zumastor receive start $vol $port" > $remote_file
+	run_remote $host "zumastor receive start $remote_vol $port" > $remote_file
 	[[ $? -ne 0 ]] && { log "starting remote snapshot receive failed"; return 1; }
 	read remote_hold remote_send remote_addr < $remote_file
 
@@ -253,8 +255,8 @@ function replicate_snapshot {
 	fi
 
 	log "sending snapshot complete, notifying downstream host"
-	run_remote $host "zumastor receive done $vol $port"
-	[[ $? -ne 0 ]] && { log "zumastor receive done $vol $port failed"; return 1; }
+	run_remote $host "zumastor receive done $remote_vol $port"
+	[[ $? -ne 0 ]] && { log "zumastor receive done $remote_vol $port failed"; return 1; }
 
 	#[[ $snap -eq 5 ]] && restart_plug
 	# !!! FIXME TODO this is racy, we should save state by journaling
@@ -486,11 +488,12 @@ function forget_volume {
 }
 
 function define_target {
-	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
 	local -r port=$3
-	local -r period=$4
+	local -r name=$4
+	local -r period=$5
 	local -r path=$VOLUMES/$vol/targets/$host
 	local new=0
 
@@ -504,6 +507,7 @@ function define_target {
 		mkfifo $path/trigger || return 1
 	fi
 
+	echo $name >$path/name || return 1
 	echo $port > $path/port || return 1
 	if [[ -z $period ]]; then
 		rm $path/period 2> /dev/null
@@ -605,10 +609,11 @@ function forget_master {
 }
 
 function set_source {
-	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
-	local -r period=$3
+	local -r name=$3
+	local -r period=$4
 	local -r path=$VOLUMES/$vol
 	local -r mysize=$(ddsnap status $SERVERS/$vol --size) || return 1
 	local -r oldhost=$(cat $path/source/hostname 2>/dev/null)
@@ -620,7 +625,7 @@ function set_source {
 	fi
 
 	rempath=$VOLUMES/$vol/targets/$MYHOSTNAME/trigger
-	size=$(run_remote $host "ddsnap status $SERVERS/$vol --size")
+	size=$(run_remote $host "ddsnap status $SERVERS/$name --size")
 	[[ $size -gt $mysize ]] && { echo "upstream volume ($size) is larger than local ($mysize), cannot set source" ; return 1; }
 
 	if [[ -e $path/source ]]; then
@@ -630,6 +635,7 @@ function set_source {
 
 	[[ $new == "yes" ]] && { mkdir -p $path/source || return 1; }
 	echo $host > $path/source/hostname || return 1
+	echo $name >$path/source/name || return 1
 
 	if [[ -z $period ]]; then
 		rm $path/source/period 2>/dev/null || return 0
@@ -736,7 +742,8 @@ function nag_daemon {
 	local kind
 	local host
 
-	read host <$path/source/hostname
+	read remote_vol <$path/source/name || return 1
+	read host <$path/source/hostname || return 1
 	read period <$path/source/period 2>/dev/null
 
 	[[ $period -gt 0 ]] || { log "no polling period specified for $vol, nothing to do" $log; return 0; }
@@ -751,8 +758,8 @@ function nag_daemon {
 			log "nag daemon starting for volume '$vol'" $log
 		fi
 
-		log "sending wakeup to $host:" $log
-		run_remote $host "echo target/$MYHOSTNAME > $VOLUMES/$vol/master/trigger" >> $log 2>&1
+		log "sending wakeup for volume $remote_vol on $host:" $log
+		run_remote $host "echo target/$MYHOSTNAME > $VOLUMES/$remote_vol/master/trigger" >> $log 2>&1
 		sleep $period
 	done &
 }
@@ -809,18 +816,22 @@ define)
 		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
 	target)
-		declare name="$0 $1 $2"
-		declare usage="usage: $name <vol> <host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
+		declare cmd="$0 $1 $2"
+		declare usage="usage: $cmd <vol> <host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
 		declare test_fullvolume=0
-		declare period
+		declare period name
 
 		shift 2
-		args=`getopt -ot:p:h -l test:,help -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -ot:p:n:h -l test:,help,period:,name: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
 		eval set -- "$args"  # remove getopt quotes and set new arguments
 		until [[ $1 = -- ]]; do
 			case "$1" in
 			-h|--help) echo $usage; exit;;
 			-p|--period) period=$2; shift 1;;
+			-n|--name)
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
+				name=$2
+				shift 1;;
 			-t|--test)
 				case "$2" in
 					fullvolume) test_fullvolume=1;;
@@ -834,9 +845,8 @@ define)
 		shift # remove --
 
 		[[ $# -eq 2 ]] || { echo $usage; exit 2; }
-		declare vol=$1
-		declare host=$2
-		declare port=${host/*:/}
+		declare vol=$1 host=$2 port=${host/*:/}
+		[[ -z $name ]] && name=$vol
 
 		# check to see if port was specified, if so, strip it off the host
 		if [[ $host != $port ]]; then
@@ -846,10 +856,10 @@ define)
 			port=$DEFAULT_PORT
 		fi
 
-		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
+		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 1; }
+		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 1; }
 
-		define_target $vol $host $port $period
+		define_target $vol $host $port $name $period
 		exit $? ;;
 	master)
 		declare args arg kind count delta=0
@@ -921,18 +931,22 @@ define)
 
 		exit 0 ;;
 	source)
-		declare usage="usage: $name <vol> <host> [-p|--period <period>] [-y|--yes]"
-		declare period args name="$0 $1 $2"
+		declare period args cmd="$0 $1 $2"
+		declare usage="usage: $cmd <vol> <host> [-p|--period <period>] [-y|--yes]"
 		shift 2
-		args=`getopt -op:y -l help,period:,yes -n"$name" -- "$@"` || \
+		args=`getopt -op:yn: -l help,period:,yes,name: -n"$cmd" -- "$@"` || \
 			{ echo $usage; exit 2; }
 		eval set -- "$args"  # remove getopt quotes and set new arguments
 		until [[ $1 = -- ]]; do
 			case "$1" in
 			--help) echo $usage; exit;;
 			-p|--period)
-				verify_valid_number $2 || { echo "$name: error '$2' is not a valid period"; exit 3; }
+				verify_valid_number $2 || { echo "$cmd: error '$2' is not a valid period"; exit 3; }
 				period=$2
+				shift 1;;
+			-n|--name)
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
+				name=$2
 				shift 1;;
 			-y|--yes) yes_to_all=1;;
 			*) echo whoops2; exit 9;;
@@ -942,11 +956,12 @@ define)
 		shift # remove --
 		[[ $# -eq 2 ]] || { echo $usage; exit 6; }
 		declare vol=$1 host=$2
+		[[ -z $name ]] && name=$vol
 
-		verify_managed_vol $vol || { echo "$name: volume '$vol' is not a managed volume"; exit 4; }
-		verify_valid_host $host || { echo "$name: invalid host '$host'"; exit 5; }
+		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 4; }
+		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 5; }
 
-		set_source $vol $host $period
+		set_source $vol $host $name $period
 		exit $? ;;
 	*)
 		echo "usage: $0 define volume|target|master|source"
