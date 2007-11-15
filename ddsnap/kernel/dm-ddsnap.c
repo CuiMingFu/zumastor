@@ -162,7 +162,6 @@ static void kick(struct block_device *dev)
 #define READY_FLAG (1 << 4)
 #define NUM_BUCKETS 64
 #define MASK_BUCKETS (NUM_BUCKETS - 1)
-#define MAX_INFLIGHT_PAGES 1000
 
 struct devinfo {
 	u64 id;
@@ -192,10 +191,6 @@ struct devinfo {
 	spinlock_t pending_lock;
 	spinlock_t end_io_lock;
 	int dont_switch_lists;
-	atomic_t inflight;
-	atomic_t bypass;
-	unsigned capacity; // reporting only
-	struct semaphore throttle_sem; // does the real throttling
 };
 
 static inline int is_snapshot(struct devinfo *info)
@@ -226,32 +221,6 @@ static void report_error(struct devinfo *info)
 	while (down_interruptible(&info->recover_sem))
 		;
 	info->flags |= RECOVER_FLAG;
-}
-
-static void throttle(struct devinfo *info, struct bio *bio)
-{
-	unsigned consume = bio->bi_vcnt;
-
-	atomic_add(consume, &info->inflight);
-	if (current->flags & PF_MEMALLOC) {
-		atomic_add(consume, &info->bypass);
-		return;
-	}
-	while (consume--)
-		down(&info->throttle_sem);
-}
-
-static void unthrottle(struct devinfo *info, struct bio *bio)
-{
-	unsigned consumed = bio->bi_vcnt;
-
-	atomic_sub(consumed, &info->inflight);
-	while (consumed--) {
-		if (atomic_read(&info->bypass))
-			atomic_dec(&info->bypass);
-		else
-			up(&info->throttle_sem);
-	}
 }
 
 /* Static caches, shared by all ddsnap instances */
@@ -476,7 +445,6 @@ found:
 
 		bio = pending->bio;
 		trace(warn("Handle pending IO sector %Lx", (long long)bio->bi_sector);)
-		unthrottle(info, bio);
 
 		if(failed_io) {
 			warn("Unable to handle pending IO server %Lx", (long long)bio->bi_sector);
@@ -979,7 +947,6 @@ static void flush_list(struct devinfo *info, struct list_head *flush_list)
 		struct bio *bio=pending->bio;
 		list_del(entry);
 		kmem_cache_free(pending_cache, pending);
-		unthrottle(info, bio);
 		bio_io_error(bio, bio->bi_size);
 	}
 }
@@ -1192,7 +1159,6 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 	}
 #endif
 
-	throttle(info, bio);
 	/* rob: check to see if the socket is connected, otherwise failed and don't place request on the queue */
 	pending = kmem_cache_alloc(pending_cache, GFP_NOIO|__GFP_NOFAIL);
 	spin_lock(&info->pending_lock);
@@ -1202,7 +1168,6 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 	if (!worker_ready(info)) {
 		spin_unlock(&info->pending_lock);
 		kmem_cache_free(pending_cache, pending);
-		unthrottle(info, bio);
 		return -EIO;
 	}
 	list_add(&pending->list, &info->queries);
@@ -1293,7 +1258,7 @@ static int ddsnap_seq_show(struct seq_file *seq, void *offset)
 	BUG_ON(!target);
 	info = (struct devinfo *) target->private;
 	BUG_ON(!info);
-	seq_printf(seq, "ddsnap inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", atomic_read(&info->inflight), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
+	seq_printf(seq, "ddsnap inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", dm_inflight_total(target), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
 	return 0;
 }
 
@@ -1355,11 +1320,9 @@ static void sysrq_handle_ddsnap(int key, struct tty_struct *tty)
 		md = dm_table_get_md(target->table);
 		printk("state %s, ", dm_suspended(md) ? "SUSPENDED" : ((info->flags & READY_FLAG) ? "ACTIVE" : "NOT READY"));
 		dm_put(md);
-		printk("inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", atomic_read(&info->inflight), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
-		if (atomic_read(&info->inflight)) {
-			show_pending(info);
-			show_locked(info);
-		}
+		printk("inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", dm_inflight_total(target), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
+		show_pending(info);
+		show_locked(info);
 	}
 	up(&ddsnap_proc_sem);
 }
@@ -1499,8 +1462,7 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 	*info = (struct devinfo){ 
 		.flags = flags, .snap = snap,
 		.chunksize_bits = chunksize_bits,
-		.chunkshift = chunksize_bits - SECTOR_SHIFT,
-		.capacity = MAX_INFLIGHT_PAGES};
+		.chunkshift = chunksize_bits - SECTOR_SHIFT};
 	target->private = info;
 	sema_init(&info->server_in_sem, 0);
 	sema_init(&info->server_out_sem, 0);
@@ -1517,7 +1479,6 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 	INIT_LIST_HEAD(&info->locked);
 	for (i = 0; i < NUM_BUCKETS; i++)
 		INIT_LIST_HEAD(&info->pending[i]);
-	sema_init(&info->throttle_sem, info->capacity);
 
 	error = "Can't get snapshot device";
 	if ((err = dm_get_device(target, argv[0], 0, 0, dm_table_get_mode(target->table), &info->snapdev)))

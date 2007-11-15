@@ -1,6 +1,6 @@
 diff -purN linux-2.6.21.1-orig/block/ll_rw_blk.c linux-2.6.21.1/block/ll_rw_blk.c
 --- linux-2.6.21.1-orig/block/ll_rw_blk.c	2007-11-09 17:16:15.000000000 -0800
-+++ linux-2.6.21.1/block/ll_rw_blk.c	2007-11-09 17:17:45.000000000 -0800
++++ linux-2.6.21.1/block/ll_rw_blk.c	2007-11-14 19:53:28.000000000 -0800
 @@ -3116,12 +3116,19 @@ static inline int should_fail_request(st
   */
  void generic_make_request(struct bio *bio)
@@ -32,8 +32,8 @@ diff -purN linux-2.6.21.1-orig/block/ll_rw_blk.c linux-2.6.21.1/block/ll_rw_blk.
  			       "generic_make_request: Trying to access "
 diff -purN linux-2.6.21.1-orig/drivers/md/dm.c linux-2.6.21.1/drivers/md/dm.c
 --- linux-2.6.21.1-orig/drivers/md/dm.c	2007-11-09 17:16:15.000000000 -0800
-+++ linux-2.6.21.1/drivers/md/dm.c	2007-11-09 17:17:45.000000000 -0800
-@@ -880,6 +880,11 @@ static int dm_any_congested(void *conges
++++ linux-2.6.21.1/drivers/md/dm.c	2007-11-14 19:54:13.000000000 -0800
+@@ -880,6 +880,22 @@ static int dm_any_congested(void *conges
  	return r;
  }
  
@@ -42,10 +42,21 @@ diff -purN linux-2.6.21.1-orig/drivers/md/dm.c linux-2.6.21.1/drivers/md/dm.c
 +	return bio->bi_vcnt;
 +}
 +
++unsigned dm_inflight_total(struct dm_target *target)
++{
++	struct mapped_device *md;
++	request_queue_t *queue;
++	md = dm_table_get_md(target->table);
++	queue = md->queue;
++	dm_put(md);
++	return (queue->capacity - atomic_read(&queue->available));
++}
++EXPORT_SYMBOL_GPL(dm_inflight_total);
++
  /*-----------------------------------------------------------------
   * An IDR is used to keep track of allocated minor numbers.
   *---------------------------------------------------------------*/
-@@ -958,6 +963,7 @@ out:
+@@ -958,6 +974,7 @@ out:
  
  static struct block_device_operations dm_blk_dops;
  
@@ -53,7 +64,7 @@ diff -purN linux-2.6.21.1-orig/drivers/md/dm.c linux-2.6.21.1/drivers/md/dm.c
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -997,6 +1003,11 @@ static struct mapped_device *alloc_dev(i
+@@ -997,6 +1014,11 @@ static struct mapped_device *alloc_dev(i
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
@@ -67,7 +78,7 @@ diff -purN linux-2.6.21.1-orig/drivers/md/dm.c linux-2.6.21.1/drivers/md/dm.c
  	blk_queue_make_request(md->queue, dm_request);
 diff -purN linux-2.6.21.1-orig/fs/bio.c linux-2.6.21.1/fs/bio.c
 --- linux-2.6.21.1-orig/fs/bio.c	2007-11-09 17:16:16.000000000 -0800
-+++ linux-2.6.21.1/fs/bio.c	2007-11-09 17:17:45.000000000 -0800
++++ linux-2.6.21.1/fs/bio.c	2007-11-14 19:53:28.000000000 -0800
 @@ -142,6 +142,8 @@ void bio_init(struct bio *bio)
  	bio->bi_end_io = NULL;
  	atomic_set(&bio->bi_cnt, 1);
@@ -93,7 +104,7 @@ diff -purN linux-2.6.21.1-orig/fs/bio.c linux-2.6.21.1/fs/bio.c
  	if (bio->bi_end_io)
 diff -purN linux-2.6.21.1-orig/include/linux/bio.h linux-2.6.21.1/include/linux/bio.h
 --- linux-2.6.21.1-orig/include/linux/bio.h	2007-11-09 17:16:17.000000000 -0800
-+++ linux-2.6.21.1/include/linux/bio.h	2007-11-09 17:17:45.000000000 -0800
++++ linux-2.6.21.1/include/linux/bio.h	2007-11-14 19:53:28.000000000 -0800
 @@ -109,6 +109,9 @@ struct bio {
  	bio_end_io_t		*bi_end_io;
  	atomic_t		bi_cnt;		/* pin count */
@@ -106,7 +117,7 @@ diff -purN linux-2.6.21.1-orig/include/linux/bio.h linux-2.6.21.1/include/linux/
  	bio_destructor_t	*bi_destructor;	/* destructor */
 diff -purN linux-2.6.21.1-orig/include/linux/blkdev.h linux-2.6.21.1/include/linux/blkdev.h
 --- linux-2.6.21.1-orig/include/linux/blkdev.h	2007-11-09 17:16:17.000000000 -0800
-+++ linux-2.6.21.1/include/linux/blkdev.h	2007-11-09 17:17:45.000000000 -0800
++++ linux-2.6.21.1/include/linux/blkdev.h	2007-11-14 19:53:28.000000000 -0800
 @@ -394,6 +394,10 @@ struct request_queue
  	struct work_struct	unplug_work;
  
@@ -118,3 +129,14 @@ diff -purN linux-2.6.21.1-orig/include/linux/blkdev.h linux-2.6.21.1/include/lin
  
  	/*
  	 * The queue owner gets to use this for whatever they like.
+diff -purN linux-2.6.21.1-orig/include/linux/device-mapper.h linux-2.6.21.1/include/linux/device-mapper.h
+--- linux-2.6.21.1-orig/include/linux/device-mapper.h	2007-11-09 17:16:17.000000000 -0800
++++ linux-2.6.21.1/include/linux/device-mapper.h	2007-11-14 19:54:13.000000000 -0800
+@@ -191,6 +191,7 @@ const char *dm_device_name(struct mapped
+ struct gendisk *dm_disk(struct mapped_device *md);
+ int dm_suspended(struct mapped_device *md);
+ int dm_noflush_suspending(struct dm_target *ti);
++unsigned dm_inflight_total(struct dm_target *target);
+ 
+ /*
+  * Geometry functions.
