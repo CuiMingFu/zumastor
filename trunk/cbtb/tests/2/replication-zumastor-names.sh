@@ -86,7 +86,7 @@ ${SSH} root@${slave} zumastor status --usage
 
 echo ok 7 - testfile written, synced, and snapshotted
 
-hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
+hash=`md5sum /var/run/zumastor/mount/testvol/testfile|cut -f1 -d\ `
 
 #
 # schedule an immediate replication cycle
@@ -98,7 +98,7 @@ zumastor replicate testvol slave
 # that it is there.  If not, look at the target volume, wait 5 minutes,
 # and look again
 sleep 60
-rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/slavevol/testfile` || \
+rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/slavevol/testfile|cut -f1 -d\ ` || \
   ${SSH} root@${slave} <<EOF
     mount
     df
