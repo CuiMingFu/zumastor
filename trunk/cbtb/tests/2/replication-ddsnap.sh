@@ -29,7 +29,7 @@ SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 # necessary at the moment, ddsnap just sends requests and doesn't wait
 SLEEP=10
 
-echo "1..27"
+echo "1..29"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -127,60 +127,68 @@ echo ok 15 - $volname==$volname\($tosnap\)
 sleep $SLEEP
 
 ddsnap transmit $serversocket ${slave}:$listenport $tosnap
-echo ok 16 - snapshot $tosnap transmitting to slave
+echo ok 16 - snapshot $tosnap transmitting to slave origin
 sleep $SLEEP
 
 $SSH root@$slave \
+  ddsnap create $serversocket $tosnap
+echo ok 17 - create snapshot $tosnap on slave
+
+$SSH root@$slave \
   "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
-echo ok 17 - create $volname\($tosnap\) block device on slave
+echo ok 18 - create $volname\($tosnap\) block device on slave
 
 hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash0" != "$hash0slave" ] ; then
   echo -e "not "
-  rc=18
+  rc=19
 fi
-echo ok 18 - master $volname\($tosnap\) == slave $volname\($tosnap\)
+echo ok 19 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 
 dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/$volname  
-echo 19 - copy random data onto master $volname
+echo 20 - copy random data onto master $volname
 
 fromsnap=0
 tosnap=2
 ddsnap create $serversocket $tosnap
-echo ok 20 - ddsnap create $tosnap
+echo ok 21 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
-echo ok 21 - create $volname\($tosnap\) block device on master
+echo ok 22 - create $volname\($tosnap\) block device on master
 
 hash=`md5sum </dev/mapper/$volname`
 hash2=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash2" ] ; then
   echo -e "not "
-  rc=22
+  rc=23
 fi
-echo ok 22 - $volname==$volname\($tosnap\)
+echo ok 23 - $volname==$volname\($tosnap\)
 
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
-echo ok 23 - snapshot $tosnap transmitting to slave, delta from $fromsnap
+echo ok 24 - delta from $fromsnap to $tosnap transmitting to slave origin
 sleep $SLEEP
 
 $SSH root@$slave \
+  ddsnap create $serversocket $tosnap
+echo ok 25 - create snapshot $tosnap on slave
+
+$SSH root@$slave \
   "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
-echo ok 24 - create $volname\($tosnap\) block device on slave
+echo ok 26 - create $volname\($tosnap\) block device on slave
 
 hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash2" != "$hash2slave" ] ; then
   echo -e "not "
-  rc=25
+  rc=27
 fi
-echo ok 25 - master $volname\($tosnap\) == slave $volname\($tosnap\)
+echo ok 27 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 # TODO
-echo ok 26 - stop ddsnap listen on testvol
+echo ok 28 - stop ddsnap listen on testvol
 
 $SSH root@$slave dmsetup remove $volname\(2\)
 $SSH root@$slave dmsetup remove $volname\(0\)
@@ -188,10 +196,10 @@ $SSH root@$slave dmsetup remove $volname
 dmsetup remove $volname\(2\)
 dmsetup remove $volname\(0\)
 dmsetup remove $volname
-echo ok 27 - remove master and slave device mappings
+echo ok 29 - remove master and slave device mappings
 
 # TODO
-# echo ok 28 - delete ddsnap snapshots on master and slave
+# echo ok 30 - delete ddsnap snapshots on master and slave
 
 exit $rc
 
