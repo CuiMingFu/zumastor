@@ -845,7 +845,8 @@ define)
 		shift # remove --
 
 		[[ $# -eq 2 ]] || { echo $usage; exit 2; }
-		declare vol=$1 host=$2 port=${host/*:/}
+		declare vol=$1 host=$2
+		declare port=${host/*:/}
 		[[ -z $name ]] && name=$vol
 
 		# check to see if port was specified, if so, strip it off the host
