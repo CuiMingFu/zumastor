@@ -829,8 +829,8 @@ define)
 			-h|--help) echo $usage; exit;;
 			-p|--period) period=$2; shift 1;;
 			-n|--name)
-				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
 				name=$2
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
 				shift 1;;
 			-t|--test)
 				case "$2" in
@@ -946,8 +946,8 @@ define)
 				period=$2
 				shift 1;;
 			-n|--name)
-				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
 				name=$2
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
 				shift 1;;
 			-y|--yes) yes_to_all=1;;
 			*) echo whoops2; exit 9;;
