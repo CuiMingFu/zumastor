@@ -100,8 +100,7 @@ $SSH root@${slave} ls -l /dev/mapper
 
 listenport=3333
 $SSH root@${slave} \
-  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
-  listenpid=$!
+  ddsnap delta listen /dev/mapper/$volname ${slave}:${listenport}
 echo ok 13 - slave ddsnap delta listening for snapshot deltas
 sleep $SLEEP
 
@@ -169,11 +168,11 @@ if [ "$hash" != "$hash2" ] ; then
 fi
 echo ok 23 - $volname==$volname\($tosnap\)
 
-$SSH root@${slave} \
-  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
-  listenpid2=$!
-echo ok 24 - slave ddsnap delta listening for snapshot deltas
-sleep $SLEEP
+#$SSH root@${slave} \
+#  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
+#  listenpid2=$!
+#echo ok 24 - slave ddsnap delta listening for snapshot deltas
+#sleep $SLEEP
 
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
 echo ok 25 - delta from $fromsnap to $tosnap transmitting to slave origin
