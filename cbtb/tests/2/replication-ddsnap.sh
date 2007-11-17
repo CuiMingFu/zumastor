@@ -133,6 +133,7 @@ sleep $SLEEP
 $SSH root@$slave \
   ddsnap create $serversocket $tosnap
 echo ok 17 - create snapshot $tosnap on slave
+sleep $SLEEP
 
 $SSH root@$slave \
   "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
@@ -168,27 +169,35 @@ if [ "$hash" != "$hash2" ] ; then
 fi
 echo ok 23 - $volname==$volname\($tosnap\)
 
+$SSH root@${slave} \
+  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
+  listenpid2=$!
+echo ok 24 - slave ddsnap delta listening for snapshot deltas
+sleep $SLEEP
+
 ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
-echo ok 24 - delta from $fromsnap to $tosnap transmitting to slave origin
+echo ok 25 - delta from $fromsnap to $tosnap transmitting to slave origin
 sleep $SLEEP
 
 $SSH root@$slave \
   ddsnap create $serversocket $tosnap
-echo ok 25 - create snapshot $tosnap on slave
+echo ok 26 - create snapshot $tosnap on slave
 
 $SSH root@$slave \
   "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
-echo ok 26 - create $volname\($tosnap\) block device on slave
+echo ok 27 - create $volname\($tosnap\) block device on slave
 
 hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash2" != "$hash2slave" ] ; then
   echo -e "not "
-  rc=27
+  rc=28
 fi
-echo ok 27 - master $volname\($tosnap\) == slave $volname\($tosnap\)
+echo ok 28 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
-# TODO
-echo ok 28 - stop ddsnap listen on testvol
+# TODO.  Kill if necessary (TODO).  wait on the ssh to die.
+wait $listenpid
+wait #listenpid2
+echo ok 29 - stop ddsnap listen on testvol
 
 $SSH root@$slave dmsetup remove $volname\(2\)
 $SSH root@$slave dmsetup remove $volname\(0\)
@@ -198,8 +207,12 @@ dmsetup remove $volname\(0\)
 dmsetup remove $volname
 echo ok 29 - remove master and slave device mappings
 
-# TODO
-# echo ok 30 - delete ddsnap snapshots on master and slave
+
+ddsnap delete $serversocket 2
+ddsnap delete $serversocket 0
+$SSH root@$slave ddsnap delete $serversocket 2
+$SSH root@$slave ddsnap delete $serversocket 2
+echo ok 30 - delete ddsnap snapshots on master and slave
 
 exit $rc
 
