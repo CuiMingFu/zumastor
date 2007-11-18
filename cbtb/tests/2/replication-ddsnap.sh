@@ -174,7 +174,7 @@ echo ok 23 - $volname==$volname\($tosnap\)
 #echo ok 24 - slave ddsnap delta listening for snapshot deltas
 #sleep $SLEEP
 
-ddsnap transmit $controlsocket ${slave}:$listenport $fromsnap $tosnap
+ddsnap transmit $serversocket ${slave}:$listenport $fromsnap $tosnap
 echo ok 25 - delta from $fromsnap to $tosnap transmitting to slave origin
 sleep $SLEEP
 
