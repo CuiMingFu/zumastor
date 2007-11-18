@@ -202,7 +202,7 @@ $SSH root@$slave ddsnap delete $serversocket 0
 echo ok 30 - delete ddsnap snapshots on master and slave
 
 $SSH root@$slave \
-  pkill "'ddsnap delta listen /dev/mapper/$volname ${slave}:${listenport}'"
+  "pkill 'ddsnap delta listen /dev/mapper/$volname ${slave}:${listenport}'"
 echo ok 31 - kill delta listen on slave
 
 # see what's left running on the master and slave
