@@ -94,9 +94,7 @@ sleep $SLEEP
 
 $SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname"
 echo ok 12 - slave create $volname
-$SSH root@${slave} ls -l /dev/mapper
 sleep $SLEEP
-$SSH root@${slave} ls -l /dev/mapper
 
 listenport=3333
 $SSH root@${slave} \
@@ -168,11 +166,6 @@ if [ "$hash" != "$hash2" ] ; then
 fi
 echo ok 23 - $volname==$volname\($tosnap\)
 
-#$SSH root@${slave} \
-#  ddsnap delta listen --foreground /dev/mapper/$volname ${slave}:${listenport} & \
-#  listenpid2=$!
-#echo ok 24 - slave ddsnap delta listening for snapshot deltas
-#sleep $SLEEP
 
 ddsnap transmit $serversocket ${slave}:$listenport $fromsnap $tosnap
 echo ok 25 - delta from $fromsnap to $tosnap transmitting to slave origin
@@ -193,11 +186,6 @@ if [ "$hash2" != "$hash2slave" ] ; then
 fi
 echo ok 28 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
-# TODO.  Kill if necessary (TODO).  wait on the ssh to die.
-# wait $listenpid
-# wait #listenpid2
-# echo ok 29 - stop ddsnap listen on testvol
-
 $SSH root@$slave "dmsetup remove $volname\(2\)"
 $SSH root@$slave "dmsetup remove $volname\(0\)"
 $SSH root@$slave "dmsetup remove $volname"
@@ -210,8 +198,16 @@ echo ok 29 - remove master and slave device mappings
 ddsnap delete $serversocket 2
 ddsnap delete $serversocket 0
 $SSH root@$slave ddsnap delete $serversocket 2
-$SSH root@$slave ddsnap delete $serversocket 2
+$SSH root@$slave ddsnap delete $serversocket 0
 echo ok 30 - delete ddsnap snapshots on master and slave
+
+$SSH root@$slave \
+  pkill "ddsnap delta listen /dev/mapper/$volname ${slave}:${listenport}"
+echo ok 31 - kill delta listen on slave
+
+# see what's left running on the master and slave
+ps aux
+$SSH root@$slave ps aux
 
 exit $rc
 
