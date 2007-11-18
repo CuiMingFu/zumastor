@@ -29,7 +29,7 @@ SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 # necessary at the moment, ddsnap just sends requests and doesn't wait
 SLEEP=10
 
-echo "1..29"
+echo "1..30"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -194,13 +194,13 @@ fi
 echo ok 28 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 # TODO.  Kill if necessary (TODO).  wait on the ssh to die.
-wait $listenpid
-wait #listenpid2
-echo ok 29 - stop ddsnap listen on testvol
+# wait $listenpid
+# wait #listenpid2
+# echo ok 29 - stop ddsnap listen on testvol
 
-$SSH root@$slave dmsetup remove $volname\(2\)
-$SSH root@$slave dmsetup remove $volname\(0\)
-$SSH root@$slave dmsetup remove $volname
+$SSH root@$slave "dmsetup remove $volname\(2\)"
+$SSH root@$slave "dmsetup remove $volname\(0\)"
+$SSH root@$slave "dmsetup remove $volname"
 dmsetup remove $volname\(2\)
 dmsetup remove $volname\(0\)
 dmsetup remove $volname
