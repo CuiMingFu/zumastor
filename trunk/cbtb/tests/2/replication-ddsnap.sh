@@ -105,66 +105,66 @@ sleep $SLEEP
 
 tosnap=0
 ddsnap create $serversocket $tosnap
-echo ok 13 - ddsnap create $tosnap
+echo ok 14 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
-echo ok 14 - create $volname\($tosnap\) block device on master
+echo ok 15 - create $volname\($tosnap\) block device on master
 sleep $SLEEP
 
 hash=`md5sum </dev/mapper/$volname`
 hash0=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash0" ] ; then
   echo -e "not "
-  rc=15
+  rc=16
 fi
-echo ok 15 - $volname==$volname\($tosnap\)
+echo ok 16 - $volname==$volname\($tosnap\)
 sleep $SLEEP
 
 ddsnap transmit $serversocket ${slave}:$listenport $tosnap
-echo ok 16 - snapshot $tosnap transmitting to slave origin
+echo ok 17 - snapshot $tosnap transmitting to slave origin
 sleep $SLEEP
 
 $SSH root@$slave \
   ddsnap create $serversocket $tosnap
-echo ok 17 - create snapshot $tosnap on slave
+echo ok 18 - create snapshot $tosnap on slave
 sleep $SLEEP
 
 $SSH root@$slave \
   "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
-echo ok 18 - create $volname\($tosnap\) block device on slave
+echo ok 19 - create $volname\($tosnap\) block device on slave
 
 hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash0" != "$hash0slave" ] ; then
   echo -e "not "
-  rc=19
+  rc=20
 fi
-echo ok 19 - master $volname\($tosnap\) == slave $volname\($tosnap\)
+echo ok 20 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 
 dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/$volname  
-echo 20 - copy random data onto master $volname
+echo 21 - copy random data onto master $volname
 
 fromsnap=0
 tosnap=2
 ddsnap create $serversocket $tosnap
-echo ok 21 - ddsnap create $tosnap
+echo ok 22 - ddsnap create $tosnap
 sleep $SLEEP
 
 echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
-echo ok 22 - create $volname\($tosnap\) block device on master
+echo ok 23 - create $volname\($tosnap\) block device on master
 
 hash=`md5sum </dev/mapper/$volname`
 hash2=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash2" ] ; then
   echo -e "not "
-  rc=23
+  rc=24
 fi
-echo ok 23 - $volname==$volname\($tosnap\)
+echo ok 24 - $volname==$volname\($tosnap\)
 
 
 ddsnap transmit $serversocket ${slave}:$listenport $fromsnap $tosnap
@@ -201,18 +201,9 @@ $SSH root@$slave ddsnap delete $serversocket 2
 $SSH root@$slave ddsnap delete $serversocket 0
 echo ok 30 - delete ddsnap snapshots on master and slave
 
-# see what's left running on the master and slave
-ps aux
-$SSH root@$slave ps aux
-
-$SSH root@$slave \
-  "pkill \'ddsnap delta listen /dev/mapper/$volname ${slave}:${listenport}\'"
-echo ok 31 - kill delta listen on slave
-
-# see what's left running on the master and slave
-ps aux
-$SSH root@$slave ps aux
-
+# TODO: if ddsnap gets a native method to shut down, test it.  Leave out
+# using pkill to test shutdown for now.  Without pkill this will verify
+# that a system can shut down with ddsnap daemons still running.
 
 exit $rc
 
