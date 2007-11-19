@@ -11,3 +11,6 @@ fi
     
 LOG=`mktemp`
 host_tap_ip=192.168.100.111
+
+SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
+SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
