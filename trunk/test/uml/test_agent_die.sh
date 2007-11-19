@@ -4,9 +4,10 @@
 
 # test zumastor stop on target
 
+. config_uml
 . config_single
 
-. setup_single.sh || { echo UNRESOLVED; exit 1; }
+./setup_single.sh || { echo UNRESOLVED; exit 1; }
 
 mount_point=/var/run/zumastor/mount/$vol
 RUNPATH=/var/run/zumastor

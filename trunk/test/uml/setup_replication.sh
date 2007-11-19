@@ -11,23 +11,20 @@ function create_device {
 }
 
 # build linux uml kernel
-[[ -e linux-${KERNEL_VERSION} ]] || . build_uml.sh
+[[ -e linux-${KERNEL_VERSION} ]] || ./build_uml.sh
 
 # setup source and target file system and network
-# if both source_fs and target_fs exists, do nothing assuming everything is setup
+# if source_fs and target_fs both exist, do nothing assuming everything is setup
 # if only source_fs exists (e.g., a copy from a previously configured image), re-config network and copy it to target_fs
 # if source_fs does not exist, download the Debian image and build everything needed
-initial=1
-[[ -e $source_uml_fs ]] && [[ -e $target_uml_fs ]] && initial=0
-[[ -e $source_uml_fs ]] || . build_fs.sh $source_uml_fs
-
-echo -n Setting up IP MASQUERADE...
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE >> $LOG || { echo "please check and set the following kernel config options"; echo "Networking -> Network Options -> Network packet filtering framework -> Core Netfilter Configuration -> Netfilter connection tracking support"; echo "Networking -> Network Options -> Network packet filtering framework -> IP: Netfilter Configuration -> IPv4 connection tracking support && Full NAT && MASQUERADE target support"; exit $?; }
-echo -e "done.\n"
-
-[[ $initial -eq 1 ]] && . setup_network.sh $source_uml_ip $source_uml_host $source_uml_fs
+source_initial=$source_uml_fs
+target_initial=$target_uml_fs 
+[[ -e $source_uml_fs ]] && [[ -e $target_uml_fs ]] && source_initial= && target_initial=
+[[ -e $source_uml_fs ]] || ./build_fs.sh $source_uml_fs
 [[ -e $target_uml_fs ]] || cp $source_uml_fs $target_uml_fs
-[[ $initial -eq 1 ]] && . setup_network.sh $target_uml_ip $target_uml_host $target_uml_fs
+
+[[ $USER == "root" ]] && ./setup_network_root.sh $source_uml_ip $host_tap_ip $source_uml_host $source_initial
+[[ $USER == "root" ]] && ./setup_network_root.sh $target_uml_ip $host_tap_ip $target_uml_host $target_initial
 
 [[ -e $source_ubdb_dev ]] || create_device $source_ubdb_dev
 [[ -e $source_ubdc_dev ]] || create_device $source_ubdc_dev
@@ -71,20 +68,22 @@ if ! $ssh_ready; then
 fi
 
 # set up ssh keys for source and target umls to access each other
-if [[ $initial -eq 1 ]]; then
+ssh $SSH_OPTS $source_uml_host "ssh $SSH_OPTS $target_uml_host 'echo'" >& /dev/null
+status=$?
+if [[ $status -ne 0 ]]; then
 	echo -n Setting up ssh-keygen...
-	ssh $SSH_OPTS $source_uml_host "rm /root/.ssh/id_dsa; rm /root/.ssh/id_dsa.pub"
-	ssh $SSH_OPTS $source_uml_host "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''"
-	scp $SSH_OPTS $source_uml_host:/root/.ssh/id_dsa.pub /tmp/$source_uml_host.pub
-	scp $SSH_OPTS /tmp/$source_uml_host.pub $target_uml_host:/root/.ssh/$source_uml_host.pub
+	ssh $SSH_OPTS $source_uml_host "rm /root/.ssh/id_dsa; rm /root/.ssh/id_dsa.pub" >& $LOG
+	ssh $SSH_OPTS $source_uml_host "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''" >& $LOG
+	scp $SCP_OPTS root@$source_uml_host:/root/.ssh/id_dsa.pub /tmp/$source_uml_host.pub >& $LOG
+	scp $SCP_OPTS /tmp/$source_uml_host.pub root@$target_uml_host:/root/.ssh/$source_uml_host.pub
 	rm -f /tmp/$source_uml_host.pub
 	ssh $SSH_OPTS $target_uml_host "cat /root/.ssh/$source_uml_host.pub >> /root/.ssh/authorized_keys"
 	ssh $SSH_OPTS $source_uml_host "echo $target_uml_ip $target_uml_host > /etc/hosts"
 
-	ssh $SSH_OPTS $target_uml_host "rm /root/.ssh/id_dsa; rm /root/.ssh/id_dsa.pub"
-	ssh $SSH_OPTS $target_uml_host "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''"
-	scp $SSH_OPTS $target_uml_host:/root/.ssh/id_dsa.pub /tmp/$target_uml_host.pub
-	scp $SSH_OPTS /tmp/$target_uml_host.pub $source_uml_host:/root/.ssh/$target_uml_host.pub
+	ssh $SSH_OPTS $target_uml_host "rm /root/.ssh/id_dsa; rm /root/.ssh/id_dsa.pub" >& $LOG
+	ssh $SSH_OPTS $target_uml_host "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''" >& $LOG
+	scp $SCP_OPTS root@$target_uml_host:/root/.ssh/id_dsa.pub /tmp/$target_uml_host.pub
+	scp $SCP_OPTS /tmp/$target_uml_host.pub root@$source_uml_host:/root/.ssh/$target_uml_host.pub
 	rm -f /tmp/$target_uml_host.pub
 	ssh $SSH_OPTS $source_uml_host "cat /root/.ssh/$target_uml_host.pub >> /root/.ssh/authorized_keys"
 	ssh $SSH_OPTS $target_uml_host "echo $source_uml_ip $source_uml_host > /etc/hosts"
@@ -93,16 +92,14 @@ fi
 
 # set up source and target volumes according to the configuratiosn in config_replication
 echo -n Setting up source volume...
-ssh $SSH_OPTS $source_uml_host "/etc/init.d/zumastor start"
-ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol"
-ssh $SSH_OPTS $source_uml_host "echo y | zumastor define volume -i $vol /dev/ubdb /dev/ubdc"
-ssh $SSH_OPTS $source_uml_host "mkfs.ext3 /dev/mapper/$vol"
-ssh $SSH_OPTS $source_uml_host "zumastor define master $vol -h $hourly_snapnum -d 7"
+ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" >& $LOG
+ssh $SSH_OPTS $source_uml_host "echo y | zumastor define volume -i $vol /dev/ubdb /dev/ubdc" >& $LOG
+ssh $SSH_OPTS $source_uml_host "mkfs.ext3 /dev/mapper/$vol" >& $LOG
+ssh $SSH_OPTS $source_uml_host "zumastor define master $vol -h $hourly_snapnum -d 7" >& $LOG
 echo -e "done.\n"
 
 echo -n Setting up target volume...
-ssh $SSH_OPTS $target_uml_host "/etc/init.d/zumastor start"
-ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol"
-ssh $SSH_OPTS $target_uml_host "echo y | zumastor define volume -i $vol /dev/ubdb /dev/ubdc"
+ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" >& $LOG
+ssh $SSH_OPTS $target_uml_host "echo y | zumastor define volume -i $vol /dev/ubdb /dev/ubdc" >& $LOG
 echo -e "done.\n"
 

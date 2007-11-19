@@ -4,9 +4,10 @@
 
 # keep running full volume replication between source and target
 
+. config_uml
 . config_replication
 
-. setup_replication.sh || { echo UNRESOLVED; exit 1; }
+./setup_replication.sh || { echo UNRESOLVED; exit 1; }
 
 echo -n Start full-volume replication test...
 ssh $SSH_OPTS $source_uml_host "zumastor define target $vol $target_uml_host:$target_port -p 1 -t fullvolume" || { echo FAIL; exit 1; }
