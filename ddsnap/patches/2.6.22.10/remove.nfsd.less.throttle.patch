@@ -1,0 +1,11 @@
+--- 2.6.22.10.clean/fs/nfsd/nfssvc.c	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/fs/nfsd/nfssvc.c	2007-11-16 11:39:13.000000000 -0800
+@@ -431,7 +431,7 @@ nfsd(struct svc_rqst *rqstp)
+ 	 * localhost doesn't cause nfsd to lock up due to all the client's
+ 	 * dirty pages.
+ 	 */
+-	current->flags |= PF_LESS_THROTTLE;
++	//current->flags |= PF_LESS_THROTTLE;
+ 
+ 	/*
+ 	 * The main request loop
