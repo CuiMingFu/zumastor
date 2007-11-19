@@ -17,6 +17,17 @@ email_success="zumastor-buildd@google.com"
 repo="${PWD}/zumastor"
 top="${PWD}"
 
+# obtain a lock on the repository to build, and a general build lock so
+# only one build runs at once
+replock=${repo}/lock
+if [ "x$LOCKFILE" = "x" ] ; then
+  locks="$repolock"
+else
+  locks="$LOCKFILE $repolock"
+fi
+lockfile $locks
+
+
 branch=`cat $repo/Version`
 
 diskimgdir=${HOME}/testenv
@@ -52,9 +63,10 @@ if [ $buildret -eq 0 ]; then
   subject="zumastor b$branch r$revision build success"
   files="$buildlog"
   email="${email_success}"
-  # store the revision just built in a symlink for use by readlink
+  # store the revision just built in build/buildrev
   # in the installer stage running in a separate loop
-  ln -sf $revision ${top}/buildrev
+  echo $revision >${top}/zumastor/build/buildrev.new
+  mv ${top}/zumastor/build/buildrev.new ${top}/zumastor/build/buildrev
 else
   subject="zumastor b$branch r$revision build failure $buildret"
   files="$buildlog"
@@ -89,16 +101,27 @@ elif [ -x ${sendmail} ] ; then
   ) | ${sendmail} ${email}
 fi
 
+# remove locks, just waiting now for another update
+rm -f $locks
+
+
 # loop waiting for a new update
 oldrevision=${revision}
 diff=`mktemp`
 while true
 do
+
+  # get just the repository lock for the update
+  lockfile $repolock
+
   svn update
   revision=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
 
   # the diff between the old revision and the current one
   svn diff -r$oldrevision >$diff
+
+  # free lock
+  rm -f $repolock
 
   # wait and loop if the revision number is the same
   if [ "x$revision" = "x$oldrevision" ]
