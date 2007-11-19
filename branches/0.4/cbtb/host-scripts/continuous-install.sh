@@ -13,13 +13,13 @@ top="${PWD}"
 branch=`cat $repo/Version`
 
 buildrev=''
-if [ -L ${top}/buildrev ] ; then
-  buildrev=`readlink ${top}/buildrev`
+if [ -f ${repo}/build/buildrev ] ; then
+  buildrev=`cat ${repo}/build/buildrev`
 fi
 
 installrev=''
-if [ -L ${top}/installrev ] ; then
-  installrev=`readlink ${top}/installrev`
+if [ -f ${repo}/build/installrev ] ; then
+  installrev=`cat ${repo}/build/installrev`
 fi
 
 if [ "x$buildrev" = "x$installrev" ] ; then
@@ -73,11 +73,9 @@ if [ $installret -eq 0 ]; then
   files="$installlog"
   email="${email_success}"
 
-  # creating this symlink only on success will cause the install step to
-  # keep repeating on failure.  For the moment, while the continuous build
-  # is maturing, this is desired.  Modify the logic later to not loop over
-  # installation attempts.
-  ln -sf $buildrev ${top}/installrev
+  # update the revision number that last successfully installed
+  echo $buildrev >${repo}/build/installrev.new
+  mv ${repo}/build/installrev.new ${repo}/build/installrev
 
 else
   subject="zumastor b$branch r$buildrev install failure $installret"

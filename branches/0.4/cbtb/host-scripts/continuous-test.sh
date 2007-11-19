@@ -11,13 +11,13 @@ top="${PWD}"
 branch=`cat $top/zumastor/Version`
 
 installrev=''
-if [ -L ${top}/installrev ] ; then
-  installrev=`readlink ${top}/installrev`
+if [ -f ${top}/zumastor/build/installrev ] ; then
+  installrev=`cat ${top}/zumastor/build/installrev`
 fi
   
 testrev=''
-if [ -L ${top}/testrev ] ; then
-  testrev=`readlink ${top}/testrev`
+if [ -f ${top}/zumastor/build/testrev ] ; then
+  testrev=`cat ${top}/zumastor/build/testrev`
 fi
     
 if [ "x$installrev" = "x$testrev" ] ; then
@@ -125,11 +125,10 @@ if [ $testret -eq 0 ]; then
   subject="zumastor b$branch r$installrev test success"
   email="${email_success}"
 
-  # creating this symlink only on success will cause the test step to
-  # keep repeating on failure.  For the moment, while the continuous build
-  # is maturing, this is desired.  Modify the logic later to not loop over
-  # test attempts.
-  ln -sf $installrev ${top}/testrev
+  # update the presistent revision number of the last revision that passed
+  # all required tests
+  echo $installrev >${top}/zumastor/build/testrev.new
+  mv ${top}/zumastor/build/testrev.new ${top}/zumastor/build/testrev
 
 else
   subject="zumastor b$branch r$installrev test failure $testret"
