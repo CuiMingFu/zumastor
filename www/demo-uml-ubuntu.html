@@ -15,7 +15,7 @@ dependencies, will pull an upstream kernel, and requires use of
 debootstrap to build a local userspace.
 <p>
 
-<verbatim>
+<pre>
 svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
 cd zumastor
 sudo ./builddepends.sh  # copy to /tmp first if building on NFS)
@@ -24,13 +24,13 @@ cd test/uml
 cp linux-2.6.21.1/linux ../../zuma-linux
 cd ../..
 ./buildcurrent.sh kernel/config/2.6.21.1-um-uml # wasteful, or download debs
-</verbatim>
+</pre>
 <p>
 
 Create a device for / and install Ubuntu/dapper into it:
 <p>
 
-<verbatim>
+<pre>
 dd if=/dev/zero of=zuma-uml.raw bs=1024K seek=1000 count=0
 mkfs.ext3  zuma-uml.raw
 sudo mkdir /tmp/uml
@@ -41,15 +41,15 @@ sudo chroot /tmp/uml
 apt-get install dmsetup cron
 echo proc /proc proc defaults 0 0 >/etc/fstab
 sudo umount /tmp/uml
-</verbatim>
+</pre>
 <p>
 
 
 Boot the new userspace using the zumastor UML kernel.
 
-<verbatim>
+<pre>
 ./zuma-linux ubda=zuma-uml.raw mem=256M
-</verbatim>
+</pre>
 
 Log in as root.  Install the ddsnap and zumastor packages already in /.
 
