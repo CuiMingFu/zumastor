@@ -3,6 +3,7 @@
 # Author: Jiaying Zhang <jiayingz@google.com>
 
 # test replication resuming after network goes down and up
+# this program requires root previlige
 
 . config_uml
 . config_replication
