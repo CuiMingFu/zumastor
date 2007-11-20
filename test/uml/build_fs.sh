@@ -23,11 +23,45 @@ fi
 mv $fs_image $uml_fs
 chmod a+rw $uml_fs
 
+echo -n Setting up ssh keys for user $USER ...
 if [[ $USER != "root" ]]; then
 	mkdir -p ~/.ssh
 	[[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f ~/.ssh/id_dsa -P '' >> $LOG
 	cp ~/.ssh/id_dsa.pub $USER.pub
 	chmod a+rw $USER.pub
 fi
+echo -e "done.\n"
 
-[[ $USER == "root" ]] && ./build_fs_root.sh $uml_fs >> $LOG
+echo -n Building zumastor Debian package...
+VERSION=`awk '/^[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' $ZUMA_REPOSITORY/Version`
+if [ "x$VERSION" = "x" ] ; then
+	echo "Suspect Version file"
+	exit 1
+fi
+
+if [ -f $ZUMA_REPOSITORY/SVNREV ] ; then
+	SVNREV=`awk '/^[0-9]+$/ { print $1; }' $ZUMA_REPOSITORY/SVNREV`
+else
+	pushd $ZUMA_REPOSITORY
+	SVNREV=`svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+	popd
+fi
+
+pushd ${ZUMA_REPOSITORY}/zumastor >> $LOG || exit 1
+[ -f debian/changelog ] && rm debian/changelog
+EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dpkg-buildpackage -uc -us -rfakeroot >> $LOG || exit 1
+popd >> $LOG
+
+pushd ${ZUMA_REPOSITORY}/ddsnap >> $LOG || exit 1
+[ -f debian/changelog ] && rm debian/changelog
+EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dpkg-buildpackage -uc -us -rfakeroot >> $LOG || exit 1
+popd >> $LOG
+mv ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_*.deb .
+mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .
+rm ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_* ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*
+chmod a+rw *.deb
+echo -e "done.\n"
+
+[[ $USER == "root" ]] && ./build_fs_root.sh $uml_fs

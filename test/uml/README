@@ -28,16 +28,17 @@ Content
 Usage
   * The host machine needs to run a 32 bit kernel and a libc compatible with Debian 
     Etch (such as Ubuntu Dapper) to compile uml linux kernel.
-  * The default configuration files assume the tests are running from the test/uml
-    directory under a zumastor source repository. If you only check out the uml test
-    scripts, please change $ZUMA_REPOSITORY to the path where the uml test scripts 
-    locate and $KERNEL_VERSION to the current zumastor linux kernel version.
+  * The default configuration files assume the tests are run from the test/uml
+    directory under a zumastor source repository. If you want to run the uml tests
+    from a different place, please copy all the files in this directory to your
+    working directory and change $ZUMA_REPOSITORY in config_uml to the path where 
+    zumastor repository locates.
   * If running as root, you can simply start a test script test_XXX.sh that automatically 
     builds everything for you at the first time. After that, it re-uses the existing 
     kernel and file system images in the subsequent tests.
   * For security reason, we recommend you to run uml tests as a normal user.
     Here are the steps to set up a uml environment for zumastor replication test
-    as a normal user. Below, Step 2 and step 3 require root previlige. 
+    as a normal user. Below, steps 2, 3, and 5 require root previlige. 
 	step 1: ./build_fs.sh uml_fs1
 	step 2: sudo ./build_fs_root.sh uml_fs1
 	step 3: sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
@@ -99,3 +100,6 @@ Troubleshooting
     * If syslogd or ssh are extremely slow, check if your DNS server responds to 
       queries from the assigned uml names. Append your domain name to those uml
       names to see if that solves the problem.
+    * If you want to check the status of a running uml, you can ssh to it with
+      'ssh -l uml_1' where uml_1 is the assigned uml hostname. In case ssh does
+      not work, you can attach to the running uml with 'screen -r pid-of-uml-screen'.
