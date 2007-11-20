@@ -4,8 +4,6 @@
 
 # install all the required libraries and utilities based on the image downloaded from uml website
 
-ZUMA_RELEASE="0.4-r880"
-
 [[ $# -eq 1 ]] || { echo "Usage: build_fs.sh uml_fs"; exit 1; }
 uml_fs=$1
 

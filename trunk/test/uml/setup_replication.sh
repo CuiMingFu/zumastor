@@ -15,7 +15,8 @@ function create_device {
 
 # setup source and target file system and network
 # if source_fs and target_fs both exist, do nothing assuming everything is setup
-# if only source_fs exists (e.g., a copy from a previously configured image), re-config network and copy it to target_fs
+# if only source_fs exists (e.g., a copy from a previously configured image), 
+#     re-config network and copy it to target_fs
 # if source_fs does not exist, download the Debian image and build everything needed
 source_initial=$source_uml_fs
 target_initial=$target_uml_fs 
