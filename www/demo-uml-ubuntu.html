@@ -1,0 +1,66 @@
+<html>
+<head>
+<link href="doxygen.css" rel="stylesheet" type="text/css">
+<title>Zumastor Walkthroughs</title>
+</head>
+<body>
+
+<h1>Zumastor Walkthroughs</h1>
+
+<h2>Ubuntu walkthrough on Usermode Linux</h2>
+
+Check out the zumastor remository and build a UML kernel and zumastor
+userspace packages.  Requires root access to install build
+dependencies, will pull an upstream kernel, and requires use of
+debootstrap to build a local userspace.
+<p>
+
+<verbatim>
+svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
+cd zumastor
+sudo ./builddepends.sh  # copy to /tmp first if building on NFS)
+cd test/uml
+./build_uml.sh
+cp linux-2.6.21.1/linux ../../zuma-linux
+cd ../..
+./buildcurrent.sh kernel/config/2.6.21.1-um-uml # wasteful, or download debs
+</verbatim>
+<p>
+
+Create a device for / and install Ubuntu/dapper into it:
+<p>
+
+<verbatim>
+dd if=/dev/zero of=zuma-uml.raw bs=1024K seek=1000 count=0
+mkfs.ext3  zuma-uml.raw
+sudo mkdir /tmp/uml
+sudo mount -o loop zuma-uml.raw /tmp/uml
+sudo debootstrap --arch i386 dapper /tmp/uml http://archive.ubuntu.com/ubuntu/
+sudo cp build/ddsnap*.deb build/zumastor*.deb /tmp/uml
+sudo chroot /tmp/uml
+apt-get install dmsetup cron
+echo proc /proc proc defaults 0 0 >/etc/fstab
+sudo umount /tmp/uml
+</verbatim>
+<p>
+
+
+Boot the new userspace using the zumastor UML kernel.
+
+<verbatim>
+./zuma-linux ubda=zuma-uml.raw mem=256M
+</verbatim>
+
+Log in as root.  Install the ddsnap and zumastor packages already in /.
+
+<p>
+
+TODO: finish
+
+
+
+<p>
+<hr>
+<center>&copy; 2007 Google</center>
+</body>
+</html>
