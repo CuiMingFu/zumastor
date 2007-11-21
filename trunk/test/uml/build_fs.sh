@@ -9,12 +9,14 @@
 [[ $# -eq 1 ]] || { echo "Usage: build_fs.sh uml_fs"; exit 1; }
 uml_fs=$1
 
-echo -n Unpacking root file system image...
-bunzip2 -k $DOWNLOAD_CACHE/${fs_image}.bz2
-mv $DOWNLOAD_CACHE/${fs_image} .
-echo -e "done.\n"
-mv $fs_image $uml_fs
-chmod a+rw $uml_fs
+if [[ ! -e $uml_fs ]]; then
+	echo -n Unpacking root file system image...
+	bunzip2 -k $DOWNLOAD_CACHE/${fs_image}.bz2
+	mv $DOWNLOAD_CACHE/${fs_image} .
+	echo -e "done.\n"
+	mv $fs_image $uml_fs
+	chmod a+rw $uml_fs
+fi
 
 echo -n Setting up ssh keys for user $USER ...
 mkdir -p ~/.ssh

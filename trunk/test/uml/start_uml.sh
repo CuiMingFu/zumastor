@@ -26,7 +26,6 @@ echo -n Bring up uml...
 cd linux-${KERNEL_VERSION}
 screen -d -m ./linux ubda=../$uml_fs ubdb=$ubdb_dev ubdc=$ubdc_dev eth0=tuntap,,,$host_tap_ip mem=64M umid=$uml_host
 cd ..
-echo -e "done.\n"
 sleep 10
 
 # It could take a while for the machine to get ready
@@ -38,6 +37,7 @@ for i in `seq 10`; do
   fi
   sleep 20
 done
+echo -e "done.\n"
 
 if ! $ssh $SSH_OPTS_ready; then
   echo "Couldn't connect to the source uml"
