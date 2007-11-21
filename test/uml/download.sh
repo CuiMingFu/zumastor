@@ -23,7 +23,8 @@ download() {
 [[ -e $DOWNLOAD_CACHE ]] || mkdir $DOWNLOAD_CACHE
 
 echo -n Getting kernel sources from kernel.org ...
-download http://www.kernel.org/pub/linux/kernel/v2.6/linux-${KERNEL_VERSION}.tar.bz2 22d5885f87f4b63455891e2042fcae96900af57a
+read sha1sum < $ZUMA_REPOSITORY/kernel/sha1sum/${KERNEL_VERSION}
+download http://www.kernel.org/pub/linux/kernel/v2.6/linux-${KERNEL_VERSION}.tar.bz2 $sha1sum
 echo -e "done.\n"
 
 if [ -f $fs_image ]; then
