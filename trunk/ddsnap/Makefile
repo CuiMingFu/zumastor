@@ -74,7 +74,7 @@ ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
 
 clean:
-	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/00_dm-ddsnap.AUTO
+	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/AUTO.*
 .PHONY: clean
 
 install:
