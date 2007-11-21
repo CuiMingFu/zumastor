@@ -5,8 +5,9 @@ set -x
 
 # utilities to build debian packages and run uml
 dpkg -s devscripts >& /dev/null || sudo apt-get install devscripts
-dpkg -s uml-utilities >& /dev/null || apt-get install uml-utilities
-chmod a+rx /usr/lib/uml/uml_net  # allow normal user to start uml network
+dpkg -s fakeroot >& /dev/null || sudo apt-get install fakeroot
+dpkg -s uml-utilities >& /dev/null || sudo apt-get install uml-utilities
+sudo chmod a+rx /usr/lib/uml/uml_net  # allow normal user to start uml network
 
 # One-time setup common to all tests
 . config_uml

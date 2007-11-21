@@ -9,7 +9,9 @@
 # Download a file and checks its checksum
 download() {
 	file=`basename "$1"`
-	test -f $DOWNLOAD_CACHE/$file || (pushd $DOWNLOAD_CACHE; wget -c "$1"; popd)
+	pushd $DOWNLOAD_CACHE
+	wget -c "$1"
+	popd
 	if [ "$2"x != ""x ]
 	then
 		echo "$2  $DOWNLOAD_CACHE/$file" > $DOWNLOAD_CACHE/$file.sha1sum
