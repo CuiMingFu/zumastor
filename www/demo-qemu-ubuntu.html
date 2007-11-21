@@ -36,7 +36,7 @@ chosen.
 <p>
 
 <code>
-qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zumastor.raw -boot d -no-reboot
+qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zumastor.raw -boot d
 </code>
 <p>
 
@@ -51,7 +51,7 @@ networking enabled.
 <p>
 
 <code>
-qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zumastor.raw -boot c -no-reboot -net user -net nic
+qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zumastor.raw -boot c -net user -net nic
 </code
 <p>
 
@@ -59,11 +59,24 @@ qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zumastor.raw -boot c -no-reboot -
 Log in using the username and password used during installation,
 become root, and begin installing dependencies.
 
-
+<pre>
+$ sudo apt-get install elinks dmsetup
+$ mkdir tmp
+$ cd tmp
+$ links zumastor.org
+[download the kernel image, zumastor, and ddsnap packages.  Don't forget to let the downloads finish!]
+$ sudo dpkg -i *.deb
+</pre>
+(This currently fails with Ubuntu 7.10, which is why this walkthrough uses 6.06.)
+Ignore the warnings about deleting symbolic links.
 <p>
-TODO: finish
+Reboot the virtual machine:
+<pre>
+$ sudo reboot
+</pre>
 
 <hr>
 <center>&copy; 2007 Google</center>
 </body>
 </html>
+
