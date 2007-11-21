@@ -4,8 +4,7 @@ set -e
 set -x
 
 # utilities to build debian packages and run uml
-dpkg -s devscripts >& /dev/null || sudo apt-get install devscripts
-dpkg -s fakeroot >& /dev/null || sudo apt-get install fakeroot
+dpkg -s devscripts fakeroot debhelper >& /dev/null || sudo apt-get install devscripts fakeroot debhelper
 dpkg -s uml-utilities >& /dev/null || sudo apt-get install uml-utilities
 sudo chmod a+rx /usr/lib/uml/uml_net  # allow normal user to start uml network
 
