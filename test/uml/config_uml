@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # ZUMA_REPOSITORY is the path of the zumastor code
 ZUMA_REPOSITORY="${PWD}/../.."
 

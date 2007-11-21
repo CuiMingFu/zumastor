@@ -1,5 +1,3 @@
-#!/bin/bash
-
 source_uml_ip=192.168.100.1
 source_uml_host=uml_1
 source_uml_fs=uml_fs1

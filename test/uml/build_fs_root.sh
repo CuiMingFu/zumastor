@@ -44,9 +44,6 @@ echo -e "done.\n"
 chroot /mnt apt-get clean >& /dev/null
 
 echo -n Setting up ssh...
-mkdir -p /mnt/root/.ssh
-[[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f  ~/.ssh/id_dsa -P ''
-cat ~/.ssh/id_dsa.pub > /mnt/root/.ssh/authorized_keys
 ls *.pub >& /dev/null && cat *.pub >> /mnt/root/.ssh/authorized_keys && rm *.pub
 echo -e "done.\n"
 

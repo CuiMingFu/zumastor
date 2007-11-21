@@ -40,7 +40,8 @@ Usage
     kernel and file system images in the subsequent tests.
   * For security reason, we recommend you to run uml tests as a normal user.
     Here are the steps to set up a uml environment for zumastor replication test
-    as a normal user. Below, steps 2, 3, and 5 require root previlige. 
+    as a normal user. Below, steps 2, 3, and 5 require root previlige. After the
+    initial setup, any test will re-use the existing kernel and file system images.
         step 1: ./build_fs.sh uml_fs1
         step 2: sudo ./build_fs_root.sh uml_fs1
         step 3: sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
