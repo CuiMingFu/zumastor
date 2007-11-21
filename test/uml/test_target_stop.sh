@@ -44,8 +44,8 @@ while [[ $count -lt $ITERATIONS ]]; do
 	count=$(( count+1 ))
 done
 
-ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
 
 ssh $SSH_OPTS $source_uml_host "halt" || { echo FAIL; exit 1; }
 ssh $SSH_OPTS $target_uml_host "halt" || { echo FAIL; exit 1; }

@@ -44,7 +44,7 @@ echo -e "done.\n"
 chroot /mnt apt-get clean >& /dev/null
 
 echo -n Setting up ssh...
-ls *.pub >& /dev/null && cat *.pub >> /mnt/root/.ssh/authorized_keys && rm *.pub
+ls *.pub >& /dev/null && mkdir -p /mnt/root/.ssh && cat *.pub >> /mnt/root/.ssh/authorized_keys && rm *.pub
 echo -e "done.\n"
 
 echo -n Making nodes for ubdb and ubdc...
