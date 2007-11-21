@@ -10,9 +10,6 @@ host_tap_ip=$2
 uml_host=$3
 uml_fs=$4
 
-dpkg -s uml-utilities >& /dev/null || apt-get -y install uml-utilities || exit $?
-chmod a+rx /usr/lib/uml/uml_net  # allow normal user to start uml network
-
 echo -n Setting up IP MASQUERADE...
 iptables -t nat -L | grep "MASQUERADE" >& /dev/null || iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE || { echo "please check and set the following kernel config options"; echo "Networking -> Network Options -> Network packet filtering framework -> Core Netfilter Configuration -> Netfilter connection tracking support"; echo "Networking -> Network Options -> Network packet filtering framework -> IP: Netfilter Configuration -> IPv4 connection tracking support && Full NAT && MASQUERADE target support"; exit $?; }
 echo -e "done.\n"
