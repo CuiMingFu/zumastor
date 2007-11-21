@@ -6,6 +6,17 @@
 
 . config_uml
 
+# Download a file and checks its checksum
+download() {
+    file=`basename "$1"`
+    test -f $WINETRICKS_CACHE/$file || (cd $WINETRICKS_CACHE; wget -c "$1")
+    if [ "$2"x != ""x ]
+    then
+	echo "$2  $WINETRICKS_CACHE/$file" > $WINETRICKS_CACHE/$file.sha1sum
+	try sha1sum --status -c $WINETRICKS_CACHE/$file.sha1sum
+    fi
+}
+
 [[ -e $ZUMA_REPOSITORY/build ]] || mkdir $ZUMA_REPOSITORY/build
 
 echo -n Getting kernel sources from kernel.org ...

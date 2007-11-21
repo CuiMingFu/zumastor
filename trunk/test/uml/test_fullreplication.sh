@@ -17,7 +17,7 @@ sleep 30
 
 # test program that keeps allocating/de-allocating 64M memory
 gcc -o cyclic-anon cyclic-anon.c
-scp cyclic-anon $target_uml_host:/root/cyclic-anon
+scp $SCP_OPTS cyclic-anon root@$target_uml_host:/root/cyclic-anon
 ssh $SSH_OPTS $target_uml_host "/root/cyclic-anon 64" &
 
 # rasing dirty_ratio to trigger problem faster
@@ -26,8 +26,7 @@ ssh $SSH_OPTS $target_uml_host "echo 95 > /proc/sys/vm/dirty_ratio" || { echo FA
 
 echo Monitoring replication progress...
 count=0
-TOTAL=10000
-while [[ $count -lt $TOTAL ]]; do
+while [[ $count -lt $ITERATIONS ]]; do
 	echo -n "source send  "
 	ssh $SSH_OPTS $source_uml_host "cat $VOLUMES/$vol/targets/$target_uml_host/send"
 	ssh $SSH_OPTS $target_uml_host "echo" > /dev/null || { echo "downstream not responding, lockup?"; echo FAIL; exit 1; }

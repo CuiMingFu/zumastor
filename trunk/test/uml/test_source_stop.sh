@@ -15,11 +15,10 @@ ssh $SSH_OPTS $target_uml_host "zumastor define source $vol $source_uml_host -p 
 echo -e "done.\n"
 sleep 30
 
-TOTAL=1000
 last_mod_time=$(ssh $SSH_OPTS $source_uml_host stat -c %Y $VOLUMES/$vol/targets/$target_uml_host)
 count=0
 noprogress_count=0
-while [[ $count -lt $TOTAL ]]; do
+while [[ $count -lt $ITERATIONS ]]; do
 	# test zumastor stop on source
 	ssh $SSH_OPTS $source_uml_host "/etc/init.d/zumastor stop" || { echo FAIL; exit 1; }
 	left=$(ssh $SSH_OPTS $source_uml_host "ls /dev/mapper | grep $vol")

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Copyright 2007 Google Inc.
 # Author: Jiaying Zhang <jiayingz@google.com>
 
@@ -16,7 +16,7 @@ else
   echo -n Getting Debian uml root file system image...
   wget -c -q http://uml.nagafix.co.uk/Debian-3.1/${fs_image}.bz2 || exit $?
   echo -n Unpacking root file system image...
-  bunzip2 ${fs_image}.bz2 >> $LOG
+  bunzip2 -k ${fs_image}.bz2 >> $LOG
   echo -e "done.\n"
 fi
 
@@ -24,12 +24,10 @@ mv $fs_image $uml_fs
 chmod a+rw $uml_fs
 
 echo -n Setting up ssh keys for user $USER ...
-if [[ $USER != "root" ]]; then
-	mkdir -p ~/.ssh
-	[[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f ~/.ssh/id_dsa -P '' >> $LOG
-	cp ~/.ssh/id_dsa.pub $USER.pub
-	chmod a+rw $USER.pub
-fi
+mkdir -p ~/.ssh
+[[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f ~/.ssh/id_dsa -P '' >> $LOG
+cp ~/.ssh/id_dsa.pub $USER.pub
+chmod a+rw $USER.pub
 echo -e "done.\n"
 
 echo -n Building zumastor Debian package...
@@ -49,13 +47,13 @@ fi
 
 pushd ${ZUMA_REPOSITORY}/zumastor >> $LOG || exit 1
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
 
 pushd ${ZUMA_REPOSITORY}/ddsnap >> $LOG || exit 1
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
 mv ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_*.deb .
@@ -63,5 +61,3 @@ mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .
 rm ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_* ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*
 chmod a+rw *.deb
 echo -e "done.\n"
-
-[[ $USER == "root" ]] && ./build_fs_root.sh $uml_fs
