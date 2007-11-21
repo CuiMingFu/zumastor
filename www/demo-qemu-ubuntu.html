@@ -118,6 +118,8 @@ A snapshot will be created once an hour via the zumastor hourly cron script.  We
 </pre>
 
 If you do some IO on the filesystem you will notice only the origin device, mounted on <code>/var/run/zumastor/mount/zumatest</code> changes.
+Note:  You do <i>not</i> need to add the filesystem to your /etc/fstab.  The zumastor init script will mount the volume and all its snapshots automatically at boot time.
+
 <hr>
 <center>&copy; 2007 Google</center>
 </body>
