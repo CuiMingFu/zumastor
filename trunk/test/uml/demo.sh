@@ -8,7 +8,7 @@ set -x
 ./download.sh
 test -e  linux-${KERNEL_VERSION}/linux || ./build_uml.sh
 # utilities to build debian packages
-dpkg -s devscripts >& /dev/null || sudo apt-get devscripts
+dpkg -s devscripts >& /dev/null || sudo apt-get install devscripts
 test -e uml_fs1 || { ./build_fs.sh uml_fs1; sudo ./build_fs_root.sh uml_fs1; }
 
 # Just run each test once through, for a quick sanity check
