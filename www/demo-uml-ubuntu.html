@@ -9,56 +9,33 @@
 
 <h2>Ubuntu walkthrough on Usermode Linux</h2>
 
-Check out the zumastor remository and build a UML kernel and zumastor
-userspace packages.  Requires root access to install build
-dependencies, will pull an upstream kernel, and requires use of
-debootstrap to build a local userspace.
+First, find an Ubuntu system with at least 3.5 gigabytes of free space!
 <p>
-
+Second, grab the Zumastor sources:
 <pre>
 svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
-cd zumastor
-sudo ./builddepends.sh  # copy to /tmp first if building on NFS)
-cd test/uml
-./build_uml.sh
-cp linux-2.6.21.1/linux ../../zuma-linux
-cd ../..
-./buildcurrent.sh kernel/config/2.6.21.1-um-uml # wasteful, or download debs
 </pre>
+and have a look at the files in test/uml, particularly demo.sh.
+That script downloads kernel sources and a Debian system image,
+then builds UML and Zumastor, and runs a bunch of simple tests
+of Zumastor inside one or two UML images.
 <p>
-
-Create a device for / and install Ubuntu/dapper into it:
+It's intended to be simple to run; the most complicated part
+is that it uses sudo to get root privileges when needed.
 <p>
-
+Here's how to try it:
 <pre>
-dd if=/dev/zero of=zuma-uml.raw bs=1024K seek=1000 count=0
-mkfs.ext3  zuma-uml.raw
-sudo mkdir /tmp/uml
-sudo mount -o loop zuma-uml.raw /tmp/uml
-sudo debootstrap --arch i386 dapper /tmp/uml http://archive.ubuntu.com/ubuntu/
-sudo cp build/ddsnap*.deb build/zumastor*.deb /tmp/uml
-sudo chroot /tmp/uml
-apt-get install dmsetup cron
-echo proc /proc proc defaults 0 0 >/etc/fstab
-sudo umount /tmp/uml
+cd zumastor/test/uml
+bash test.sh
 </pre>
 <p>
-
-
-Boot the new userspace using the zumastor UML kernel.
-
-<pre>
-./zuma-linux ubda=zuma-uml.raw mem=256M
-</pre>
-
-Log in as root.  Install the ddsnap and zumastor packages already in /.
-
+It's a bit rough yet - you may see a bunch of spurious error messages,
+but each test will output PASS if it finishes successfully, and
+you should see "All tests complete" if everything passes.
 <p>
-
-TODO: finish
-
-
-
+If that works, Zumastor is set up properly in your UML instances,
+and you can run individual tests outside of demo.sh.
+This is a convenient way to develop and test Zumastor changes.
 <p>
 <hr>
 <center>&copy; 2007 Google</center>
