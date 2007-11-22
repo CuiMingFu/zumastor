@@ -2,7 +2,7 @@
 ZUMA_REPOSITORY="${PWD}/../.."
 
 #KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' $ZUMA_REPOSITORY/KernelVersion`
-KERNEL_VERSION="2.6.21.1"
+KERNEL_VERSION="2.6.22.10"
 if [ "x$KERNEL_VERSION" = "x" ] ; then
   echo "Suspect KernelVersion file"
   exit 1

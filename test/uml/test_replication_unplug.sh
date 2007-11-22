@@ -48,7 +48,7 @@ done
 ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
 ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
 
-ssh $SSH_OPTS $source_uml_host "halt" || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "halt" || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $source_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $target_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
 
 echo PASS

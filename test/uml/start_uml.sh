@@ -21,6 +21,8 @@ function create_device {
 [[ $ubdb_dev == /* ]] || ubdb_dev=../$ubdb_dev
 [[ $ubdc_dev == /* ]] || ubdc_dev=../$ubdc_dev
 
+# killing any running linux umls with the same root file system image
+pkill -f './linux ubda=../$uml_fs'
 # load uml. uml does not work properly when running in background, so use screen detach here.
 echo -n Bring up uml...
 cd linux-${KERNEL_VERSION}
