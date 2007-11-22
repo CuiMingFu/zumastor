@@ -21,7 +21,7 @@
  obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
  obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
  obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
-+obj-$(CONFIG_DM_DDRAID)		+= dm-ddraid.o
++obj-$(CONFIG_DM_DDSNAP)		+= dm-ddsnap.o
  
  quiet_cmd_unroll = UNROLL  $@
        cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
