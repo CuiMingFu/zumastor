@@ -9,14 +9,19 @@
 # Download a file and checks its checksum
 download() {
 	file=`basename "$1"`
-	pushd $DOWNLOAD_CACHE
-	wget -c "$1"
-	popd
+	test -f $DOWNLOAD_CACHE/$file || (pushd $DOWNLOAD_CACHE; wget -c "$1"; popd)
 	if [ "$2"x != ""x ]
 	then
 		echo "$2  $DOWNLOAD_CACHE/$file" > $DOWNLOAD_CACHE/$file.sha1sum
 		sha1sum --status -c $DOWNLOAD_CACHE/$file.sha1sum
-		[[ $? -ne 0 ]] && { echo "$file sha1 checksum mismatch"; exit 1; }
+		if [[ $? -ne 0 ]]; then
+			echo "$file sha1 checksum mismatch, try to re-download $file"
+			pushd $DOWNLOAD_CACHE
+			wget -c "$1"
+			popd
+			sha1sum --status -c $DOWNLOAD_CACHE/$file.sha1sum
+		 	[[ $? -ne 0 ]] && { echo "$file sha1 checksum mismatch"; exit 1; }
+		fi
 	fi
 }
 

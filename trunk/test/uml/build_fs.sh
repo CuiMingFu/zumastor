@@ -29,6 +29,7 @@ echo -n Building zumastor Debian package...
 VERSION=`awk '/^[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' $ZUMA_REPOSITORY/Version`
 if [ "x$VERSION" = "x" ] ; then
 	echo "Suspect Version file"
+	rm -f $uml_fs
 	exit 1
 fi
 
@@ -40,16 +41,16 @@ else
 	popd
 fi
 
-pushd ${ZUMA_REPOSITORY}/zumastor || exit 1
+pushd ${ZUMA_REPOSITORY}/zumastor || { rm -f $uml_fs; exit 1; }
 [ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
-dpkg-buildpackage -uc -us -rfakeroot || exit 1
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || { rm -f $uml_fs; exit 1; }
+dpkg-buildpackage -uc -us -rfakeroot || { rm -f $uml_fs; exit 1; }
 popd
 
-pushd ${ZUMA_REPOSITORY}/ddsnap || exit 1
+pushd ${ZUMA_REPOSITORY}/ddsnap || { rm -f $uml_fs; exit 1; }
 [ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
-dpkg-buildpackage -uc -us -rfakeroot || exit 1
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || { rm -f $uml_fs; exit 1; }
+dpkg-buildpackage -uc -us -rfakeroot || { rm -f $uml_fs; exit 1; }
 popd
 mv ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_*.deb .
 mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .

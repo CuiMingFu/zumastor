@@ -5,8 +5,8 @@
 . config_uml
 . config_replication
 
-./start_uml.sh $source_uml_fs $source_ubdb_dev $source_ubdc_dev $source_uml_host
-./start_uml.sh $target_uml_fs $target_ubdb_dev $target_ubdc_dev $target_uml_host
+./start_uml.sh $source_uml_fs $source_ubdb_dev $source_ubdc_dev $source_uml_host || exit 1
+./start_uml.sh $target_uml_fs $target_ubdb_dev $target_ubdc_dev $target_uml_host || { killall linux; exit 1; }
 
 # set up ssh keys for source and target umls to access each other
 ssh $SSH_OPTS $source_uml_host "ssh $SSH_OPTS $target_uml_host 'echo'" >& /dev/null

@@ -18,7 +18,7 @@ sleep 30
 # test program that keeps allocating/de-allocating 64M memory
 gcc -o cyclic-anon cyclic-anon.c
 scp $SCP_OPTS cyclic-anon root@$target_uml_host:/root/cyclic-anon
-ssh $SSH_OPTS $target_uml_host "/root/cyclic-anon 64" &
+ssh $SSH_OPTS $target_uml_host "/root/cyclic-anon 64" >& /dev/null &
 
 # raising dirty_ratio to trigger problem faster
 ssh $SSH_OPTS $target_uml_host "echo 50 > /proc/sys/vm/dirty_background_ratio" || { echo FAIL; exit 1; }
@@ -39,7 +39,7 @@ done
 ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
 ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
 
-ssh $SSH_OPTS $source_uml_host "halt" || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "halt" || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $source_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $target_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
 
 echo PASS
