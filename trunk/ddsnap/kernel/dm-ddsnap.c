@@ -69,8 +69,7 @@ static int rwpipe(struct file *file, const void *buffer, unsigned int count,
         set_fs(get_ds());
         while (count) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-                int chunk = (*op)(&iocb, &(struct iovec){ .iov_base = buffer, .iov_len = count },
-                                        1, iocb.ki_pos);
+                int chunk = (*op)(&iocb, &(struct iovec){ .iov_base = (void *)buffer, .iov_len = count }, 1, iocb.ki_pos);
 #else
                 int chunk = (*op)(&iocb, buffer, count, iocb.ki_pos);
 #endif
@@ -225,8 +224,8 @@ static void report_error(struct devinfo *info)
 
 /* Static caches, shared by all ddsnap instances */
 
-static kmem_cache_t *pending_cache;
-static kmem_cache_t *end_io_cache;
+static struct kmem_cache *pending_cache;
+static struct kmem_cache *end_io_cache;
 static struct super_block *snapshot_super;
 
 /* We cache query results because we are greedy about speed */
@@ -572,7 +571,9 @@ static int incoming(struct dm_target *target)
 	int err, length;
 	char *err_msg;
 	u32 chunksize_bits;
+#ifdef CONFIG_DM_DDSNAP_SWAP
 	struct socket *vm_sock;
+#endif
 
 	daemonize("%s/%x", "ddcli", info->snap);
 	while (down_interruptible(&info->exit2_sem))
@@ -1163,7 +1164,7 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 	pending = kmem_cache_alloc(pending_cache, GFP_NOIO|__GFP_NOFAIL);
 	spin_lock(&info->pending_lock);
 	id = info->nextid;
-	info->nextid = (id + 1) & ~(-1 << RW_ID_BITS);
+	info->nextid = (id + 1) & ~(-1UL << RW_ID_BITS);
 	*pending = (struct pending){ .id = id, .bio = bio, .chunk = chunk, .chunks = 1, .timestamp = jiffies };
 	if (!worker_ready(info)) {
 		spin_unlock(&info->pending_lock);

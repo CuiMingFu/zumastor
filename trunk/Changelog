@@ -14,7 +14,7 @@ New features:
     scripts, or interpreted or compiled programs.
 
   * Extended functionality of zumastor snapshot to allow the admin to create
-    and arbitrary snapshot that is not part of the regular snapshot schedule
+    an arbitrary snapshot that is not part of the regular snapshot schedule
     and will not be automatically deleted
 
   * ddsnap magic number format improved to incorporate the date of most
