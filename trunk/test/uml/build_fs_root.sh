@@ -18,6 +18,7 @@ echo -e "done.\n"
 echo -n Installing ssh...
 chroot /mnt dpkg -s openssh-client >& /dev/null || chroot /mnt apt-get -y -q install openssh-client >& /dev/null || { umount /mnt; exit 1; }
 chroot /mnt dpkg -s openssh-server >& /dev/null || chroot /mnt apt-get -y -q install openssh-server >& /dev/null || { umount /mnt; exit 1; }
+chroot /mnt sh /etc/init.d/ssh stop
 # to get rid of the need for initial confirmation
 grep "StrictHostKeyChecking no" /mnt/etc/ssh/ssh_config >& /dev/null || echo "    StrictHostKeyChecking no" >> /mnt/etc/ssh/ssh_config
 grep "VerifyHostKeyDNS yes" /mnt/etc/ssh/ssh_config >& /dev/null || echo "    VerifyHostKeyDNS yes" >> /mnt/etc/ssh/ssh_config
@@ -51,4 +52,5 @@ echo -n Making nodes for ubdb and ubdc...
 [[ -e /mnt/dev/ubdb ]] || mknod /mnt/dev/ubdb b 98 16
 [[ -e /mnt/dev/ubdc ]] || mknod /mnt/dev/ubdc b 98 32
 echo -e "done.\n"
+
 umount /mnt
