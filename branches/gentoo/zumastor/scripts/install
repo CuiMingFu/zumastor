@@ -1,0 +1,23 @@
+#!/bin/sh
+
+[ -z "$DESTDIR" ] && DESTDIR=/
+
+rm ${DESTDIR}/lib/zumastor >/dev/null 2>&1 # in case of symlink
+rm ${DESTDIR}/var/lib/zumastor >/dev/null 2>&1 # in case of symlink
+rm ${DESTDIR}/var/run/zumastor >/dev/null 2>&1 # in case of symlink
+rm ${DESTDIR}/etc/zumastor >/dev/null 2>&1 # in case of symlink
+
+echo ${DESTDIR}
+mkdir -p ${DESTDIR}
+echo ${DESTDIR}/t.tar
+tar -cv --exclude=.svn -f ${DESTDIR}/t.tar bin etc lib usr var
+
+cd ${DESTDIR}
+tar xvf t.tar
+cd -
+
+rm ${DESTDIR}/t.tar
+
+chmod 755 ${DESTDIR}/etc/cron.{hourly,daily,weekly}/zumastor ${DESTDIR}/etc/init.d/zumastor
+mkdir -p ${DESTDIR}/usr/share/man/man8 2>/dev/null
+gzip -c ./man/zumastor.8 > ${DESTDIR}/usr/share/man/man8/zumastor.8.gz

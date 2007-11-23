@@ -1,0 +1,307 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <title>Zumastor Installation Notes</title>
+  </head>
+
+  <body>
+    <h1>Zumastor Installation Notes</h1>
+
+    This document describes how to get a basic zumastor master node
+    with snapshots running on Debian or Ubuntu, and then how to
+    replicate that to a second slave server.  Actual deployments may
+    be more complex - the goal here is simplicity to get started.
+
+    <h2>Common node setup</h2>
+
+    The following sections are required for both master and slave
+    nodes.
+
+    <h3>1. Partition and install OS</h3>
+    Zumastor requires some storage space for storing snapshot data (and for the volume
+    itself if you are creating a new filesystem).  If you are starting from scratch,
+    install operating systems using custom partitioning, preferably
+    leaving a large LVM volume group (named <i>sysvg</i> in this example) for use when
+    creating origin and snapshot devices.
+    Eg.<p>
+    <code>
+      pvcreate /dev/hda7 <br>
+      vgcreate sysvg /dev/hda7
+    </code>
+
+    <h3>2. Build Debian packages</h3>
+    There are three required packages to build: the patched kernel package, ddsnap (snapshot device userspace), and zumastor (management cli) package.
+    <ol>
+    <li> Make sure you have the necessary build tools install, including the following:<p>
+    <code>aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion</code><p>
+
+    <li> Get the latest code:<p>
+    <code>svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</code><p>
+
+    <li> Run the build script.  This will build all three required packages.<p>
+      <code>$ cd zumastor<br>
+      $ ./buildcurrent kernel/config/full
+      </code><p>
+<i>Note:</i> This will download the required kernel image from kernel.org (currently 2.6.21.1).  The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in <code>kernel/config/full</code>.  If you need to use a different config, make sure you enable <code>CONFIG_DM_DDSNAP</code> (y or m)
+    </ol>
+    If you do not wish to use the build script, you can follow the "tarball" installation instructions in the ddsnap <a href="../ddsnap/INSTALL">INSTALL</a> file.  You can also use these instruction only for the kernel install, then build the ddsnap and zumastor packages by running <code>dpkg-buildpkg -rfakeroot</code> in both the <code>ddsnap</code> and <code>zumastor</code> subdirectories.
+
+    <h3>3. Install packages</h3>
+    <ol>
+    <li>Install kernel packages.  If you have built the kernel packages about, install using dpkg:<p>
+    <code># dpkg -i kernel-image-2.6.21.1-zumastor-r880_1.0_i386.deb</code>
+    <li>Reboot on to the new kernel<p>
+    <code># shutdown -r now</code>
+    <li>Install ddsnap and zumastor packages.  First, ensure the dependcies are installed.<p>
+    <code># aptitude install dmsetup libpopt0 zlib1g util-linux cron<br>
+          # dpkg -i ddsnap_0.4-r596_i386.deb zumastor_0.4-r596_i386.deb</code>
+
+    <li>Ensure zumastor is installed
+    <pre>
+# zumastor status --usage
+      RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|-- cron/
+|-- mount/
+|-- running
+`-- servers/
+    </pre>
+    </ol>
+    Now you're ready to start using zumastor.
+
+    <h3>4. Create block devices for origin and snapshot stores</h3>
+    <code>
+      lvcreate --size 20g -n test sysvg <br>
+      lvcreate --size 40g -n test_snap sysvg
+    </code>
+    <p>
+
+    These snapshot stores are large compared to the origin store since
+    the tests below will create and destroy large amounts of random
+    data with nothing shared between snapshots in most cases.  Choose
+    sizes appropriate to your usage.
+
+<a name="user">
+    <h2>Snapshot Management Steps</h2>
+    
+    <h3>define testvol</h3>
+    On the master node:
+    <code>
+      zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+    </code>
+   <p>
+    The output should resemble:
+    <pre>
+js_bytes was 512000, bs_bits was 12 and cs_bits was 12
+cs_bits 14
+chunk_size is 16384 & js_chunks is 32
+Initializing 5 bitmap blocks...
+pid = 5879
+Thu May 10 13:45:54 2007: [5880] snap_server_setup: ddsnapd server bound to socket /var/run/zumastor/servers/testvol
+pid = 5881
+Successfully created and initialized volume 'testvol'.
+You can now create a filesystem on /dev/mapper/testvol
+    </pre>
+
+    <h3>Create a filesystem on testvol</h3>
+    <code>
+      mkfs.ext3 /dev/mapper/testvol
+    </code>
+
+    <h3>Automate hourly and daily snapshots</h3>
+    <code>
+      zumastor define master testvol -h 24 -d 7
+    </code>
+
+    <p>
+      zumastor status --usage
+      <pre>
+VOLUME testvol:
+Data chunk size: 16384
+Used data: 0
+Free data: 0
+Metadata chunk size: 16384
+Used metadata: 56
+Free metadata: 2621384
+Origin size: 21474836480
+Write density: 0
+Creation time: Tue May 15 18:33:23 2007
+  Snap            Creation time   Chunks Unshared   Shared
+totals                                 0        0        0
+Status: running
+Configuration:
+/var/lib/zumastor/volumes/testvol
+|-- device/
+|   |-- origin -> /dev/sysvg/test
+|   `-- snapstore -> /dev/sysvg/test_snap
+|-- master/
+|   |-- next
+|   |-- schedule/
+|   |   |-- daily
+|   |   `-- hourly
+|   |-- snapshots/
+|   `-- trigger|
+`-- targets/
+
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|   `-- testvol=
+|-- cron/
+|   `-- testvol
+|-- mount/
+|   `-- testvol/
+|-- running
+`-- servers/
+    `-- testvol=
+    </pre>
+
+    As hours roll by, snapshots should appear as well under master/snapshot.
+    <p>
+      df
+    <pre>
+/dev/mapper/testvol   20642428    131228  19462624   1% /var/run/zumastor/mount/testvol
+    </pre>
+
+    The origin filesystem on /var/run/zumastor/mount/testvol is where
+    all testing and fielsystem activity should take place.
+
+<p>
+      To verify snapshots are working correctly:<br>
+      <code> date >> /var/run/zumastor/mount/testvol/testfile </code> <br>
+      <code> sync </code><br>
+      <code sleep 5 </code><br>
+      <code>zumastor snapshot testvol hourly </code><br>
+      <code sleep 5 </code><br>
+      <code> date >> /var/run/zumastor/mount/testvol/testfile </code> <br>
+      <code sleep 5 </code><br>
+      <code>zumastor snapshot testvol hourly </code><br>
+      <code sleep 5 </code><br>
+      <code> cat /var/run/zumastor/mount/testvol\(2\)/testfile </code><br>
+      <code> cat /var/run/zumastor/mount/testvol\(4\)/testfile </code><br>
+      <code> cat /var/run/zumastor/mount/testvol/testfile </code><br>
+
+    <h2>Remote replication</h2>
+
+    Install both an origin and a slave node.  These will be
+    <tt>lab1</tt> and <tt>lab2</tt> below.
+
+    <h3>ssh authorization</h3>
+
+    On each machine, run <code>ssh-keygen</code> as root.  Copy the
+    .ssh/id_dsa.pub file from each account to .ssh/authorized_keys on
+    the other.  This authorizes root on each machine to connect
+    without a password to the other.  More restricted access may be
+    used in actual deployment.
+
+    <h3>Define target on master</h3>
+
+    root@lab1:~#
+    <code>zumastor define target testvol lab2.example.com:11235 -p 30</code>
+
+    <p>
+      This tells lab1 to replicate to port 11235 on lab2 every 30 seconds.
+If the period is omitted, replication will not occur.
+
+    <p> zumastor status --usage
+    <pre>
+...
+`-- targets/
+    `-- gsdlab2.corp.google.com/
+        |-- period
+        |-- port
+        `-- trigger|
+...
+    </pre>
+
+    <h3>Define volume and configure source on target</h3>
+
+    root@lab2:~#
+    <code>
+zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+    </code>
+    <p>
+root@lab2:~#
+      <code>
+	zumastor define source testvol lab1.example.com --period 600
+      </code>
+
+     <p>zumastor status --usage
+    <pre>
+VOLUME testvol:
+Data chunk size: 16384
+Used data: 0
+Free data: 0
+Metadata chunk size: 16384
+Used metadata: 56
+Free metadata: 2621384
+Origin size: 21474836480
+Write density: 0
+Creation time: Wed May 16 10:28:27 2007
+  Snap            Creation time   Chunks Unshared   Shared
+totals                                 0        0        0
+Status: running
+Configuration:
+/var/lib/zumastor/volumes/testvol
+|-- device/
+|   |-- origin -> /dev/sysvg/test
+|   `-- snapstore -> /dev/sysvg/test_snap
+|-- source/
+|   |-- hostname
+|   `-- period
+`-- targets/
+
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|   `-- testvol=
+|-- cron/
+|-- mount/
+|-- running
+`-- servers/
+    `-- testvol=
+    </pre>
+
+    <h3>Start replication</h3>
+
+    root@lab2:~#
+    <code>zumastor start source testvol</code>
+
+    <p>
+    Alternatively, you may kick off replication manually each time from the master. <p>
+
+      root@lab1:~#
+      <code>zumastor replicate testvol lab2.example.com</code>
+
+    <p> Once initial replication is started, <code>ddsnap</code>
+    processes should begin consuming CPU cycles and moving tens of
+    megabits per second between the nodes.  Initially, the entire
+    origin device will need to be moved, so wait 15 minutes before
+    looking on the target for snapshots.  When replication is
+    complete, df on the slave should show the same
+    /var/run/zumstor/testvol volume locally mounted.
+
+   <h3>Verify replication</h3>
+      root@lab1:~#
+      <code> date >> /var/run/zumastor/mount/testvol/testfile </code>
+
+      <p>
+      Wait 30-60 seconds for next replication cycle to complete.
+
+    <p>
+      root@lab2:~#
+      <code> cat /var/run/zumastor/mount/testvol/testfile </code>
+
+    <p>
+      You may need to leave the current directory to see incoming
+      changes.  If the same file is there on the slave (lab2),
+      replication is working.
+
+    <h2>Stopping zumastor</h2>
+	If a zumastor volume is exported via nfs, the kernel server
+	must be stopped before zumastor is stopped in order to allow
+	unmounting of the volume.  Due to what appears to be a bug,
+	nfs-common also needs to be stopped in some cases.
+  </body>
+</html>

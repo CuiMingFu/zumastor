@@ -1,0 +1,135 @@
+.TH ZUMASTOR 8 "Jan 30, 2007" "Linux"
+.SH NAME
+zumastor \- block level snapshot and replication
+
+\fB
+.SH SYNOPSIS
+.B zumastor define volume
+.I volume_name snapshot_device origin_device \fP[\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadata_device\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP]
+.br
+.B zumastor define master
+.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
+.br
+.B zumastor define source
+.I volume_name \fP\fIhost\fP [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
+.br
+.B zumastor define target
+.I volume_name \fP\fIhost\fP[\fI:port\fP] [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
+.br
+.B zumastor forget volume
+.I volume_name
+.br
+.B zumastor forget target
+.I volume_name host
+.br
+.B zumastor snapshot
+.I volume_name \fP[\fBhourly\fP|\fBdaily\fP|\fBweekly\fP|\fBmonthly\fP|\fBcustom\fP]
+.br
+.br
+.B zumastor replicate
+.I volume_name host \fP[\fB-s\fP|\fB--snapnum\fP \fIsnap\fP] [\fB-d\fP|\fB--delay\fP \fIseconds\fP]
+.br
+.B zumastor status
+[\fIvolume_name\fP [\fIsnap\fP]] [\fB-u\fP|\fB--usage\fP]
+
+.SH DESCRIPTION
+\fBzumastor\fP provides block device replication given a block level snapshot facility capable of holding multiple simultaneous snapshots efficiently. \fBzumastor\fP can generate a list of snapshot chunks that differ between two snapshots, then send that difference over the wire. On a downstream server, write the updated data to a snapshotted block device.
+
+\fBzumastor\fP snapshots a block device and replicates the data on another block device. It is assumed that the user has access to hardware capable of holding multiple simultaneous snapshots efficiently.
+\fBzumastor\fP can also general a list of snapshot chunks containing the differences between two snapshots and can send those chunks across a network. On the target server, ddsnap writes the updated data to a block device.
+
+\fBzumastor\fP provides some useful low\-level flexibility. The user can set it to run daemonized or in the foreground; can set the desired journal size to use when creating the snapshot, and can set the desired block size on the target block device.
+
+.SH OPTIONS
+
+.SH COMMANDS
+.IP \fBdefine\ \fBvolume\fP 
+.I volume_name snapshot_device origin_device \fP[\fB-i\fP|\fB--initialize\fP] [\fB-m\fP|\fB--metadev\fP \fImetadata_device\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP]
+.br
+Define a new zumastor volume named \fIvolume_name\fP based on the underlying volumes \fIorigin_device\fP and \fIsnapshot_device\fP.  If specified, the \fImetadata_device\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the newly created volume data will be overwritten with zeros, overwriting all data on the origin device.
+
+The snapshot block and chunk sizes can be specified with the \fBblocksize\fP and \fBchunksize\fP options, respectively.
+They may only differ if separate metadata and snapshot devices are specified.
+Note that these are are specified as powers of two.
+If the sizes given are not powers of two, in each case the next greater power
+of two will be used instead.
+.IP \fBdefine\ \fBmaster\fP
+.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
+.br
+Used after \fBdefine\fP \fBvolume\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If this volume was previously a replication target, removes the \fBsource\fP definition, since it is now a master. If \fIvolume_name\fP is already defined, just updates the rotation limits.
+.IP \fBdefine\ source\fP
+.I volume_name
+\fIhost\fP[\fI:port\fP]] [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
+.br
+Used after \fBdefine\fP \fBvolume\fP to specify the upstream host that is expected to replicate snapshots to this volume. If the volume was previously a \fBmaster\fP volume, removes the \fBmaster\fP definition, since it is now a replication target.  If the optional \fIinterval\fP (in seconds) is specified, the upstream server will be asked for updates at this interval and when the volume is started.  It should be smaller than the automatic replication interval configured for this target on the upstream host.  The name option allows you to specify a different \fIremote_volume\fP name on the upstream host.  The yes option answers yes to all prompts.
+.IP \fBdefine\ \fBtarget\fP
+.I volume_name \fP\fIhost\fP[\fI:port\fP] [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
+.br
+Used after \fBdefine\fP \fBvolume\fP to specify a downstream host to which the volume will be replicated to.  If the optional \fIinterval\fP (in seconds) is specified, the target (downstream) server will be replicated to at the given interval.  The name option allows you to specify a different \fIremote_volume\fP name on the downstream host. The test option is used for testing purpose.
+.IP \fBforget\ \fBvolume\fP
+.I volume_name
+.br
+Stop automatic snapshotting and/or replication for \fIvolume_name\fP and remove it from the \fBzumastor\fP database.
+.IP \fBforget\ \fBtarget\fP
+.I volume_name host
+.br
+Stop automatic replication for a volume target and remove the target from the \fBzumastor\fP database.
+.IP \fBsnapshot\fP
+.I volume_name \fP[\fIhourly\fP|\fIdaily\fP|\fIweekly\fP|\fImonthly\fP|\fIcustom\fP]
+.br
+Explicitly initiate a volume snapshot within the specified snapshot rotation. If no rotation type is specified, a manual snapshot is taken.  A manual snapshot exists outside of the normal replication cycle is taken and a device mapper device is created. You must check the log file /var/log/zumastor/\fIvolume_name\fP/master.log to determine the snapshot number.  A device will be created on /dev/mapper/\fIvolume_name\fP(\fIsnapshot_number\fP).  For manual snapshots, the usecount will drop to zero and the device will not be created after a zumastor is restarted.
+.IP \fBreplicate\fP
+.I volume_name host \fP[\fB-s\fP|\fB--snapnum\fP \fIsnap\fP] [\fB-d\fP|\fB--delay\fP \fIseconds\fP]
+.br
+Explicitly initiate a volume replication cycle to the specified host. If \fIsnap\fP is specified then the snapshot with id \fIsnap\fP will be replicated, unless a more recent snapshot has already been replicated. If \fIsnap\fP is omitted then the most recent volume snapshot will be replicated. If \fIseconds\fP is specified, the script will sleep for the specified number of seconds before triggering a replication cycle. This is used internally to support periodic replication. The default is 0, meaning immediately.
+.IP \fBstatus\fP
+[\fIvolume_name\fP [\fIsnap\fP]] [\fB-u\fP|\fB--usage\fP]
+.br
+Display the status of all the volumes if given no arguments.  If a \fIvolume_name\fP is given, only information for that volume is shown.  If a snapshot id, \fIsnap\fP, is given in additional, only the status of that single snapshot is displayed.  The --usage argument displays additional snapshot usage information.
+
+.SH EXAMPLES
+# Initializing snapshot storage device, creating an origin volume named test located in /dev/mapper/test, and zeroing out that device
+.TP
+.B
+\fBzumastor\fP \fIdefine volume\fP test /dev/sysvg/vol /dev/sysvg/snap
+.PP
+# Creating a snapshot schedule that will keep the last 5 hours as snapshots
+.TP
+.B
+\fBzumastor\fP \fIdefine master\fP test -h 24 -d 7
+.PP
+
+.SH TERMINOLOGY
+.TP
+\fBsnapshot\fP \- a virtually instant copy of a defined collection of data created at a particular instant in time.
+.TP
+\fBorigin volume\fP \- One of two block devices underlying a virtual snapshot device.  This volume is mapped one-to-one to a snapshot origin virtual device.  The virtual device could be removed and the underlying origin volume accessed directly, at the risk of losing the integrity of any snapshots sharing data with the origin.
+.TP
+\fBsnapshot store\fP \- The other block device underlying a virtual snapshot device.  This volume contains data chunks that were copied from the origin in order to preserve the integrity of snapshot data, or were written directly to the snapshot store via a snapshot virtual device.  It also contains all metadata required to keep track of which snapshot store chunks belong to which snapshots.
+.TP
+\fBchunk\fP \- a user-definable binary multiple of 4K block size.
+.TP
+\fBexception\fP \- a chunk of data in the snapshot store, belonging to one or more snapshots.
+.SH SEE ALSO
+\fBddsnap\fP(8), \fBddraid\fP(8), \fBdmsetup\fP(8)
+
+zumastor project page: http://code.google.com/p/zumastor/
+.SH FUTURE ADDITIONS
+In the future, we will go further in the direction of hiding the device names, by coming up with a proper library API for creating the virtual devices so we don't need the clumsy dmsetup command any more or the even more clumsy libdevmapper interface, or worse yet, the devmapper ioctl interface.  Our library interface might even offer the option of creating a virtual device with no name, it just gives the program a FD for a device that we set (somehow) to be a virtual origin or snapshot.  No device name ever appears on the filesystem.  I have some misgivings about this idea because we then invite the situation where we can have multiple virtual devices on the same host, referring to the same snapshot.  This ought to work for fine for our \fBddsnap\fP and ddraid devices because they are designed as cluster devices, but I dunno.  I'm still mulliing over the right thing to do there.  This is just to let everybody know that the deficiencies of the current scheme are known, they are being thought about, and for now the result is some visible warts.
+.SH BUGS
+Please report bugs at \fBhttp://code.google.com/p/zumastor\fP or mail them to \fBzumastor@googlegroups.com\fP.
+.SH VERSION
+This man page is current for version 0.5 of \fBhotcakes\fP.
+.SH AUTHORS
+.TP
+Man page written by Jane Chiu and Jyoti Sood. 
+.SH CREDITS
+.TP
+\fBddsnap\fP is distributed under the GNU public license, version 2.  See the file COPYING for details.
+.TP
+This program uses zlib compression library and popt library.  Many people sent patches, lent machines, gave advice and were generally helpful.
+.SH THANKS
+.TP
+Thanks to Google, Red Hat and Sistina Software for supporting this work.  Special thanks to: Mike Todd, Joseph Dries, Douglas Merril and Matthew O'Keefe.
+.TP
+The home page of \fBzumastor\fP is \fBhttp://code.google.com/p/zumastor\fP.  This site may cover questions unanswered by this manual page.  Mailing lists for support and development are available at zumastor@googlegroups.com

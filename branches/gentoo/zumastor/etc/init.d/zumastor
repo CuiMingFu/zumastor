@@ -1,0 +1,141 @@
+#!/bin/bash
+# Zumastor Linux Storage Server
+# Copyright (c) 2006 Google Inc.
+# Author: Daniel Phillips <phillips@google.com>
+# Licensed under the GNU GPL version 2
+
+### BEGIN INIT INFO
+# Provides:          zumastor
+# Required-Start:    $network
+# Required-Stop:     $network 
+# Should-Start:      lvm $named
+# should-Stop:       lvm $named
+# X-Start-Before:    nfs-kernel-server samba
+# X-Stop-After:      nfs-kernel-server samba
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 6
+# Short-Description: Zumastor Linux Storage Server
+# Description:       Zumastor is a block device used to provide
+#                    enterprise storage features such as atomic snapshots,
+#                    filesystem access to the origin device and snapshots,
+#                    and network replication to backup fileservers.
+### END INIT INFO
+
+. /lib/lsb/init-functions || { echo "$0: unable to load LSB init functions"; exit 1; }
+. /lib/zumastor/common || { echo "$0: unable to load common zumastor functions"; exit 1; }
+. /lib/zumastor/ddfake
+
+function start_zumastor {
+	echo Starting zumastor
+	local vol
+	local id
+	local host
+	local log
+
+	# setup directory structure
+	if ! [ -d $RUNPATH ]; then
+		mkdir -p $AGENTS || return 1
+		mkdir -p $SERVERS || return 1
+		mkdir -p $CRONS || return 1
+		mkdir -p $MOUNTS || return 1
+	fi
+
+	touch_atomic $LOCKFILE || { echo "$LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
+	touch_atomic $RUNFILE || { echo "$RUNFILE exists, is zumastor already running?"; rm $LOCKFILE; exit 1; }
+
+	for vol in $(ls $VOLUMES); do
+		log=$LOGS/$vol/start.log
+		log "starting volume '$vol'" $log
+		echo "Starting volume '$vol'"
+		zumastor start volume $vol >> $log 2>&1 || { echo start volume error; rm $LOCKFILE; return 1; }
+
+		list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
+		for id in $list; do
+			log "Mounting snapshot '$vol($id)'" $log
+			mount_device $vol $id >> $log 2>&1
+		done
+
+		if [ -x $VOLUMES/$vol/master ]; then
+			echo "Starting master"
+			zumastor start master $vol || { echo "starting master fail"; rm $LOCKFILE; exit 1; }
+		else
+			# start the nag daemon
+			if [ -x $VOLUMES/$vol/source ]; then
+				echo "Starting source"
+				zumastor start source $vol
+			else
+				echo "info: orphan volume '$vol' is neither master nor slave"
+			fi
+		fi
+
+		for host in $(ls $VOLUMES/$vol/targets); do
+			echo "Starting target for '$vol' on '$host'"
+			zumastor start target $vol $host
+		done
+
+	done
+
+	rm $LOCKFILE
+}
+
+function stop_zumastor {
+	echo Stopping zumastor
+	local vol
+	local id
+	local host
+	local log
+
+	touch_atomic $LOCKFILE || { echo "$LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
+
+	for vol in $(ls $VOLUMES); do
+		log=$LOGS/$vol/stop.log
+		log "stopping volume $vol" $log
+		for host in $(ls $VOLUMES/$vol/targets); do
+			zumastor stop target $vol $host
+		done
+		[ -x $VOLUMES/$vol/master ] && zumastor stop master $vol
+		[ -x $VOLUMES/$vol/source ] && zumastor stop source $vol
+
+		stop_volume $vol || { rm $LOCKFILE; exit 1; }
+	done
+
+	rm $RUNFILE 2>/dev/null
+	rm $LOCKFILE
+}
+
+[ -d $VOLUMES ] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
+
+case $1 in
+start)
+	start_zumastor
+	;;
+
+stop)
+	stop_zumastor
+	;;
+
+restart)
+	[[ -e $RUNFILE ]] && stop_zumastor
+	start_zumastor
+	;;
+
+force-reload)
+	[[ -e $LOCKFILE ]] && { echo force-reload: remove $LOCKFILE left from zumastor start/stop; rm $LOCKFILE; }
+	[[ -e $RUNFILE ]] && stop_zumastor
+	rm $RUNFILE
+	start_zumastor
+	;;
+status)
+	if [ -e $RUNFILE ]; then
+		echo zumastor is running
+		echo "use 'zumastor status' for more info..."
+	else
+		echo zumastor is NOT running
+	fi
+	exit 0
+	;;
+*)
+	echo "Usage: $0 {start|stop|restart|force-reload}"
+	exit 2
+	;;
+esac

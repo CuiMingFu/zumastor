@@ -1,0 +1,8 @@
+uml_ip=192.168.100.1
+uml_host=uml_1
+uml_fs=uml_fs1
+ubdb_dev=$PWD/ubdb
+ubdc_dev=$PWD/ubdc
+
+vol="test"
+VOLUMES=/var/lib/zumastor/volumes
