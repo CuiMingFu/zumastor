@@ -40,7 +40,7 @@ ssh $SSH_OPTS $source_uml_host "zumastor define master $vol -h $hourly_snapnum -
 echo -e "done.\n"
 
 echo -n Setting up target volume...
-ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol"
+ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" >& /dev/null
 ssh $SSH_OPTS $target_uml_host "echo y | zumastor define volume -i $vol /dev/ubdb /dev/ubdc"
 echo -e "done.\n"
 

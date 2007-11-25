@@ -10,8 +10,11 @@ ubdc_dev=$3
 uml_host=$4
 
 function create_device {
-        dd if=/dev/zero of=$1 count=102400 bs=1024 >& /dev/null
-        [[ $? -eq 0 ]] || { echo "can not create device $1, error $?"; exit -1; }
+	fsize=`stat -c %s $1`
+	if [[ -z $fsize || $fsize -lt 104857600 ]]; then
+        	[[  $1 == /dev/sysvg/* ]] || dd if=/dev/zero of=$1 count=102400 bs=1024 >& /dev/null
+        	[[ $? -eq 0 ]] || { echo "can not create device $1, error $?"; exit -1; }
+	fi
 }
 
 [[ -e $ubdb_dev ]] || create_device $ubdb_dev

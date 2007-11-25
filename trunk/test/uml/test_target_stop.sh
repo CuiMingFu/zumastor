@@ -10,12 +10,12 @@
 ./setup_replication.sh || { echo UNRESOLVED; exit 1; }
 
 echo -n Start replication ...
-ssh $SSH_OPTS $source_uml_host "zumastor define target $vol $target_uml_host:$target_port -p 1" || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "zumastor define source $vol $source_uml_host -p $interval" || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $source_uml_host "zumastor define target $vol $target_uml_host:$target_port -p 1" >& $LOG || { echo FAIL; exit 1; }
+ssh $SSH_OPTS $target_uml_host "zumastor define source $vol $source_uml_host -p $interval" >& $LOG || { echo FAIL; exit 1; }
 echo -e "done.\n"
 sleep 30
 
-last_mod_time=$(ssh $SSH_OPTS $source_uml_host stat -c %Y $VOLUMES/$vol/source)
+last_mod_time=$(ssh $SSH_OPTS $target_uml_host stat -c %Y $VOLUMES/$vol/source)
 count=0
 noprogress_count=0
 while [[ $count -lt $ITERATIONS ]]; do
