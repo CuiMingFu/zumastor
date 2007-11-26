@@ -27,6 +27,7 @@ pushd $WORKDIR
 sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
 popd
 . config_single
+./test_ddsnap_create.sh
 ./test_agent_die.sh
 
 # Two-node tests

@@ -29,12 +29,14 @@ function resize_device {
 ./start_replication.sh || { echo UNRESOLVED; exit 1; }
 
 # check if volume size is larger than 500M for untar test
+pushd $WORKDIR
 echo -n Checking the volume size, resize if necessary ...
 resize_device $source_ubdb_dev
 resize_device $source_ubdc_dev
 resize_device $target_ubdb_dev
 resize_device $target_ubdc_dev
 echo -e "done.\n"
+popd
 
 echo -n Copy necessary files to umls ...
 ssh $SSH_OPTS $source_uml_host "ls /root/source-crontab /root/introduce_bugs.sh /root/untar_kernel_test.sh" >& /dev/null
@@ -76,7 +78,6 @@ fi
 echo -e "done.\n"
 
 count=0
-
 while [[ $count -lt $ITERATIONS ]]; do
 	echo count $count
 	echo -n "source send  "
