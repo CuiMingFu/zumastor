@@ -45,6 +45,6 @@ for down_time in $DOWN_TIME; do
 	echo 1 > /proc/sys/net/ipv4/ip_forward
 done
 
-./replication_cleanup.sh || { echo FAIL; exit 1; }
+./stop_replication.sh || { echo FAIL; exit 1; }
 
 echo PASS
