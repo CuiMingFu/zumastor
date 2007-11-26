@@ -2,6 +2,7 @@
 # Copyright 2007 Google Inc.
 # Author: Jiaying Zhang <jiayingz@google.com>
 
+# Load source and target umls. Set up source and target volumes.
 . config_uml
 . config_replication
 

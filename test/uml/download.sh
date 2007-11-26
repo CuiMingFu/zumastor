@@ -2,7 +2,7 @@
 # Copyright 2007 Google Inc.
 # Author: Jiaying Zhang <jiayingz@google.com>
 
-# build kernel linux uml with the KERNEL_VERSION specified in config_uml and with ddsnap kerenel patches
+# download linux kernel and debian root file system image
 
 . config_uml
 

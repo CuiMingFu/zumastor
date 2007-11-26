@@ -1,5 +1,8 @@
 #!/bin/bash
+# Copyright 2007 Google Inc.
+# Author: Jiaying Zhang <jiayingz@google.com>
 
+# shutdown source and target umls
 . config_uml
 . config_replication
 

@@ -21,6 +21,7 @@ function create_device {
 	fi
 }
 
+pushd $WORKDIR
 [[ -e $ubdb_dev ]] || create_device $ubdb_dev
 [[ -e $ubdc_dev ]] || create_device $ubdc_dev
 
@@ -36,6 +37,7 @@ cd linux-${KERNEL_VERSION}
 screen -d -m ./linux ubda=../$uml_fs ubdb=$ubdb_dev ubdc=$ubdc_dev eth0=tuntap,,,$host_tap_ip mem=64M umid=$uml_host
 cd ..
 sleep 10
+popd
 
 # It could take a while for the machine to get ready
 ssh_ready=false

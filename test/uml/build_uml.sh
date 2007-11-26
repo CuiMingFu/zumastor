@@ -5,6 +5,7 @@
 # build kernel linux uml with the KERNEL_VERSION specified in config_uml and with ddsnap kerenel patches
 . config_uml
 
+pushd $WORKDIR
 [[ -e linux-${KERNEL_VERSION} ]] && rm -rf linux-${KERNEL_VERSION}
 echo -n Unpacking kernel...
 tar xjfk $DOWNLOAD_CACHE/linux-${KERNEL_VERSION}.tar.bz2 || exit 1
@@ -25,3 +26,4 @@ make oldconfig ARCH=um || exit 1
 make linux ARCH=um || exit 1
 cd ..
 echo -e "done.\n"
+popd
