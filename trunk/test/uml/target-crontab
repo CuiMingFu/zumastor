@@ -1,0 +1,2 @@
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/X11
+0-59/10 * * * * /root/introduce_bugs.sh >>/root/induced_bugs 2>&1
