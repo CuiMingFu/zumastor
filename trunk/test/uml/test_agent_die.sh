@@ -2,7 +2,7 @@
 # Copyright 2007 Google Inc.
 # Author: Jiaying Zhang <jiayingz@google.com>
 
-# test zumastor stop on target
+# test correctness when 'ddsnap agent' dies
 
 . config_uml
 . config_single

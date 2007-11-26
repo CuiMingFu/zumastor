@@ -2,12 +2,15 @@
 # Copyright 2007 Google Inc.
 # Author: Jiaying Zhang <jiayingz@google.com>
 
-# Download the base filesystem image from uml website
+# Unpack the base filesystem image downloaded from uml website, 
+# setup ssh keys, and build zumastor debian packages
 
 . ./config_uml
 
 [[ $# -eq 1 ]] || { echo "Usage: build_fs.sh uml_fs"; exit 1; }
 uml_fs=$1
+
+pushd $WORKDIR
 
 if [[ ! -e $uml_fs ]]; then
 	echo -n Unpacking root file system image...
@@ -57,3 +60,5 @@ mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .
 rm ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_* ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*
 chmod a+rw *.deb
 echo -e "done.\n"
+
+popd

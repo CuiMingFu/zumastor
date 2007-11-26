@@ -6,10 +6,10 @@ target_uml_ip=192.168.100.2
 target_uml_host=uml_2
 target_uml_fs=uml_fs2
 
-source_ubdb_dev=$PWD/source_ubdb
-source_ubdc_dev=$PWD/source_ubdc
-target_ubdb_dev=$PWD/target_ubdb
-target_ubdc_dev=$PWD/target_ubdc
+source_ubdb_dev=source_ubdb
+source_ubdc_dev=source_ubdc
+target_ubdb_dev=target_ubdb
+target_ubdc_dev=target_ubdc
 
 vol="test"
 hourly_snapnum=24

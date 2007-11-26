@@ -9,6 +9,7 @@ fi
     
 DOWNLOAD_CACHE="$ZUMA_REPOSITORY/build"
 fs_image=Debian-3.1-x86-root_fs
+WORKDIR="working"
 
 LOG=`mktemp`
 host_tap_ip=192.168.100.111
