@@ -9,7 +9,7 @@
 ./start_uml.sh $target_uml_fs $target_ubdb_dev $target_ubdc_dev $target_uml_host || { killall linux; exit 1; }
 
 # set up ssh keys for source and target umls to access each other
-ssh $SSH_OPTS $source_uml_host "ssh $SSH_OPTS $target_uml_host 'echo'" >& /dev/null
+ssh $SSH_OPTS $source_uml_host "ssh $SSH_OPTS $target_uml_host /bin/true" >& /dev/null
 status=$?
 if [[ $status -ne 0 ]]; then
 	echo -n Setting up ssh keys between source and target...
