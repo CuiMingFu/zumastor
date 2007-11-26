@@ -7,7 +7,7 @@
 . config_uml
 . config_replication
 
-./setup_replication.sh || { echo UNRESOLVED; exit 1; }
+./start_replication.sh || { echo UNRESOLVED; exit 1; }
 
 echo -n Start full-volume replication test...
 ssh $SSH_OPTS $source_uml_host "zumastor define target $vol $target_uml_host:$target_port -p 1 -t fullvolume" >& $LOG || { echo FAIL; exit 1; }
@@ -36,10 +36,6 @@ while [[ $count -lt $ITERATIONS ]]; do
 	count=$(( count+1 ))
 done
 
-ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" >& $LOG || { echo FAIL; exit 1; }
-
-ssh $SSH_OPTS $source_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
+./replication_cleanup.sh || { echo FAIL; exit 1; }
 
 echo PASS

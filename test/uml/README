@@ -10,14 +10,12 @@ Content
   * build_fs_root.sh requires root privilege. It installs all the required libraries
     and utilities on the root file system image.
   * setup_network_root.sh requires root privilege. It configures host and uml network.
-  * set_single.sh loads up a uml and sets up a zumastor volume according to the
-    configurations specified in config_single.
-  * setup_replication.sh loads up source and target umls, sets up ssh keys for source 
+  * start_uml.sh loads up a uml.
+  * start_replication.sh loads up source and target umls, sets up ssh keys for source 
     and target umls to access each other, and sets up source and target volumes 
     according to the configurations specified in config_replication.
-  * replication_cleanup.sh removes zumastor volumes and shuts down the umls.
-  * update_zuma_root.sh requires root privilege. It takes the root file system 
-    image as input and installs ddnsap and zumastor from the $ZUMA_REPOSITORY repository
+  * update_zuma_root.sh requires root privilege. It takes the root file system image 
+    as input and installs ddnsap and zumastor from the $ZUMA_REPOSITORY repository
     specified in config_uml. The ddsnap and zumastor code need to be compiled first
     before running this script. ddsnap and zumastor directories need to be readable
     by root.
@@ -30,25 +28,25 @@ Content
 Usage
   * The host machine needs to run a 32 bit kernel and a libc compatible with Debian 
     Etch (such as Ubuntu Dapper) to compile uml linux kernel.
+  * The host machine needs 3.5G free space to set up uml replication test.
   * The default configuration files assume the tests to be run from the test/uml
     directory under a zumastor source repository. If you want to run the uml tests
     from a different place, please copy all the files in this directory to your
     working directory and change $ZUMA_REPOSITORY in config_uml to the path where 
     zumastor repository locates.
-  * If running as root, you can simply start a test script test_XXX.sh that automatically 
-    builds everything for you at the first time. After that, it re-uses the existing 
-    kernel and file system images in the subsequent tests.
   * For security reason, we recommend you to run uml tests as a normal user.
     Here are the steps to set up a uml environment for zumastor replication test
-    as a normal user. Below, steps 2, 3, and 5 require root previlige. After the
-    initial setup, any test will re-use the existing kernel and file system images.
-        step 1: ./build_fs.sh uml_fs1
-        step 2: sudo ./build_fs_root.sh uml_fs1
-        step 3: sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
+    as a normal user. Below, steps 2, 4, 5, and 7 require root previlige. 
+        step 1: sudo apt-get install devscripts fakeroot debhelper
+                sudo apt-get install uml-utilities; sudo chmod a+rx /usr/lib/uml/uml_net
+        step 2: ./download.sh  # download the linux source tarball and Debian root image.
+        step 3: ./build_fs.sh uml_fs1
+        step 4: sudo ./build_fs_root.sh uml_fs1
+        step 5: sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
                 (If it is single uml test, go directly to step 6)
-        step 4: cp uml_fs1 uml_fs2; chmod a+rw uml_fs2
-        step 5: sudo ./setup_network_root.sh 192.168.100.2 192.168.100.111 uml_2 uml_fs2
-        step 6: ./test_xxx.sh
+        step 6: cp uml_fs1 uml_fs2; chmod a+rw uml_fs2
+        step 7: sudo ./setup_network_root.sh 192.168.100.2 192.168.100.111 uml_2 uml_fs2
+        step 8: ./test_xxx.sh
     Above, uml_fs1 is the file name of the source uml file system image, uml_fs2 is 
     the file name of the target uml file system image, 192.168.100.1 is the virtual 
     IP assigned to source uml, 192.168.100.2 is the virtual IP assigned to target uml, 
@@ -57,10 +55,12 @@ Usage
     these values with your own configuration. When you change a configuration, have a 
     look at config_uml and config_replication (or config_single for single uml test) 
     and modify them accordingly.
-  * If you have a file system image built from a previous test, you can first 
-    copy it to the directory where you want to run the test and name it as 
-    $source_uml_fs as specified in config_replicaiton (or $uml_fs in config_single
-    for single uml test). You can then skip step 1 during uml setup.
+  * After the initial setup, any test will re-use the existing kernel and file system 
+    images. You can start a test by running ./test_xxx.sh. The only exception is that
+    you need to re-configure iptable every time the host machine reboots:
+         sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    To set up iptable automatically, you can put the above command into a script under 
+    /etc/init.d and link it to the proper rc scripts.
   * If you want to run large volume replication tests, you can create four logical 
     volumes on the host with 'lvcreate', and replace $source_ubdb_dev, $source_ubdc_dev,
     $target_ubdb_dev, and $target_ubdc_dev with these lvms in config_replication.

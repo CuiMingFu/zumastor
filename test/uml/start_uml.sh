@@ -1,4 +1,8 @@
 #!/bin/bash
+# Copyright 2007 Google Inc.
+# Author: Jiaying Zhang <jiayingz@google.com>
+
+# load up a uml linux
 
 . config_uml
 
@@ -10,7 +14,7 @@ ubdc_dev=$3
 uml_host=$4
 
 function create_device {
-	fsize=`stat -c %s $1`
+	fsize=`stat -c %s $1 2> /dev/null`
 	if [[ -z $fsize || $fsize -lt 104857600 ]]; then
         	[[  $1 == /dev/sysvg/* ]] || dd if=/dev/zero of=$1 count=102400 bs=1024 >& /dev/null
         	[[ $? -eq 0 ]] || { echo "can not create device $1, error $?"; exit -1; }
@@ -25,7 +29,7 @@ function create_device {
 [[ $ubdc_dev == /* ]] || ubdc_dev=../$ubdc_dev
 
 # killing any running linux umls with the same root file system image
-pkill -f './linux ubda=../$uml_fs'
+pkill -f './linux ubda=../$uml_fs' >& /dev/null
 # load uml. uml does not work properly when running in background, so use screen detach here.
 echo -n Bring up uml...
 cd linux-${KERNEL_VERSION}
