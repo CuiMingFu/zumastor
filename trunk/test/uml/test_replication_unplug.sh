@@ -8,7 +8,7 @@
 . config_uml
 . config_replication
 
-./setup_replication.sh || { echo UNRESOLVED; exit 1; }
+./start_replication.sh || { echo UNRESOLVED; exit 1; }
 
 echo -n Start replication ...
 ssh $SSH_OPTS $source_uml_host "zumastor define target $vol $target_uml_host:$target_port -p 1" >& $LOG || { echo FAIL; exit 1; }
@@ -45,10 +45,6 @@ for down_time in $DOWN_TIME; do
 	echo 1 > /proc/sys/net/ipv4/ip_forward
 done
 
-ssh $SSH_OPTS $source_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "zumastor forget volume $vol" || { echo FAIL; exit 1; }
-
-ssh $SSH_OPTS $source_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
-ssh $SSH_OPTS $target_uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
+./replication_cleanup.sh || { echo FAIL; exit 1; }
 
 echo PASS

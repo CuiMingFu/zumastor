@@ -63,5 +63,5 @@ while [[ $count -lt $ITERATIONS ]]; do
 done
 
 ssh $SSH_OPTS $uml_host "zumastor forget volume $vol" >& $LOG
-ssh $SSH_OPTS $uml_host "halt" >& /dev/null || { echo FAIL; exit 1; }
+./stop_uml.sh $uml_host $uml_fs || { echo FAIL; exit 1; }
 echo PASS
