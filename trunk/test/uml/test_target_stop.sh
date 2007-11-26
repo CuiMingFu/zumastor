@@ -44,6 +44,6 @@ while [[ $count -lt $ITERATIONS ]]; do
 	count=$(( count+1 ))
 done
 
-./replication_cleanup.sh || { echo FAIL; exit 1; }
+./stop_replication.sh || { echo FAIL; exit 1; }
 
 echo PASS
