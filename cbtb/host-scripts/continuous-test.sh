@@ -47,7 +47,7 @@ email_failure="zumastor-buildd@google.com"
 email_success="zumastor-buildd@google.com"
 repo="${top}/zumastor-tests"
 export DISKIMG="${top}/zumastor/build/dapper-i386-zumastor-r$installrev.img"
-export LOGDIR="${top}/zumastor/build/logs-r$installrev"
+export LOGDIR="${top}/zumastor/build/r$installrev"
 [ -d $LOGDIR ] || mkdir $LOGDIR
 
 summary=${LOGDIR}/summary

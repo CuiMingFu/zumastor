@@ -49,9 +49,12 @@ pushd ${repo}
 
 # build and test the current working directory packages
 revision=`svn info | awk '/Revision:/ { print $2; }'`
-buildlog=`mktemp`
+buildlog="build/r${revision}/build-r${revision}.log"
 buildret=-1
 
+if [ ! -d "build/r${revision}" ] ; then
+  mkdir "build/r${revision}"
+fi
 
 time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh >${buildlog} 2>&1
 buildret=$?
