@@ -11,20 +11,18 @@
 
 set -e
 
-# Terminate test in 20 minutes.  Read by test harness.
-TIMEOUT=1200
+# Terminate test in 10 minutes.  Read by test harness.
+TIMEOUT=600
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-aptitude install e2fsprogs xfsprogs jfsutils reiser4progs 
+mkfs='mkfs.jfs -q'
+aptitude install jfsutils 
 
 lvcreate --size 16m -n test sysvg
-lvcreate --size 32m -n test_snap sysvg
+lvcreate --size 16m -n test_snap sysvg
 
-for mkfs in 'mkfs.ext3 -F' 'mkfs.ext2 -F' 'mkfs.xfs -f' 'mkfs.jfs -q' \
-    'mkfs.reiser4 -y'
-do
   echo "1..6"
 
   zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
@@ -55,7 +53,10 @@ do
     exit 3
   fi
 
-  sync ; zumastor snapshot testvol hourly 
+  sleep $SLEEP
+  sync
+  sleep $SLEEP
+  zumastor snapshot testvol hourly 
   sleep $SLEEP
 
   if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
@@ -87,6 +88,8 @@ do
   fi
 
   zumastor forget volume testvol
-done
+
+lvremove -f /dev/sysvg/test
+lvremove -f /dev/sysvg/test_snap
 
 exit 0
