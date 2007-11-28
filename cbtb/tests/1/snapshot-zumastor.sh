@@ -18,14 +18,14 @@ TIMEOUT=1200
 SLEEP=5
 
 
-echo "1..6"
-
 lvcreate --size 16m -n test sysvg
 lvcreate --size 32m -n test_snap sysvg
-zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 
 for fstype in ext3 ext2 xfs jfs reiser4
 do
+  echo "1..6"
+
+  zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 
   mkfs.$fstype /dev/mapper/testvol
   zumastor define master testvol -h 24 -d 7
@@ -84,7 +84,7 @@ do
     exit 6
   fi
 
-  zumastor forget master testvol
+  zumastor forget volume testvol
 done
 
 exit 0
