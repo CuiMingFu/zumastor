@@ -23,8 +23,8 @@ EXPECT_FAIL=1
 mkfs='mkfs.xfs -f'
 aptitude install xfsprogs
 
-lvcreate --size 8m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
+lvcreate --size 16m -n test sysvg
+lvcreate --size 16m -n test_snap sysvg
 
   echo "1..6"
 
@@ -36,9 +36,11 @@ lvcreate --size 8m -n test_snap sysvg
   echo ok 1 - testvol set up
 
   sync
-  # add xfs_freeze here
+  xfs_freeze -f /var/run/zumastor/mount/testvol
   zumastor snapshot testvol hourly 
-
+  sleep $SLEEP
+  xfs_freeze -u /var/run/zumastor/mount/testvol
+  
   date >> /var/run/zumastor/mount/testvol/testfile
   sleep $SLEEP
 
@@ -60,9 +62,11 @@ lvcreate --size 8m -n test_snap sysvg
 
   sleep $SLEEP
   sync
+  xfs_freeze -f /var/run/zumastor/mount/testvol
   sleep $SLEEP
   zumastor snapshot testvol hourly 
   sleep $SLEEP
+  xfs_freeze -u /var/run/zumastor/mount/testvol
 
   if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
     echo "ok 4 - second snapshot mounted"
