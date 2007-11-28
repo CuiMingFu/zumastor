@@ -17,17 +17,19 @@ TIMEOUT=1200
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
+aptitude install e2fsprogs xfsprogs jfsutils reiser4progs 
 
 lvcreate --size 16m -n test sysvg
 lvcreate --size 32m -n test_snap sysvg
 
-for fstype in ext3 ext2 xfs jfs reiser4
+for mkfs in 'mkfs.ext3 -F' 'mkfs.ext2 -F' 'mkfs.xfs -f' 'mkfs.jfs -q' \
+    'mkfs.reiser4 -y'
 do
   echo "1..6"
 
   zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 
-  mkfs.$fstype /dev/mapper/testvol
+  $mkfs /dev/mapper/testvol
   zumastor define master testvol -h 24 -d 7
 
   echo ok 1 - testvol set up
