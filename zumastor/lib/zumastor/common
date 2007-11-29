@@ -255,7 +255,7 @@ function mount_device {
 
 	# to support mounting arbitrary snapshots to the unqualified volume mountpoint
 	[[ $3 == "unqualified" ]] && mount=${MOUNTS}/$vol
-	[[ $3 == "rw" ]] && options="rw,errors=remount-ro,usrquota,grpquota"
+	[[ $3 == "rw" ]] && options="rw"
 	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
 
 	test -d $mount || mkdir $mount || return 1
