@@ -483,6 +483,7 @@ function forget_volume {
 
 	rmdir $path/targets
 	rm -rf $path/device
+	rm -rf $path/filesystem
 
 	rmdir $path || return 1
 }

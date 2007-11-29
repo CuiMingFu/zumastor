@@ -252,6 +252,7 @@ function mount_device {
 	local -r device=/dev/mapper/$name
 	local mount=${MOUNTS}/$name
 	local options=ro
+	local fsopts=${VOLUMES}/$vol/filesystem/options
 
 	# to support mounting arbitrary snapshots to the unqualified volume mountpoint
 	[[ $3 == "unqualified" ]] && mount=${MOUNTS}/$vol
@@ -260,8 +261,14 @@ function mount_device {
 
 	test -d $mount || mkdir $mount || return 1
 
+	# additional per-filesystem mount options
+	if [[ -r $fsopts ]]; then
+		read opts <$fsopts
+		options="$options,$opts"
+	fi
+
 	# mount ro, umount, and re-mount to work around free blocks bug in ext3
-	mount -o ro $device $mount || { sleep 3; mount -o ro $device $mount || return 1; }
+	mount -o "ro,$options" $device $mount || { sleep 3; mount -o "ro,$options" $device $mount || return 1; }
 	umount $device && \
 	mount -o $options $device $mount || \
 		{ echo "unable to mount $device on $mount"; return 1; }
