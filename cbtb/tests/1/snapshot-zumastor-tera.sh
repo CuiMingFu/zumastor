@@ -40,7 +40,7 @@ zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.xfs /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
-  mkdir /var/lib/zumastor/volumes/testvol/filesystem/options
+  mkdir /var/lib/zumastor/volumes/testvol/filesystem
   echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
 
 zumastor define master testvol -h 24 -d 7
