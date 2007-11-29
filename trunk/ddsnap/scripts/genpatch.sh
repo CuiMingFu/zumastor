@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 tmp=/tmp/$$
 ver=$1
 kpath=$2
