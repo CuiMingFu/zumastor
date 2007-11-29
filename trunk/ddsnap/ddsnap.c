@@ -45,10 +45,8 @@ int fd_size(int fd, u64 *bytes)
 		*bytes = stat.st_size;
 		return 0;
 	}
-	unsigned long sectors; // !!! will puke at 2 TB
-	if (ioctl(fd, BLKGETSIZE, &sectors))
+	if (ioctl(fd, BLKGETSIZE64, bytes))
 		return -errno;
-	*bytes = ((u64)sectors) << 9;
 	return 0;
 }
 
