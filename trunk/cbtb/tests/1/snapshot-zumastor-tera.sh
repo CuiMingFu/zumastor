@@ -31,10 +31,13 @@ TIMEOUT=1200
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
+aptitude install jfsutils
+modprobe jfs
+
 echo "1..6"
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.xfs /dev/mapper/testvol
+mkfs.jfs /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
