@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 pushd patches >/dev/null
 vers=$(echo *)
