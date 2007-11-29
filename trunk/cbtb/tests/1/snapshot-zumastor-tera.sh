@@ -25,24 +25,33 @@ EXPECT_FAIL=1
 HDBSIZE=1024
 HDCSIZE=1024
 
-# Terminate test in 10 minutes.  Read by test harness.
+# Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-aptitude install jfsutils
-modprobe jfs
+aptitude install xfsprogs
+modprobe xfs
 
 echo "1..6"
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.jfs /dev/mapper/testvol
+mkfs.xfs /dev/mapper/testvol
+
+  # TODO: make this part of the zumastor define master or define volume
+  mkdir /var/lib/zumastor/volumes/testvol/filesystem/options
+  echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
+
 zumastor define master testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
-sync ; zumastor snapshot testvol hourly 
+sync
+xfs_freeze -f /var/run/zumastor/mount/testvol
+zumastor snapshot testvol hourly 
+sleep $SLEEP
+xfs_freeze -u /var/run/zumastor/mount/testvol
 
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
@@ -63,8 +72,11 @@ else
   exit 3
 fi
 
-sync ; zumastor snapshot testvol hourly 
+sync
+xfs_freeze -f /var/run/zumastor/mount/testvol
+zumastor snapshot testvol hourly 
 sleep $SLEEP
+xfs_freeze -u /var/run/zumastor/mount/testvol
 
 if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
   echo "ok 4 - second snapshot mounted"
