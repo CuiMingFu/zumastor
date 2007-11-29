@@ -15,16 +15,18 @@ set -e
 TIMEOUT=600
 
 # necessary at the moment, looks like a zumastor bug
-SLEEP=5
+SLEEP=30
 
-# reiser4 seems to lack sync response, much like xfs
+# reiserfs seems to lack sync response, much like xfs
 EXPECT_FAIL=1
 
-mkfs='mkfs.reiser4 -y'
-aptitude install reiser4progs 
+mkfs='mkfs.reiserfs -f'
+aptitude install reiserfsprogs 
 
-lvcreate --size 4m -n test sysvg
-lvcreate --size 4m -n test_snap sysvg
+modprobe reiserfs
+
+lvcreate --size 64m -n test sysvg
+lvcreate --size 64m -n test_snap sysvg
 
   echo "1..6"
 
@@ -37,6 +39,7 @@ lvcreate --size 4m -n test_snap sysvg
 
   sync ; zumastor snapshot testvol hourly 
 
+  sleep $SLEEP
   date >> /var/run/zumastor/mount/testvol/testfile
   sleep $SLEEP
 

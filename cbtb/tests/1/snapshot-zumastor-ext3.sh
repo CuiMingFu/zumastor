@@ -33,7 +33,8 @@ lvcreate --size 4m -n test_snap sysvg
   echo ok 1 - testvol set up
 
   sync ; zumastor snapshot testvol hourly 
-
+  sleep $SLEEP
+ 
   date >> /var/run/zumastor/mount/testvol/testfile
   sleep $SLEEP
 
