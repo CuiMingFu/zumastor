@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Copyright 2007 Google Inc.
 # Author: cklin@google.com (Chuan-kai Lin)
