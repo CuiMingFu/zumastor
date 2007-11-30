@@ -180,7 +180,7 @@ function replicate_snapshot {
 	local -r volume_file=$target_dir/name
 	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol
 
-	read -d" " old_snap <$hold_file 2>/dev/null
+	read -d" " old_snap 2>/dev/null <$hold_file
 	read remote_vol <$volume_file || return 1
 
 	log "replication beginning from snapshot '$old_snap' to '$snap' on volume '$vol' for '$host'"
@@ -556,7 +556,7 @@ function forget_source {
 
 	zumastor stop source $vol
 	# !!! FIXME TODO clean up replication in progress
-	read hold <$VOLUMES/$vol/source/hold 2>/dev/null
+	read hold 2>/dev/null <$VOLUMES/$vol/source/hold
 	if [[ $hold ]]; then
 		drop_snapshot $vol $hold
 		umount_device $vol $(($hold + 1))
@@ -687,7 +687,7 @@ function replication_cycle {
 	local -r mount=$((next + 1))
 	local hold oldmount
 
-	read hold <$holdfile
+	read hold 2>/dev/null <$holdfile
 	[[ -z $hold ]] && hold=initial || oldmount=$((hold + 1))
 
 	log "replication cycle beginning - snapshot ($hold, $next)..." $log
@@ -745,7 +745,7 @@ function nag_daemon {
 
 	read remote_vol <$path/source/name || return 1
 	read host <$path/source/hostname || return 1
-	read period <$path/source/period 2>/dev/null
+	read period 2>/dev/null <$path/source/period
 
 	[[ $period -gt 0 ]] || { log "no polling period specified for $vol, nothing to do" $log; return 0; }
 
@@ -794,6 +794,7 @@ define)
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
 				exit;;
+
 			-i|--initialize) init="yes";;
 			-m|--metadev) metadev=$2; shift 1;;
 			-b|--blocksize) blocksize=$2; shift 1;;
@@ -812,6 +813,7 @@ define)
 		verify_managed_vol $vol && { echo "$0: volume '$vol' is already configured"; exit 1; }
 		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
 		verify_valid_device $snapstore || { echo "$0: invalid device '$snapstore'"; exit 1; }
+
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
 		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
@@ -1060,8 +1062,8 @@ start)
 		done
 		if [[ -x $VOLUMES/$vol/source ]] && [[ -e $progressfile ]] ; then
 			declare sent hold send_chunk send_addr
-			read hold < $holdfile
-			read sent send_chunk send_addr <$progressfile 2>/dev/null
+			read hold 2>/dev/null < $holdfile
+			read sent send_chunk send_addr 2>/dev/null <$progressfile
 			if [[ ${send_chunk/*\//} -eq ${send_chunk/\/*/} ]] && [[ $sent -ne $hold ]]; then
 				echo "recover from interrupted replication_cycle"
 				replication_cycle $vol $sent && rm $progressfile
@@ -1256,7 +1258,7 @@ receive)
 	declare hold send_snap send_chunk send_addr count=0 status
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-	read send_snap send_chunk send_addr <$progressfile 2>/dev/null
+	read send_snap send_chunk send_addr 2>/dev/null <$progressfile
 
 	# kill listen first in case it is already listening (previous replication interrupted)
 	while pkill -f "ddsnap delta listen /dev/mapper/$vol 0.0.0.0"; do
@@ -1267,7 +1269,7 @@ receive)
 
 	case $startstop in
 	start)
-		read hold <$holdfile 2>/dev/null
+		read hold 2>/dev/null <$holdfile
 		if [[ $hold ]]; then
 			verify_existing_snap $vol $hold
 			status=$?
