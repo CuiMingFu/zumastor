@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 echo set title \"Time to untar a kernel source tree vs Number of Snapshots\"
 echo set xlabel \"Number of Snapshots\"

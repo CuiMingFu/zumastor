@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/sh -x
 #
 # Build an image with current or provided zumastor debs installed, booted,
 # and ready to immediately run single-node tests.

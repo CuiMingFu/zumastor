@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/sh -x
 
 # Set up the initial Debian/etch template image, for use when duplicating
 # the install to multiple server/client tests.  Makes use of tunbr and
