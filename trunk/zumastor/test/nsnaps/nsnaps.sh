@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/bash 
 
 set -u # let make sure we use initialized variable 
 

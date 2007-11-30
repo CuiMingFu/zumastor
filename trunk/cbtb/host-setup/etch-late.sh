@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # run after the base packages are installed, from inside the d-i environment
 # copied into the initrd so it doesn't need to be fetched over network

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 dest_dir=/var/run/zumastor/mount/test
 number=1

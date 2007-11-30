@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 ln -s $(pwd)/bin/zumastor /bin/zumastor
 ln -s $(pwd)/lib/zumastor /lib/zumastor
