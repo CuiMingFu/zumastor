@@ -1,6 +1,6 @@
-.TH DDSNAP 8 "Jan 3, 2007" "Linux"
+.TH ddsnap 8 "Nov 30, 2007" "Linux"
 .SH NAME
-ddsnap \- block level snapshot and replication
+ddsnap \- block device snapshot and replication
 
 \fB
 .SH SYNOPSIS
@@ -220,7 +220,7 @@ sudo ./\fBddsnap delta apply\fP \fI/path/to/deltafile0\-1\fP \fI/dev/mapper/vol\
 .SH SEE ALSO
 \fBzumastor\fP(8), \fBddraid\fP(8), \fBdmsetup\fP(8)
 
-zumastor project page: http://code.google.com/p/zumastor/
+zumastor project page: http://zumastor.org
 .SH FUTURE ADDITIONS
 In the future, we will go further in the direction of hiding the device names, by coming up with a proper library API for creating the virtual devices so we don't need the clumsy dmsetup command any more or the even more clumsy libdevmapper interface, or worse yet, the devmapper ioctl interface.  Our library interface might even offer the option of creating a virtual device with no name, it just gives the program a FD for a device that we set (somehow) to be a virtual origin or snapshot.  No device name ever appears on the filesystem.  I have some misgivings about this idea because we then invite the situation where we can have multiple virtual devices on the same host, referring to the same snapshot.  This ought to work for fine for our \fBddsnap\fP and ddraid devices because they are designed as cluster devices, but I dunno.  I'm still mulliing over the right thing to do there.  This is just to let everybody know that the deficiencies of the current scheme are known, they are being thought about, and for now the result is some visible warts.
 .SH BUGS
@@ -239,4 +239,4 @@ This program uses zlib compression library and popt library.  Many people sent p
 .TP
 Thanks to Google, Red Hat and Sistina Software for supporting this work.  Special thanks to: Mike Todd, Joseph Dries and Matthew O'Keefe.
 .TP
-The home page of \fBddsnap\fP is \fBhttp://code.google.com/p/zumastor\fP.  This site may cover questions unanswered by this manual page.  Mailing lists for support and development are available at zumastor@googlegroups.com
+The home page of \fBddsnap\fP is \fBhttp://zumastor.org\fP.  This site may cover questions unanswered by this manual page.  Mailing lists for support and development are available at zumastor@googlegroups.com
