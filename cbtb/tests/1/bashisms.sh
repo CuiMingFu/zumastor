@@ -24,7 +24,7 @@ ln -sf dash /bin/sh
 for f in /bin/zumastor /etc/cron.hourly/zumastor /etc/init.d/zumastor \
     /etc/cron.weekly/zumastor /etc/cron.daily/zumastor
 do
-  sed -i 's/^#!\/bin\/bash/#!/bin/sh' $f
+  sed -i 's/^#!\/bin\/bash/#!\/bin\/sh/' $f
 done
 
 
