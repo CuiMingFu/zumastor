@@ -1,7 +1,7 @@
 Source: ddsnap
 Section: unknown
 Priority: optional
-Maintainer: Jane Chiu <jchiu@google.com>
+Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
 Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev
 Standards-Version: 0.1.0
 

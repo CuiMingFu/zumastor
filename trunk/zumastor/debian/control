@@ -1,7 +1,7 @@
 Source: zumastor
 Section: unknown
 Priority: optional
-Maintainer: root <root@bounty.smo.corp.google.com.smo.corp.google.com>
+Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
 Build-Depends: debhelper (>= 4.0.0)
 Standards-Version: 3.6.2
 
