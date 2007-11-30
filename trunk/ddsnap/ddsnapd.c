@@ -324,7 +324,7 @@ struct commit_block
 } PACKED;
 
 /*
- * Given journal offset i, return the actual sector number of that block,
+ * Given journal offset i, return the actual address of that block,
  * suitable for bread()ing.
  */
 static sector_t journal_sector(struct superblock *sb, unsigned i)
@@ -387,6 +387,10 @@ static int bytebits(unsigned char c)
 	return count;
 }
 
+/*
+ * Walk the given allocation space bitmap and count the number of
+ * free blocks.
+ */
 static chunk_t count_free(struct superblock *sb, struct allocspace *alloc)
 {
 	unsigned blocksize = sb->metadata.allocsize;
@@ -444,7 +448,7 @@ static void selfcheck_freespace(struct superblock *sb)
  *
  * Since we don't have any asynchronous IO at the moment, journal commit is
  * straightforward: walk through the dirty blocks once, writing them to the
- * journal, then again, adding sector locations to the commit block.  We know
+ * journal, then again, adding block addresses to the commit block.  We know
  * the dirty list didn't change between the two passes.  When ansynchronous
  * IO arrives here, this all has to be handled a lot more carefully.
  */
@@ -456,6 +460,9 @@ static void commit_transaction(struct superblock *sb)
 	struct list_head *list;
 	int safety = dirty_buffer_count;
 
+	/*
+	 * Write each dirty buffer sequentially to the journal.
+	 */
 	list_for_each(list, &dirty_buffers) {
 		struct buffer *buffer = list_entry(list, struct buffer, dirty_list);
 		unsigned pos = next_journal_block(sb);
@@ -472,6 +479,11 @@ static void commit_transaction(struct superblock *sb)
 	}
 	assert(!safety);
 
+	/*
+	 * Prepare the commit block, add the block address for each of the
+	 * blocks we just wrote to it, checksum it and write it to the
+	 * journal.
+	 */
 	unsigned pos = next_journal_block(sb);
 	struct buffer *commit_buffer = jgetblk(sb, pos);
 	memset(commit_buffer->data, 0, sb->metadata.allocsize);
@@ -493,6 +505,9 @@ static void commit_transaction(struct superblock *sb)
 		jtrace(warn("unable to write checksum fro commit block"););
 	brelse(commit_buffer);
 
+	/*
+	 * Now write each dirty buffer to its proper location.
+	 */
 	while (!list_empty(&dirty_buffers)) {
 		struct list_head *entry = dirty_buffers.next;
 		struct buffer *buffer = list_entry(entry, struct buffer, dirty_list);
@@ -762,12 +777,21 @@ found:
  * higher level code may split the leaf and try again.  This keeps the
  * leaf-editing code complexity down to a dull roar.
  */
+/*
+ * Returns the number of bytes of free space in the given leaf by computing
+ * the difference between the end of the map entry list and the beginning
+ * of the first set of exceptions.
+ */
 static unsigned leaf_freespace(struct eleaf *leaf)
 {
 	char *maptop = (char *)(&leaf->map[leaf->count + 1]); // include sentinel
 	return (char *)emap(leaf, 0) - maptop;
 }
 
+/*
+ * Returns the number of bytes used in the given leaf by computing the number
+ * of bytes used by the map entry list and all sets of exceptions.
+ */
 static unsigned leaf_payload(struct eleaf *leaf)
 {
 	int lower = (char *)(&leaf->map[leaf->count]) - (char *)leaf->map;
@@ -1224,6 +1248,9 @@ static inline struct enode *path_node(struct etree_path path[], int level)
 	return buffer2node(path[level].buffer);
 }
 
+/*
+ * Release each buffer in the given path array.
+ */
 static void brelse_path(struct etree_path *path, unsigned levels)
 {
 	unsigned i;
@@ -1564,6 +1591,9 @@ static void remove_index(struct etree_path path[], int level)
 	}
 }
 
+/*
+ * Release the passed buffer and free the block it contains.
+ */
 static void brelse_free(struct superblock *sb, struct buffer *buffer)
 {
 	brelse(buffer);
@@ -1575,6 +1605,13 @@ static void brelse_free(struct superblock *sb, struct buffer *buffer)
 	set_buffer_empty(buffer);
 }
 
+/*
+ * Set the given buffer as dirty, then check the number of dirty buffers and
+ * if that number meets or exceeds the size of the journal itself less the
+ * maximum number of dirty B-Tree buffers (i.e. reserving enough space for
+ * B-Tree operations), commit the current transaction, thereby flushing the
+ * buffer cache.
+ */
 #define MAX_BTREE_DIRTY	10 // max dirty buffers generated in a btree operation, depends on how bushy the btree is
 static void set_buffer_dirty_check(struct buffer *buffer, struct superblock *sb)
 {
@@ -1764,6 +1801,10 @@ keep_prev_node:
 	}
 }
 
+/*
+ * Find the given snapshot tag in the list of snapshots in the superblock.
+ * Return a pointer to that snapshot entry.
+ */
 static struct snapshot *find_snap(struct superblock *sb, u32 tag)
 {
 	struct snapshot *snapshot = sb->image.snaplist;
@@ -2125,6 +2166,12 @@ static int add_exception_to_tree(struct superblock *sb, struct buffer *leafbuf, 
 
 #define chunk_highbit ((sizeof(chunk_t) * 8) - 1)
 
+/*
+ * Actually perform a "copyout" operation.
+ *
+ * If a copyout operation is pending (as set up by copyout(), below), this
+ * routine actually does the copy via calls to diskread() and diskwrite().
+ */
 static int finish_copyout(struct superblock *sb)
 {
 	if (sb->copy_chunks) {
@@ -2145,16 +2192,34 @@ static int finish_copyout(struct superblock *sb)
 	return 0;
 }
 
+/*
+ * Handle the "copyout" operation.
+ *
+ * When a shared chunk is changed, the original contents must be copied from
+ * the origin or from the snapshot in which it changed to (a new location in)
+ * the snapshot store before the change takes place.  This routine stores the
+ * latest such operation in the superblock.  As an optimization, it also
+ * accumulates consecutive chunks so that they may be copied together.
+ */
 static int copyout(struct superblock *sb, chunk_t chunk, chunk_t exception)
 {
 #if 1
+	/*
+	 * If this is the next consecutive chunk, it's mapped to the next
+	 * consecutive snapshot chunk _and_ it will fit in the copy buffer,
+	 * just bump the count; we'll copy the whole set together.
+	 */
 	if (sb->source_chunk + sb->copy_chunks == chunk &&
 		sb->dest_exception + sb->copy_chunks == exception &&
 		sb->copy_chunks < sb->copybuf_size >> sb->snapdata.asi->allocsize_bits) {
 		sb->copy_chunks++;
 		return 0;
 	}
-	finish_copyout(sb); // why do this?
+	/*
+	 * If there's a pending copyout and this one doesn't meet the above
+	 * criteria, perform the previous copyout and start a new one.
+	 */
+	finish_copyout(sb);
 	sb->copy_chunks = 1;
 	sb->source_chunk = chunk;
 	sb->dest_exception = exception;
@@ -2318,6 +2383,9 @@ static int test_unique(struct superblock *sb, chunk_t chunk, int snapbit, chunk_
 
 /* Snapshot Store Superblock handling */
 
+/*
+ * Calculate a bitmask from the list of existing snapshots.
+ */
 static u64 calc_snapmask(struct superblock *sb)
 {
 	u64 mask = 0;
@@ -3110,6 +3178,9 @@ static unsigned int bit_count(u64 num)
 	return count;
 }
 
+/*
+ * Walk a B-tree leaf, counting shared chunks per snapshot.
+ */
 static void calc_sharing(struct superblock *sb, struct eleaf *leaf, void *data)
 {
 	uint64_t *share_table = data;
@@ -3221,7 +3292,12 @@ static int incoming(struct superblock *sb, struct client *client)
 				}
 			finish_copyout(sb);
 			commit_transaction(sb);
-
+			/*
+			 * If waitfor_chunk() detected a pending readlock and
+			 * queued this write for it, just update the "pending"
+			 * structure with our client ID and fill in the
+			 * message to be sent when the lock is released.
+			 */
 			if (pending) {
 				pending->client = client;
 				memcpy(&pending->message, &message, message.head.length + sizeof(struct head));
