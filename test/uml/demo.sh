@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Demostrates how to run all UML-based Zumastor tests
 set -e
 set -x

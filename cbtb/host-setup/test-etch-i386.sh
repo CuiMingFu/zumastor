@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 # Run the etch/i386 image using -snapshot to verify that it works.
 # The template should be left unmodified.
