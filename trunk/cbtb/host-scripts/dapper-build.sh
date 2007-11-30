@@ -124,6 +124,11 @@ cd ~build/zumastor
 echo CONCURRENCY_LEVEL := ${threads} >> /etc/kernel-pkg.conf
 EOF
 
+# replace bash with dash in the build environment, to see where it fails
+# and prevent future undeclared bashisms
+${SETUPTIMEOUT} ${SSH} root@${IPADDR} aptitude install dash
+${SETUPTIMEOUT} ${SSH} root@${IPADDR} ln -sf dash /bin/sh
+
 # Specific kernel configurations take priority over general configurations
 # kernel/config/${KERNEL_VERSION}-${ARCH} is not in the archive and may
 # be a symlink to specify a specific kernel config in the local repository
