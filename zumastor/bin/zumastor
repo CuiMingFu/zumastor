@@ -94,6 +94,7 @@ function new_snapshot {
 
 	[[ $kind == "/manual" ]] && return 0
 	mount_device $vol $next
+	export_snap $vol $next
 
 	if [[ $num -ge $max ]]; then
 		oldest=${snapshots[0]}

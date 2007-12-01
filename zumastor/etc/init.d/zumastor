@@ -53,6 +53,7 @@ function start_zumastor {
 		for id in $list; do
 			log "Mounting snapshot '$vol($id)'" $log
 			mount_device $vol $id >> $log 2>&1
+			export_snap $vol $id
 		done
 
 		if [ -x $VOLUMES/$vol/master ]; then
