@@ -17,9 +17,6 @@ TIMEOUT=600
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-# xfs ignores sync, so expect failure until xfs_freeze is added to the test
-EXPECT_FAIL=1
-
 mkfs='mkfs.xfs -f'
 aptitude install xfsprogs
 

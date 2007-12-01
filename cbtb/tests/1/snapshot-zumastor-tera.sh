@@ -15,11 +15,6 @@
 
 set -e
 
-# Expect failure.  Delete this when the test is fully successful.
-# Since xfs is used, xfs_freeze will certainly be required instead of sync.
-# Read only by the test harness.
-EXPECT_FAIL=1
-
 # The required sizes of the sdb and sdc devices in G.
 # Read only by the test harness.
 HDBSIZE=1024
