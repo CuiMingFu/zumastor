@@ -274,6 +274,20 @@ function mount_device {
 		{ echo "unable to mount $device on $mount"; return 1; }
 }
 
+# nfs server hook: export the snapshot volume with unique fsid
+function export_snap {
+	[[ $# -ge 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local vfsid fsid
+
+	# FIXME: we should only export snapshots whose origin volume is exported.
+	# The problem is we can't learn this from exports because users may export a 
+	# dir linked to the origin volume and export_snap may be run before nfs starts
+	fsid=`echo "$vol$snap" | cksum | cut -d " " -f 1`
+	exportfs -oro -ofsid=$fsid *:$MOUNTS/$vol\($snap\)
+}
+
 function umount_device {
 	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
@@ -283,6 +297,8 @@ function umount_device {
 	local -r mount=${MOUNTS}/$name
 
 	umount $option /dev/mapper/$name
+	# nfs server hook: unexport the snapshot volume
+	[[ $id -eq -1 ]] || exportfs -u *:$MOUNTS/$name 2> /dev/null
 
 	rmdir $mount 2> /dev/null
 }
