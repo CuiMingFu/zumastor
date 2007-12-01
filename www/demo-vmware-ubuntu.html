@@ -5,9 +5,9 @@
 </head>
 <body>
 
-<h1>Zumastor Walkthroughs</h1>
+<h1>Kicking Zumastor's tires with VMware</h1>
 
-<h2>Ubuntu walkthrough on VMWare Player</h2>
+<h2>Installation</h2>
 First, install vmware player on your machine.  (If you're using Ubuntu,
 it might be as simple as <tt>apt-get install vmware-player</tt>.)
 <p>
@@ -34,25 +34,81 @@ from the site where you downloaded the image).
 <p>
 Fifth, inside vmware, download and install dmsetup and the Zumastor packages, e.g.
 <pre>
-$ sudo apt-get install links dmsetup
-$ mkdir tmp
-$ cd tmp
-$ links zumastor.org
-[download the kernel image, zumastor, and ddsnap packages.  Don't forget to let the downloads finish!]
-$ sudo dpkg -i *.deb
+$ sudo apt-get install dmsetup
+$ wget -m -np zumastor.org/downloads/snapshots/0.5-r1004
+$ mv zumastor.org/downloads/snapshots/0.5-r1004 .
+$ rm -rf zumastor.org
+$ sudo dpkg -i 0.5-r1004/*.deb
 </pre>
 (This currently fails with Ubuntu 7.10, which is why this walkthrough uses 6.06.)
-Ignore the warnings about deleting symbolic links.
+The install takes several minutes.
+Ignore the warnings about deleting symbolic links '.../build' and '.../source'.
 <p>
-Sixth, reboot the virtual machine:
+Sixth, halt the virtual machine:
 <pre>
-$ sudo reboot
+$ sudo halt
 </pre>
-Booting currently fails with the error "Unable to find volume group 'Ubuntu'"
-and drops you into an emergency shell after a minute.
+Seventh, work around a problem with VMWare and newer kernels by
+editing the file ubuntu-server-6.06.1-i386.vmx to replace line 4,
+<pre>
+scsi0.virtualDev = "lsilogic"
+</pre>
+with
+<pre>
+scsi0.virtualDev = "buslogic"
+</pre>
+(thanks to Chris Smith, who found this tidbit in
+<a href="http://gentoo-wiki.com/HOWTO_Install_Gentoo_on_VMware">Gentoo's VMware documentation</a>).
 <p>
-Seventh, send annoyed email to the zumastor developers, asking them to try this walkthrough :-)
-<hr>
+Eighth, boot the virtual machine again.  (If booting fails with
+the error "Unable to find volume group 'Ubuntu'", perhaps you
+skipped step seven?)
+<p>
+Congratulations, you now have a virtual system with Zumastor installed!
+
+<h2>Configuration</h2>
+(Note: this part is copied from the qemu walkthrough, need to test it here
+and paste in the new output.)
+<p>
+Now that you have Zumastor installed and booted, it's time to
+try creating a volume and playing with snapshots.
+<p>
+Since the image we booted doesn't have any unpartitioned space,
+and there's no online shrink for ext3, let's just 
+use a regular file for our test volume, and another one
+for its snapshot store.  For now, let's
+make each of them 100 MB:
+<pre>
+$ sudo su
+# dd if=/dev/zero of=/media/volume.img bs=1024 count=100000
+# dd if=/dev/zero of=/media/volume.snapstore bs=1024 count=100000
+# losetup /dev/loop/0 /media/volume.img
+# losetup /dev/loop/1 /media/volume.snapstore
+# zumastor define volume zumatest /dev/loop/0 /dev/loop/1
+</pre>
+You now have a zumastor block device at /dev/mapper/zumatest.
+Let's create a filesystem and configure periodic snapshots:
+<pre>
+# mkfs.ext3 /dev/mapper/zumatest
+# zumastor define master zumatest --hourly 24
+# df
+...
+/dev/mapper/zumatest foo bar bletch
+</pre>
+Setting this volume as a "master" causes it be to mounted on /var/run/zumastor/mount/zumatest
+The "--hourly 24" specifies that we want to keep the 24 most recent hourly snapshots (a days worth).
+A snapshot will be created once an hour via the zumastor hourly cron script.  We can accelerate this by manually telling zumastor to take an "hourly" snapshot.
+
+<pre>
+# zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest(0)
+</pre>
+
+If you do some IO on the filesystem you will notice only the origin device, mounted on <code>/var/run/zumastor/mount/zumatest</code> changes.
+Note:  You do <i>not</i> need to add the filesystem to your /etc/fstab.  The zumastor init script will mount the volume and all its snapshots automatically at boot time.
+
 <center>&copy; 2007 Google</center>
 </body>
 </html>
