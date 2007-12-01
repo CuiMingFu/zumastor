@@ -20,9 +20,6 @@ set -e
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
-# TODO remove this when test passes
-EXPECT_FAIL=1
-
 slave=${IPADDR2}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'

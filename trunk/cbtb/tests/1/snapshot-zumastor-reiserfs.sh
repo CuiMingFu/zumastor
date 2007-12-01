@@ -17,9 +17,6 @@ TIMEOUT=600
 # necessary at the moment, looks like a zumastor bug
 SLEEP=30
 
-# reiserfs seems to lack sync response, much like xfs
-EXPECT_FAIL=1
-
 mkfs='mkfs.reiserfs -f'
 aptitude install reiserfsprogs 
 
