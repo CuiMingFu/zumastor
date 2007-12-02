@@ -145,12 +145,27 @@ So far, so good.  Now, let's see how many snapshots we can take!
   num=`expr $num + 1`
   echo $num
   done
+# df -P | grep zumatest
+</pre>
+You should see 24 snapshots (the limit set when we did the <tt>zumastor define master</tt>)
+plus the origin volume.  Each time you run 'zumastor snapshot ...'
+it creates a new snapshot, and deletes any that are 'too old'.
+<p>
+Now reboot the virtual machine and log back in as root.  
+Notice that 'df' doesn't show any Zumastor snapshots.
+That's because when Zumastor started at boot time, it
+couldn't see the loopback device, because we didn't arrange 
+for it to be set up automatically at boot time.  
+(This won't happen with real devices!)
+So do it manually now, then tell LVM about it, then tell Zumastor about it:
+<pre>
+$ sudo sh
+# losetup /dev/loop/0 /media/vg.img
+# vgchange -ay
+# bash /etc/init.d/zumastor restart
 # df | grep zumatest
 </pre>
-When I do that, I see 48 snapshots, though I expected 24
-(the limit set when we did the 
-<tt>zumastor define master</tt>).
-Curious...
+You should now see the same volume and set of snapshots that you did before.
 
 <center>&copy; 2007 Google</center>
 </body>
