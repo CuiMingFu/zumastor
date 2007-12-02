@@ -44,11 +44,19 @@ diskimgdir=${HOME}/testenv
 
 export BUILDDIR="${top}/zumastor/build"
 export SVNREV=$buildrev
-export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
-export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
+export TEMPLATEIMG="${BUILDDIR}/r${buildrev}/dapper-i386.img"
+export DISKIMG="${BUILDDIR}/r${buildrev}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
 pushd ${BUILDDIR}
+
+if [ ! -d r${SVNREV} ] ; then
+  mkdir r${SVNREV}
+fi
+
+# Each revision has a symlink to the actual template image used
+ln -sf ../`readlink dapper-i386.img` ${TEMPLATEIMG}
+
 
 # dereference template symlink so multiple templates may coexist
 if [ -L "${TEMPLATEIMG}" ] ; then
@@ -56,7 +64,7 @@ if [ -L "${TEMPLATEIMG}" ] ; then
 fi
 
 # build and test the current working directory packages
-installlog=`mktemp`
+installlog=${BUILDDIR}/r${buildrev}/install-r${buildrev}.log
 installret=-1
 
 rm -f ${diskimg}
