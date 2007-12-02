@@ -1,0 +1,64 @@
+ Zumastor HOWTO
+=================
+Dan Kegel <dank@kegel.com>
+v0.0, Dec 2007
+
+
+Introduction
+------------
+This document will explain what Zumastor is, how it differs from
+other snapshot and replication tools, how to install it,
+and how to use it.
+
+What is Zumastor?
+-----------------
+It has been difficult to convince users of commercial NAS applicances
+to switch to Linux.  In particular, some commercial NAS boxes have
+had better support for snapshots and remote replication than Linux.
+Zumastor is an effort to fix that.
+
+Snapshots
+---------
+Snapshots can be useful as part of an hourly backup system.  Instead of
+shutting down all applications for the entire duration of the backup, you
+can shut them down for just the second or two needed to take a snapshot.
+
+If your goal is to protect users from accidental deletion of files,
+you may want to take snapshots every hour, and leave the last few
+snapshots around; users who accidentally delete a file can just look in
+the snapshot.
+
+LVM already lets administrators create snapshots, but its design has the
+surprising property that every block you change on the original volume
+consumes one block for each snapshot.  The resulting speed and space
+penalty usually makes the use of more than one or two snapshots at a
+time impractical.
+
+Zumastor keeps all snapshots for a particular volume in a common snapshot
+store, and shares blocks the way one would expect.  Thus making a
+change to one block of a file in the original volume only uses one block
+in the snapshot store no matter how many snapshots you have.
+
+Remote Replication
+------------------
+Andrew Tridgell's rsync is a wonderful tool for replicating files remotely. 
+However, when doing periodic replication of large numbers of 
+infrequently changing files, the overhead for figuring out what files
+need to be sent can be extreme.
+
+Zumastor keeps track of which block change between one snapshot
+and the next, and can easily send just the changed blocks.
+Thus Zumastor can do periodic replication of large filesystems much more 
+efficiently than rsync can.
+
+Installing Zumastor
+-------------------
+Zumastor requires changes to the Linux kernel that are not yet
+in the vanilla kernel, so to install it, you will either need to
+patch your kernel, or download a prebuilt kernel package.
+
+Prebuilt kernel packages for recent Debian / Ubuntu systems
+are available at http://zumastor.org/downloads
+
+
+
