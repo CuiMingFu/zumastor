@@ -137,13 +137,16 @@ Notice that the first snapshot was named
 (Why the gap?  Zumastor uses another snapshot internally during
 replication.  Yes, this is a bit of a rough edge.)
 <p>
-So far, so good.  Now, let's see how many snapshots we can take!
+So far, so good.  Now, let's see how many snapshots we can take.
+Here's a loop that takes fifty in quick succession.
+Run it, then use df to see how many snapshots are around afterwards:
 <pre>
 # num=0
-# while test $num -lt 100
-  do zumastor snapshot zumatest hourly
-  num=`expr $num + 1`
-  echo $num
+# while test $num -lt 50
+  do 
+    zumastor snapshot zumatest hourly
+    num=`expr $num + 1`
+    echo $num
   done
 # df -P | grep zumatest
 </pre>
