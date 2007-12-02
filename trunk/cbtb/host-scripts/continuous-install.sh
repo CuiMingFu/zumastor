@@ -35,8 +35,8 @@ mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
 biabam=/usr/bin/biabam
 TUNBR=tunbr
-email_failure="zumastor-buildd@google.com"
-email_success="zumastor-buildd@google.com"
+email_failure="zumastor-commits@google.com"
+email_success="zumastor-commits@google.com"
 repo="${top}/zumastor"
 
 diskimgdir=${HOME}/testenv

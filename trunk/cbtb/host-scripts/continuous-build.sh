@@ -12,8 +12,8 @@ mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
 biabam=/usr/bin/biabam
 TUNBR=tunbr
-email_failure="zumastor-buildd@google.com"
-email_success="zumastor-buildd@google.com"
+email_failure="zumastor-commits@googlegroups.com"
+email_success="zumastor-commits@googlegroups.com"
 repo="${PWD}/zumastor"
 top="${PWD}"
 
