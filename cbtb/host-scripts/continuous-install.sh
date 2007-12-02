@@ -13,13 +13,13 @@ top="${PWD}"
 branch=`cat $repo/Version`
 
 buildrev=''
-if [ -L ${top}/buildrev ] ; then
-  buildrev=`readlink ${top}/buildrev`
+if [ -f ${repo}/build/buildrev ] ; then
+  buildrev=`cat ${repo}/build/buildrev`
 fi
 
 installrev=''
-if [ -L ${top}/installrev ] ; then
-  installrev=`readlink ${top}/installrev`
+if [ -f ${repo}/build/installrev ] ; then
+  installrev=`cat ${repo}/build/installrev`
 fi
 
 if [ "x$buildrev" = "x$installrev" ] ; then
@@ -44,11 +44,19 @@ diskimgdir=${HOME}/testenv
 
 export BUILDDIR="${top}/zumastor/build"
 export SVNREV=$buildrev
-export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
-export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
+export TEMPLATEIMG="${BUILDDIR}/r${buildrev}/dapper-i386.img"
+export DISKIMG="${BUILDDIR}/r${buildrev}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
 pushd ${BUILDDIR}
+
+if [ ! -d r${SVNREV} ] ; then
+  mkdir r${SVNREV}
+fi
+
+# Each revision has a symlink to the actual template image used
+ln -sf ../`readlink dapper-i386.img` ${TEMPLATEIMG}
+
 
 # dereference template symlink so multiple templates may coexist
 if [ -L "${TEMPLATEIMG}" ] ; then
@@ -56,7 +64,7 @@ if [ -L "${TEMPLATEIMG}" ] ; then
 fi
 
 # build and test the current working directory packages
-installlog=`mktemp`
+installlog=${BUILDDIR}/r${buildrev}/install-r${buildrev}.log
 installret=-1
 
 rm -f ${diskimg}
@@ -73,11 +81,9 @@ if [ $installret -eq 0 ]; then
   files="$installlog"
   email="${email_success}"
 
-  # creating this symlink only on success will cause the install step to
-  # keep repeating on failure.  For the moment, while the continuous build
-  # is maturing, this is desired.  Modify the logic later to not loop over
-  # installation attempts.
-  ln -sf $buildrev ${top}/installrev
+  # update the revision number that last successfully installed
+  echo $buildrev >${repo}/build/installrev.new
+  mv ${repo}/build/installrev.new ${repo}/build/installrev
 
 else
   subject="zumastor b$branch r$buildrev install failure $installret"
