@@ -17,10 +17,6 @@ rc=0
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
-# This test is currently expected to fail and should not be used by
-# the test harness to determine whether zumastor as a whole is failing.
-EXPECT_FAIL=1
-
 slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
