@@ -67,24 +67,62 @@ fi
 echo IPADDR=${IPADDR}
 echo control/tmp dir=${tmpdir}
 
-${rqemu_i386} -snapshot \
+
+# scrape HDBSIZE and HDCSIZE from the test script, create,
+# and store qemu parameters in $qemu_hd and $qemu2_hd in the $tmpdir.
+for f in ${execfiles}
+do
+  hdbsize=`awk -F = '/^HDBSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hdbsize" != "x" ] ; then
+    if [ "$hdbsize" -ge "$largest_hdbsize" ] ; then
+      largest_hdbsize=$hdbsize
+    fi
+  fi
+  hdcsize=`awk -F = '/^HDCSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hdcsize" != "x" ] ; then
+    if [ "$hdcsize" -ge "$largest_hdcsize" ] ; then
+      largest_hdcsize=$hdcsize
+    fi
+  fi
+done
+qemu_hd=""
+qemu2_hd=""
+if [ "x$largest_hdbsize" != "x" ] ; then
+  qemu-img create ${tmpdir}/hdb.img ${largest_hdbsize}G
+  qemu_hd="-hdb ${tmpdir}/hdb.img"
+  if [ "x$MACADDR2" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdb2.img ${largest_hdbsize}G
+    qemu2_hd="-hdb ${tmpdir}/hdb2.img"
+fi
+if [ "x$largest_hdcsize" != "x" ] ; then
+  qemu-img create ${tmpdir}/hdc.img ${largest_hdcsize}G
+  qemu_hd="${qemu_hd} -hdc ${tmpdir}/hdc.img"
+  if [ "x$MACADDR2" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdc2.img ${largest_hdcsize}G
+    qemu2_hd="${qemu2_hd} -hdc ${tmpdir}/hdc2.img"
+  fi
+fi
+
+${rqemu_i386} \
   -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
   -net nic,macaddr=${MACADDR},model=ne2k_pci \
   -net tap,ifname=${IFACE},script=no \
-  -boot c -hda ${diskimg} -no-reboot & qemu_pid=$!
+  -snapshot -hda ${diskimg} ${qemu_hd} \
+  -boot c -no-reboot & qemu_pid=$!
 
 if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
-  ${qemu_i386} -snapshot \
+  ${qemu_i386} \
     -serial file:${SERIAL2} \
     -monitor unix:${MONITOR2},server,nowait \
     -vnc unix:${VNC2} \
     -net nic,macaddr=${MACADDR2},model=ne2k_pci \
     -net tap,ifname=${IFACE2},script=no \
-    -boot c -hda ${diskimg} -no-reboot & qemu2_pid=$!
+    -snapshot -hda ${diskimg} ${qemu2_hd} \
+    -boot c -no-reboot & qemu2_pid=$!
 fi
 
 
@@ -148,12 +186,14 @@ then
   ${CMDTIMEOUT} ${SCP} ${execfiles} root@${IPADDR}: </dev/null || true
   for f in ${execfiles}
   do
+    # scrape TIMEOUT from the test script and store in the $timeout variable
     timelimit=`awk -F = '/^TIMEOUT=[0-9]+$/ { print $2; }' ./${f} | tail -1`
     if [ "x$timelimit" = "x" ] ; then
       timeout=""
     else
       timeout="timeout -14 $timelimit"
     fi
+
     if ${timeout} ${SSH} root@${IPADDR} ${params} ./${f}
     then
       echo ${f} ok
