@@ -35,8 +35,8 @@ mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
 biabam=/usr/bin/biabam
 TUNBR=tunbr
-email_failure="zumastor-buildd@google.com"
-email_success="zumastor-buildd@google.com"
+email_failure="zumastor-commits@googlegroups.com"
+email_success="zumastor-commits@googlegroups.com"
 repo="${top}/zumastor"
 
 diskimgdir=${HOME}/testenv
@@ -44,8 +44,8 @@ diskimgdir=${HOME}/testenv
 
 export BUILDDIR="${top}/zumastor/build"
 export SVNREV=$buildrev
-export TEMPLATEIMG="${BUILDDIR}/r${buildrev}/dapper-i386.img"
-export DISKIMG="${BUILDDIR}/r${buildrev}/dapper-i386-zumastor-r${SVNREV}.img"
+export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
+export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
 pushd ${BUILDDIR}
@@ -53,10 +53,6 @@ pushd ${BUILDDIR}
 if [ ! -d r${SVNREV} ] ; then
   mkdir r${SVNREV}
 fi
-
-# Each revision has a symlink to the actual template image used
-ln -sf ../`readlink dapper-i386.img` ${TEMPLATEIMG}
-
 
 # dereference template symlink so multiple templates may coexist
 if [ -L "${TEMPLATEIMG}" ] ; then
