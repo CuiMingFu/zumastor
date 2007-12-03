@@ -1,0 +1,84 @@
+<html>
+<head>
+<link href="doxygen.css" rel="stylesheet" type="text/css">
+<title>Zumastor Walkthroughs</title>
+</head>
+<body>
+
+<h1>Zumastor Walkthroughs</h1>
+
+<h2>Ubuntu walkthrough of running NFS server on Zumastor</h2>
+
+<h3>Set up NFS server on Zumastor</h3>
+
+Step 1: set up Zumastor following instructions at
+<a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html">Debian Installation</a>
+<p>
+Step 2: install NFS server packages.
+<pre>
+apt-get install nfs-common nfs-kernel-server
+</pre>
+<p>
+Step 3, set up NFS server exports.
+Add the following lines to /etc/exports.
+<pre>
+/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check)
+/var/run/zumastor/mount *(ro,fsid=1,nohide,no_subtree_check)
+</pre>
+The "fsid=xxx" option is required to ensure that the NFS server uses the same file
+handles after restart or remount of the exported volume. Otherwise, client will get 
+stale file handle error. Any 32 bit number can be used for the fsid of a zumastor volume, but
+it must be unique amongh all the exported filesystems.
+<p>
+If you want to export zumastor volumes from a different path, you can make symlink
+to the zumastor volumes and export the symilink directories.
+<p>
+<h3>Recover lost files from a Zumastor snapshot</h3>
+Mount the readonly Zumastor snapshot volume on the NFS client:
+<pre>
+mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount /mnt
+</pre>
+After the mount, you will see a bunch of snapshot directories under /mnt.
+Any snapshot directory is named with the time that the snapshot is taken.
+You can then recover your data by copying the file from the proper snapshot directory.
+<p>
+<h3>Set up Kerberos NFS</h3>
+Step 1: setup kadmin following instructions at 
+<a href="kadmin.html">Kadmin Setup</a>
+You can skip this step if you already have a working kadmin in your domain.
+<p>
+Step 2: add nfs client and server principles through kadmin. 
+Assume client hostname is client.domain and server hostname is server.domain
+<pre>
+root@host:~# kadmin
+kadmin: addprinc -randkey nfs/client.domain
+kadmin: ktadd -e des-cbc-crc:normal -k /tmp/client-keytab nfs/client.domain
+kadmin: addprinc -randkey nfs/server.domain
+kadmin: ktadd -e des-cbc-crc:normal -k /tmp/server-keytab nfs/server.domain
+kadmin: quit
+</pre>
+<p>
+Step 3: copy /tmp/client-keytab to /etc/krb5.keytab on the client and 
+/tmp/server-keytab to /etc/krb5.keytab on the server.
+<p>
+Step 4: edit /etc/exports directory on nfs server and add the following two lines:
+<pre>
+/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,sync)
+/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,sync)
+</pre>
+<p>
+Step 5: set "NEED_SVCGSSD=yes" in /etc/default/nfs-kernel-server on nfs server and restart nfs server:
+<pre>
+/etc/init.d/nfs-kernel-server restart
+</pre>
+Verify that rpc.gssd is running on nfs client and rpc.svcgssd 
+is running on nfs server. Also, make sure portmap and rpc.mountd are running on nfs server. 
+After this, try mount on nfs client:
+<pre>
+mount -tnfs -o "sec=krb5" server.domain:/var/run/zumastor/mount/testvol
+</pre>
+<p>
+<hr>
+<center>&copy; 2007 Google</center>
+</body>
+</html>

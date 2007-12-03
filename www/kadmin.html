@@ -1,0 +1,56 @@
+<html>
+<head>
+<link href="doxygen.css" rel="stylesheet" type="text/css">
+<title>Zumastor Walkthroughs</title>
+</head>
+<body>
+
+<h3>Set up kerberos server</h3>
+
+Assuming we want to create realm TEST.DEBIAN.ORG on kdc server kdc.debian.org
+<p>
+Step 1: install krb5 admin utils and kdc
+<pre>
+apt-get install krb5-admin-server krb5-kdc
+</pre>
+<p>
+Step 2: edit /etc/krb5.conf and add the following lines:
+<pre>
+[libdefaults]
+default_realm = TEST.DEBIAN.ORG
+forwardable = true
+[domain_realm]
+[realms]
+TEST.DEBIAN.ORG = {
+admin_server = kdc.debian.org
+kdc = ...
+}
+</pre>
+<p>
+Step 3: create kerberos realm
+<pre>
+kdb5_util create -s -r TEST.DEBIAN.ORG
+</pre>
+<p>
+Step 4: create an acl file for kdc:
+<pre>
+echo "*/admin *" > /etc/krb5kdc/kadm5.acl
+</pre>
+<p>
+Step 5: start kdc and kadmind
+<pre>
+/usr/sbin/krb5kdc
+/usr/sbin/kadmind
+</pre>
+<p>
+Step 6: create initial principles through kadmin.local
+<pre>
+root@host:~# kadmin.local
+kadmin.local: addprinc root/admin@TEST.DEBIAN.ORG
+kadmin.local: quit
+</pre>
+<p>
+<hr>
+<center>&copy; 2007 Google</center>
+</body>
+</html>
