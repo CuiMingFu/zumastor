@@ -169,6 +169,9 @@ $ sudo sh
 # df | grep zumatest
 </pre>
 You should now see the same volume and set of snapshots that you did before.
+<p>
+If vgchange -ay doesn't detect your volume group, do <tt>rm /etc/lvm/.cache</tt>
+and try again.
 
 <center>&copy; 2007 Google</center>
 </body>
