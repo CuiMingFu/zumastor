@@ -14,11 +14,11 @@ What is Zumastor?
 -----------------
 It has been difficult to convince users of commercial NAS applicances
 to switch to Linux.  In particular, some commercial NAS boxes have
-had better support for snapshots and remote replication than Linux.
+had better support for snapshots and remote replication than Linux does.
 Zumastor is an effort to fix that.
 
 Snapshots
----------
+~~~~~~~~~
 Snapshots can be useful as part of an hourly backup system.  Instead of
 shutting down all applications for the entire duration of the backup, you
 can shut them down for just the second or two needed to take a snapshot.
@@ -40,7 +40,7 @@ change to one block of a file in the original volume only uses one block
 in the snapshot store no matter how many snapshots you have.
 
 Remote Replication
-------------------
+~~~~~~~~~~~~~~~~~~
 Andrew Tridgell's rsync is a wonderful tool for replicating files remotely. 
 However, when doing periodic replication of large numbers of 
 infrequently changing files, the overhead for figuring out what files
@@ -50,6 +50,52 @@ Zumastor keeps track of which block change between one snapshot
 and the next, and can easily send just the changed blocks.
 Thus Zumastor can do periodic replication of large filesystems much more 
 efficiently than rsync can.
+
+Zumastor User Interface
+-----------------------
+Zumastor exposes itself to users in several ways:
+
+* An admin script, /etc/init.d/zumastor
+* A commandline tool, /bin/zumastor
+* Origin mount points, e.g. /var/mount/zumastor/myvolumename
+* Snapshot mount points, e.g. /var/mount/zumastor/myvolumename(10)
+
+Zumastor admin script
+~~~~~~~~~~~~~~~~~~~~~
+The admin script, /etc/init.d/zumastor, simply starts or stops the
+Zumastor daemon responsible for mounting Zumastor volumes.  Normally this
+is run once at system startup time by init, but you may need to run it
+manually in unusual circumstances.
+
+For instance, if you tell Zumastor to use origin volumes or snapshot
+stores on loopback devices that are not set up at boot time, and then
+reboot, Zumastor can't mount them automatically; you have to set them up
+and then restart Zumastor with the command `/etc/init.d/zumastor restart`.
+
+Zumastor commandline tool
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The sysadmin uses /bin/zumastor to configure snapshot stores,
+take or delete snapshots, and set up remote replication.
+
+Origin and Snapshot mount points
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Zumastor deals with two kinds of volumes: 'origin' volumes
+and 'snapshot' volumes.  Simply put, origin volumes are what you 
+take snapshots of.
+Zumastor mounts these volumes for you in appropriately named 
+subdirectories of /var/mount/zumastor.
+
+A future release of Zumastor will make the mount points configurable, but
+for now, they're not, so you can't take snapshots of /home unless
+it's a symlink to e.g. /var/mount/zumastor/home.
+
+Snapshot volumes have the same name as their origin volumes, but
+with a snapshot number in parenthesis after it.
+Zumastor skips one number each snapshot for housekeeping reasons, so
+home(1000) would be roughly the 500th snapshot of home.  
+The snapshot number never decreases (though perhaps it would
+wrap if you do billions of snapshots...)
+
 
 Installing Zumastor
 -------------------
