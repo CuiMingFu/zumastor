@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 7.1.2" />
+<meta name="generator" content="AsciiDoc 8.2.5" />
 <style type="text/css">
 /* Debug borders */
 p, li, dt, dd, div, pre, h1, h2, h3, h4, h5, h6 {
@@ -44,12 +44,17 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.3;
 }
 
-h1 {
+h1, h2, h3 {
   border-bottom: 2px solid silver;
 }
 h2 {
-  border-bottom: 2px solid silver;
   padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
 }
 
 div.sectionbody {
@@ -75,7 +80,7 @@ span#author {
   color: #527bbd;
   font-family: sans-serif;
   font-weight: bold;
-  font-size: 1.2em;
+  font-size: 1.1em;
 }
 span#email {
 }
@@ -144,6 +149,9 @@ div.sidebarblock > div.content {
   padding: 0.5em;
 }
 
+div.listingblock {
+  margin-right: 0%;
+}
 div.listingblock > div.content {
   border: 1px solid silver;
   background: #f4f4f4;
@@ -203,7 +211,7 @@ dd > *:first-child {
 ul, ol {
     list-style-position: outside;
 }
-ol.olist2 {
+div.olist2 ol {
   list-style-type: lower-alpha;
 }
 
@@ -222,6 +230,9 @@ div.hlist {
   margin-top: 0.8em;
   margin-bottom: 0.8em;
 }
+div.hlist td {
+  padding-bottom: 5px;
+}
 td.hlist1 {
   vertical-align: top;
   font-style: italic;
@@ -233,6 +244,32 @@ td.hlist2 {
 
 @media print {
   div#footer-badges { display: none; }
+}
+
+div#toctitle {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
 }
 /* Workarounds for IE6's broken and incomplete CSS2. */
 
@@ -262,7 +299,82 @@ div.exampleblock-content {
   border-left: 2px solid silver;
   padding-left: 0.5em;
 }
+
+/* IE6 sets dynamically generated links as visited. */
+div#toc a:visited { color: blue; }
 </style>
+<script type="text/javascript">
+/*<![CDATA[*/
+window.onload = function(){generateToc(2)}
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, October 2006. License: GPL */
+
+function getText(el) {
+  var text = "";
+  for (var i = el.firstChild; i != null; i = i.nextSibling) {
+    if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+      text += i.data;
+    else if (i.firstChild != null)
+      text += getText(i);
+  }
+  return text;
+}
+
+function TocEntry(el, text, toclevel) {
+  this.element = el;
+  this.text = text;
+  this.toclevel = toclevel;
+}
+
+function tocEntries(el, toclevels) {
+  var result = new Array;
+  var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+  // Function that scans the DOM tree for header elements (the DOM2
+  // nodeIterator API would be a better technique but not supported by all
+  // browsers).
+  var iterate = function (el) {
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+        var mo = re.exec(i.tagName)
+        if (mo)
+          result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+        iterate(i);
+      }
+    }
+  }
+  iterate(el);
+  return result;
+}
+
+// This function does the work. toclevels = 1..4.
+function generateToc(toclevels) {
+  var toc = document.getElementById("toc");
+  var entries = tocEntries(document.getElementsByTagName("body")[0], toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "toc" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+}
+/*]]>*/
+</script>
 <title> Zumastor HOWTO</title>
 </head>
 <body>
@@ -272,62 +384,150 @@ div.exampleblock-content {
 <span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
 <span id="revision">version 0.0,</span>
 Dec 2007
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
 </div>
-<h2>Introduction</h2>
+</div>
+<h2 id="_introduction">1. Introduction</h2>
 <div class="sectionbody">
-<p>This document will explain what Zumastor is, how it differs from
+<div class="para"><p>This document will explain what Zumastor is, how it differs from
 other snapshot and replication tools, how to install it,
-and how to use it.</p>
+and how to use it.</p></div>
 </div>
-<h2>What is Zumastor?</h2>
+<h2 id="_what_is_zumastor">2. What is Zumastor?</h2>
 <div class="sectionbody">
-<p>It has been difficult to convince users of commercial NAS applicances
+<div class="para"><p>It has been difficult to convince users of commercial NAS applicances
 to switch to Linux.  In particular, some commercial NAS boxes have
-had better support for snapshots and remote replication than Linux.
-Zumastor is an effort to fix that.</p>
-</div>
-<h2>Snapshots</h2>
-<div class="sectionbody">
-<p>Snapshots can be useful as part of an hourly backup system.  Instead of
+had better support for snapshots and remote replication than Linux does.
+Zumastor is an effort to fix that.</p></div>
+<h3 id="_snapshots">2.1. Snapshots</h3><div style="clear:left"></div>
+<div class="para"><p>Snapshots can be useful as part of an hourly backup system.  Instead of
 shutting down all applications for the entire duration of the backup, you
-can shut them down for just the second or two needed to take a snapshot.</p>
-<p>If your goal is to protect users from accidental deletion of files,
+can shut them down for just the second or two needed to take a snapshot.</p></div>
+<div class="para"><p>If your goal is to protect users from accidental deletion of files,
 you may want to take snapshots every hour, and leave the last few
 snapshots around; users who accidentally delete a file can just look in
-the snapshot.</p>
-<p>LVM already lets administrators create snapshots, but its design has the
+the snapshot.</p></div>
+<div class="para"><p>LVM already lets administrators create snapshots, but its design has the
 surprising property that every block you change on the original volume
 consumes one block for each snapshot.  The resulting speed and space
 penalty usually makes the use of more than one or two snapshots at a
-time impractical.</p>
-<p>Zumastor keeps all snapshots for a particular volume in a common snapshot
+time impractical.</p></div>
+<div class="para"><p>Zumastor keeps all snapshots for a particular volume in a common snapshot
 store, and shares blocks the way one would expect.  Thus making a
 change to one block of a file in the original volume only uses one block
-in the snapshot store no matter how many snapshots you have.</p>
-</div>
-<h2>Remote Replication</h2>
-<div class="sectionbody">
-<p>Andrew Tridgell's rsync is a wonderful tool for replicating files remotely.
+in the snapshot store no matter how many snapshots you have.</p></div>
+<h3 id="_remote_replication">2.2. Remote Replication</h3><div style="clear:left"></div>
+<div class="para"><p>Andrew Tridgell's rsync is a wonderful tool for replicating files remotely.
 However, when doing periodic replication of large numbers of
 infrequently changing files, the overhead for figuring out what files
-need to be sent can be extreme.</p>
-<p>Zumastor keeps track of which block change between one snapshot
+need to be sent can be extreme.</p></div>
+<div class="para"><p>Zumastor keeps track of which block change between one snapshot
 and the next, and can easily send just the changed blocks.
 Thus Zumastor can do periodic replication of large filesystems much more
-efficiently than rsync can.</p>
+efficiently than rsync can.</p></div>
 </div>
-<h2>Installing Zumastor</h2>
+<h2 id="_zumastor_user_interface">3. Zumastor User Interface</h2>
 <div class="sectionbody">
-<p>Zumastor requires changes to the Linux kernel that are not yet
-in the vanilla kernel, so to install it, you will either need to
-patch your kernel, or download a prebuilt kernel package.</p>
-<p>Prebuilt kernel packages for recent Debian / Ubuntu systems
-are available at http://zumastor.org/downloads</p>
+<div class="para"><p>Zumastor exposes itself to users in several ways:</p></div>
+<div class="ilist"><ul>
+<li>
+<p>
+An admin script, /etc/init.d/zumastor
+</p>
+</li>
+<li>
+<p>
+A commandline tool, /bin/zumastor
+</p>
+</li>
+<li>
+<p>
+Origin mount points, e.g. /var/mount/zumastor/myvolumename
+</p>
+</li>
+<li>
+<p>
+Snapshot mount points, e.g. /var/mount/zumastor/myvolumename(10)
+</p>
+</li>
+</ul></div>
+<h3 id="_zumastor_admin_script">3.1. Zumastor admin script</h3><div style="clear:left"></div>
+<div class="para"><p>The admin script, /etc/init.d/zumastor, simply starts or stops the
+Zumastor daemon responsible for mounting Zumastor volumes.  Normally this
+is run once at system startup time by init, but you may need to run it
+manually in unusual circumstances.</p></div>
+<div class="para"><p>For instance, if you tell Zumastor to use origin volumes or snapshot
+stores on loopback devices that are not set up at boot time, and then
+reboot, Zumastor can't mount them automatically; you have to set them up
+and then restart Zumastor with the command <tt>/etc/init.d/zumastor restart</tt>.</p></div>
+<h3 id="_zumastor_commandline_tool">3.2. Zumastor commandline tool</h3><div style="clear:left"></div>
+<div class="para"><p>The sysadmin uses /bin/zumastor to configure snapshot stores,
+take or delete snapshots, and set up remote replication.</p></div>
+<h3 id="_origin_and_snapshot_mount_points">3.3. Origin and Snapshot mount points</h3><div style="clear:left"></div>
+<div class="para"><p>Zumastor deals with two kinds of volumes: <em>origin</em> volumes
+and <em>snapshot</em> volumes.  Simply put, origin volumes are what you
+take snapshots of.
+Zumastor mounts these volumes for you in appropriately named
+subdirectories of /var/mount/zumastor.</p></div>
+<div class="para"><p>Snapshot volumes have the same name as their origin volumes, but
+with a snapshot number in parenthesis after it.
+Zumastor skips one number each snapshot for housekeeping reasons, so
+home(1000) would be roughly the 500th snapshot of home.
+The snapshot number never decreases (though perhaps it would
+wrap if you do billions of snapshots&#8230;)</p></div>
+<div class="para"><p>Note: Zumastor always mounts all its volumes under /var/mount/zumastor.
+This is fine for fileservers with no local users, as the volumes
+will be mounted at the proper location on the NFS client,
+but it's not so nice for e.g. desktops that just want to use Zumastor
+to add snapshots to home directories.
+A future release of Zumastor will make the mount points configurable
+and improve local usability of snapshots.</p></div>
+</div>
+<h2 id="_installing_zumastor">4. Installing Zumastor</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor requires changes to the Linux kernel that are not yet
+in the vanilla kernel, so a patched kernel is required.
+You can install Zumastor on any recent distribution if you're
+willing to do it by hand.  Automated installation is available
+for Debian / Ubuntu and soon also for Gentoo.  (RHEL, Fedora, and Suse
+are probably next on our list of distros to support, please
+let us know if you're willing to contribute RPM .spec files.)
+For developers, we also support automated installation
+with UML.
+And for anyone who just wants to try out Zumastor without modifying
+their system, we have tutorials showing how to install it in VMware
+and QEMU.</p></div>
+<h3 id="_debian_ubuntu">4.1. Debian / Ubuntu</h3><div style="clear:left"></div>
+<div class="para"><p>Prebuilt kernel packages for recent Debian / Ubuntu systems
+are available.
+Stable releases are at <a href="http://zumastor.org/downloads/releases">http://zumastor.org/downloads/releases</a>,
+and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">http://zumastor.org/downloads/snapshots</a>.
+The directories there are named by branch and svn revision,
+e.g. 0.4-r999 is the 0.4 branch as of svn revision 999.
+Once you've picked a version, download and install its four .deb
+packages.</p></div>
+<div class="para"><p>You should probably play with it in a virtual environment
+first.  (You can even do this on Windows!)
+See <a href="http://zumastor.org/demo-vmware-ubuntu.html">http://zumastor.org/demo-vmware-ubuntu.html</a> for
+a walkthrough using VMware, and
+<a href="http://zumastor.org/demo-qemu-ubuntu.html">http://zumastor.org/demo-qemu-ubuntu.html</a> for a
+walkthrough using QEMU.  (We should unify these and fold them
+into this HOWTO.  At the moment, the VMware walkthrough is more complete.)</p></div>
+<h3 id="_gentoo">4.2. Gentoo</h3><div style="clear:left"></div>
+<div class="para"><p>Coming soon.  Bug us about it if you're impatient.</p></div>
+<h3 id="_uml">4.3. UML</h3><div style="clear:left"></div>
+<div class="para"><p>Developers who wish to contribute changes to Zumastor should
+make sure that our UML test suite passes before and after
+their changes.  The UML test suite is in our SVN tree under
+tests/uml.  The file to run there is <strong>demo.sh</strong>.
+See also <a href="http://zumastor.org/demo-uml-ubuntu.html">http://zumastor.org/demo-uml-ubuntu.html</a>.</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 02-Dec-2007 15:05:28 PDT
+Last updated 2007-12-03 06:33:32 PDT
 </div>
 </div>
 </body>

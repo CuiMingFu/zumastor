@@ -1,3 +1,19 @@
+///////////////////
+To convert this document to HTML, use the command
+ asciidoc -a toc -a numbered zumastor-howto.txt 
+
+Note 1: the asciidoc package in Ubuntu is 7.1.2, which 
+doesn't produce working table of contents.
+Version 8.2.5 does; to install this, download
+http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz 
+and run its install.sh.  (I edited it to install into /usr/local/asciidoc
+to avoid confusing my package manager.)
+
+Note 2: asciitext seems a bit wonky; if I don't put a space at
+the beginning of the line "Zumastor HOWTO", it gives me a bunch
+of errors.  Go figure.
+///////////////////
+
  Zumastor HOWTO
 =================
 Dan Kegel <dank@kegel.com>
@@ -85,10 +101,6 @@ take snapshots of.
 Zumastor mounts these volumes for you in appropriately named 
 subdirectories of /var/mount/zumastor.
 
-A future release of Zumastor will make the mount points configurable, but
-for now, they're not, so you can't take snapshots of /home unless
-it's a symlink to e.g. /var/mount/zumastor/home.
-
 Snapshot volumes have the same name as their origin volumes, but
 with a snapshot number in parenthesis after it.
 Zumastor skips one number each snapshot for housekeeping reasons, so
@@ -96,15 +108,56 @@ home(1000) would be roughly the 500th snapshot of home.
 The snapshot number never decreases (though perhaps it would
 wrap if you do billions of snapshots...)
 
+Note: Zumastor always mounts all its volumes under /var/mount/zumastor.
+This is fine for fileservers with no local users, as the volumes
+will be mounted at the proper location on the NFS client,
+but it's not so nice for e.g. desktops that just want to use Zumastor
+to add snapshots to home directories.
+A future release of Zumastor will make the mount points configurable
+and improve local usability of snapshots.
 
 Installing Zumastor
 -------------------
 Zumastor requires changes to the Linux kernel that are not yet
-in the vanilla kernel, so to install it, you will either need to
-patch your kernel, or download a prebuilt kernel package.
+in the vanilla kernel, so a patched kernel is required.
+You can install Zumastor on any recent distribution if you're
+willing to do it by hand.  Automated installation is available
+for Debian / Ubuntu and soon also for Gentoo.  (RHEL, Fedora, and Suse
+are probably next on our list of distros to support, please 
+let us know if you're willing to contribute RPM .spec files.)
+For developers, we also support automated installation 
+with UML.
+And for anyone who just wants to try out Zumastor without modifying
+their system, we have tutorials showing how to install it in VMware
+and QEMU.
 
+Debian / Ubuntu
+~~~~~~~~~~~~~~~
 Prebuilt kernel packages for recent Debian / Ubuntu systems
-are available at http://zumastor.org/downloads
+are available.  
+Stable releases are at http://zumastor.org/downloads/releases[],
+and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
+The directories there are named by branch and svn revision,
+e.g. 0.4-r999 is the 0.4 branch as of svn revision 999.
+Once you've picked a version, download and install its four .deb
+packages.
 
+You should probably play with it in a virtual environment
+first.  (You can even do this on Windows!)
+See http://zumastor.org/demo-vmware-ubuntu.html[] for
+a walkthrough using VMware, and
+http://zumastor.org/demo-qemu-ubuntu.html[] for a
+walkthrough using QEMU.  (We should unify these and fold them
+into this HOWTO.  At the moment, the VMware walkthrough is more complete.)
 
+Gentoo
+~~~~~~
+Coming soon.  Bug us about it if you're impatient.
 
+UML
+~~~
+Developers who wish to contribute changes to Zumastor should
+make sure that our UML test suite passes before and after
+their changes.  The UML test suite is in our SVN tree under
+tests/uml.  The file to run there is *demo.sh*.
+See also http://zumastor.org/demo-uml-ubuntu.html[].
