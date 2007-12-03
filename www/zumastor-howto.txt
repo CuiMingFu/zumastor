@@ -67,6 +67,28 @@ and the next, and can easily send just the changed blocks.
 Thus Zumastor can do periodic replication of large filesystems much more 
 efficiently than rsync can.
 
+License
+-------
+Zumastor is licensed under GPLv2.
+
+Status
+------
+Zumastor has a stable release (0.4) which is limited (e.g. only supports 2GB
+volumes) but very stable.  We are focusing on documentation
+and user feedback now, and hope to have the 0.5 stable release 
+out soon.  Please download and test the 0.5 snapshots and give us feedback
+via the issue tracker, mailing list, or IRC channel at http://zumastor.org[].
+
+We have a number of kernel patches, and will push them upstream as
+soon as possible.  See http://zumastor.org[] for a list.
+
+Development
+-----------
+Most of Zumastor development is done by a small group of contributors
+(Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, and Chris Smith), but we welcome patches from the community.
+(Jonathan Van Eenwyk contributed a cool offline backup feature, 
+but http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz[his patch] has not yet been merged.  Let us know if you need this.)
+
 Zumastor User Interface
 -----------------------
 Zumastor exposes itself to users in several ways:
@@ -106,7 +128,11 @@ with a snapshot number in parenthesis after it.
 Zumastor skips one number each snapshot for housekeeping reasons, so
 home(1000) would be roughly the 500th snapshot of home.  
 The snapshot number never decreases (though perhaps it would
-wrap if you do billions of snapshots...)
+wrap if you did billions of snapshots...)
+
+Note: users would probably be happier if Zumastor used a different
+convention for naming snapshots, e.g. volname-hourly-YYYY-MM-DD-HH:MM.
+A future release of Zumastor might allow this.
 
 Note: Zumastor always mounts all its volumes under /var/mount/zumastor.
 This is fine for fileservers with no local users, as the volumes
@@ -159,5 +185,6 @@ UML
 Developers who wish to contribute changes to Zumastor should
 make sure that our UML test suite passes before and after
 their changes.  The UML test suite is in our SVN tree under
-tests/uml.  The file to run there is *demo.sh*.
+tests/uml.  The file to run there is *http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[demo.sh]*.
 See also http://zumastor.org/demo-uml-ubuntu.html[].
+
