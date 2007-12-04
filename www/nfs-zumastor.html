@@ -14,13 +14,21 @@
 Step 1: set up Zumastor following instructions at
 <a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html">Debian Installation</a>
 <p>
-Step 2: install NFS server packages.
+Step 2: install NFS server packages:
 <pre>
 apt-get install nfs-common nfs-kernel-server
 </pre>
 <p>
-Step 3, set up NFS server exports.
-Asuming <I>testvol</I> is the defined zumastor volume, add the following lines to /etc/exports.
+Step 3, apply Zumastor special patch for /etc/init.d/nfs-kernel-server: 
+<pre>
+cd /etc/init.d/
+wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
+patch -p0 < nfs-kernel-server.patch
+rm -f nfs-kernel-server.patch
+</pre>
+<p>
+Step 4, set up NFS server exports.
+Asuming <I>testvol</I> is the defined zumastor volume, add the following lines to /etc/exports:
 <pre>
 /var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check)
 /var/run/zumastor/mount/testvol.snapshots *(ro,fsid=1,nohide,no_subtree_check)
