@@ -80,9 +80,9 @@ $ sudo su
 # losetup /dev/loop/0 /media/vg.img
 # pvcreate /dev/loop/0
 # vgcreate sysvg /dev/loop/0
-# lvcreate --name origin --size 100MB sysvg
-# lvcreate --name snapstore --size 100MB sysvg
-# zumastor define volume zumatest /dev/sysvg/origin /dev/sysvg/snapstore --initialize
+# lvcreate --name test --size 100MB sysvg
+# lvcreate --name test_snap --size 100MB sysvg
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
 </pre>
 You now have a zumastor block device at /dev/mapper/zumatest.
 Let's create a filesystem and configure periodic snapshots:
