@@ -1,0 +1,450 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link title="new" rel="stylesheet" href="http://www.gentoo.org/css/main.css" type="text/css">
+<link REL="shortcut icon" HREF="http://www.gentoo.org/favicon.ico" TYPE="image/x-icon">
+<link rel="search" type="application/opensearchdescription+xml" href="http://www.gentoo.org/search/www-gentoo-org.xml" title="Gentoo Website">
+<link rel="search" type="application/opensearchdescription+xml" href="http://www.gentoo.org/search/forums-gentoo-org.xml" title="Gentoo Forums">
+<link rel="search" type="application/opensearchdescription+xml" href="http://www.gentoo.org/search/bugs-gentoo-org.xml" title="Gentoo Bugzilla">
+<link rel="search" type="application/opensearchdescription+xml" href="http://www.gentoo.org/search/archives-gentoo-org.xml" title="Gentoo List Archives">
+<title>Gentoo Linux Documentation
+--
+  Gentoo Zumastor Guide</title>
+</head>
+<body style="margin:0px;" bgcolor="#ffffff"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr><td valign="top" height="125" bgcolor="#45347b"><a href="/"><img border="0" src="http://www.gentoo.org/images/gtop-www.jpg" alt="Gentoo Logo"></a></td></tr>
+<tr><td valign="top" align="right" colspan="1" bgcolor="#ffffff"><table border="0" cellspacing="0" cellpadding="0" width="100%"><tr>
+<td width="99%" class="content" valign="top" align="left">
+<br><h1>Gentoo Zumastor Guide</h1>
+<form name="contents" action="http://www.gentoo.org">
+<b>Content</b>:
+        <select name="url" size="1" OnChange="location.href=form.url.options[form.url.selectedIndex].value" style="font-family:sans-serif,Arial,Helvetica"><option value="#doc_chap1">1. Before You Begin</option>
+<option value="#doc_chap2">2. Setting Up The Overlay</option>
+<option value="#doc_chap3">3. Installing Zumastor</option>
+<option value="#doc_chap4">4. Running Zumastor</option>
+<option value="#doc_chap5">5. Remote Replication</option></select>
+</form>
+<p class="chaphead"><a name="doc_chap1"></a><span class="chapnum">1. </span>Before You Begin</p>
+<p class="secthead"><a name="doc_chap1_sect1">Partitioning</a></p>
+<p>
+Zumastor requires some storage space for storing snapshot data (and
+for the volume itself if you are creating a new filesystem). If you
+are starting from scratch, install operating systems using custom
+partitioning, preferably leaving a large LVM volume group (named sysvg
+in this example) for use when creating origin and snapshot
+devices. While you ar at it, you might as well create an origin and
+snapshot store:
+</p>
+<a name="doc_chap1_pre1"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 1.1: Sample LVM Setup</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+<span class="code-input">pvcreate /dev/hda7
+vgcreate sysvg /dev/hda7
+lvcreate --size 20g -n test sysvg
+lvcreate --size 40g -n test_snap sysvg</span>
+</pre></td></tr>
+</table>
+<p class="chaphead"><a name="doc_chap2"></a><span class="chapnum">2. </span>Setting Up The Overlay</p>
+<p class="secthead"><a name="doc_chap2_sect1">Install Layman</a></p>
+
+<p>
+Zumastor is most easily installed by way of an overlay, managed
+through layman. If you already have layman installed, you can jump
+ahead to <a href="#add_overlay">Add the Zumastor Overlay</a>. If
+you don't know what I'm talking about, you might want to read the <a href="/proj/en/overlays/userguide.xml">Gentoo
+Overlays Guide</a>. For the impatient, I've lifted the key bits
+(note that this must all be done as root):
+</p>
+<a name="doc_chap2_pre1"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 2.1: Installing layman</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+<span class="code-input">emerge layman
+echo "source /usr/portage/local/layman/make.conf" &gt;&gt; /etc/make.conf</span>
+</pre></td></tr>
+</table>
+<p>
+Congratulations, you've installed layman
+</p>
+<a name="add_overlay"></a><p class="secthead"><a name="doc_chap2_sect2">Add the Zumastor Overlay</a></p>
+<p>
+The Zumastor overlay isn't (yet) an officially sanctioned Gentoo overlay, so adding it is a bit more complicated than usual.
+</p>
+<table class="ncontent" width="100%" border="0" cellspacing="0" cellpadding="0"><tr><td bgcolor="#ffbbbb"><p class="note"><b>Warning: </b>
+Overlays are perhaps the best known way to mess up a Gentoo setup... even the officially sanctioned overlays. Consider this fair warning.
+</p></td></tr></table>
+<p>
+If you (again as root) open up /etc/layman/layman.cfg in your editor
+of choice, you will find a line that looks something like this:
+</p>
+<a name="doc_chap2_pre2"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 2.2: layman.cfg fragment</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+overlays   : http://www.gentoo.org/proj/en/overlays/layman-global.txt
+</pre></td></tr>
+</table>
+<p>
+URL's for addtional overlays belong on their own line. So, to add our overlay listing, so that it looks like this:
+</p>
+<a name="doc_chap2_pre3"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 2.3: Edited layman.cfg fragment</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+overlays   : http://www.gentoo.org/proj/en/overlays/layman-global.txt
+             <span class="code-input">http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml</span>
+</pre></td></tr>
+</table>
+<p>
+You've now added Zumastor's overlay listing to layman. Now you need to
+add Zumastor's overlay (still as root):
+</p>
+<a name="doc_chap2_pre4"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 2.4: Adding the Zumastor overlay</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">layman -f -a zumastor</span>
+</pre></td></tr>
+</table>
+<p class="chaphead"><a name="doc_chap3"></a><span class="chapnum">3. </span>Installing Zumastor</p>
+<p class="secthead"><a name="doc_chap3_sect1">Emerging Zumastor</a></p>
+<p>
+The next step is to emerge the relevant ebuilds. Because this is still
+experimental, everything is masked, so our first order of business is
+to unmask them (still as root ;-):
+</p>
+<a name="doc_chap3_pre1"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 3.1: Unmasking Zumastor ebuilds</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">echo "sys-kernel/zumastor-sources ~x86" &gt;&gt; /etc/portage/package.keywords</span>
+# <span class="code-input">echo "sys-block/zumastor ~x86" &gt;&gt; /etc/portage/package.keywords</span>
+</pre></td></tr>
+</table>
+<table class="ncontent" width="100%" border="0" cellspacing="0" cellpadding="0"><tr><td bgcolor="#bbffbb"><p class="note"><b>Note: </b>
+If you are building for a 64-bit platform, you should of course use ~amd64 instead of ~x86.
+</p></td></tr></table>
+<p>
+Now we emerge the packages:
+</p>
+<a name="doc_chap3_pre2"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 3.2: Emerging Zumastor</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">emerge zumastor-sources zumastor</span>
+</pre></td></tr>
+</table>
+<p class="secthead"><a name="doc_chap3_sect2">Configuring/Building A Zumastor Kernel</a></p>
+<p>
+If you are running Gentoo, you've built/configured a kernel
+before. Doing the same with the zumastor-source package is really no
+different. All you need change is adding the CONFIG_DM_DDSNAP option
+(as module or otherwise). CONFIG_DM_DDSNAP is located under "Device
+Drivers" -&gt; "Multi-device support" -&gt; "Distributed Data Snapshot
+target".
+</p>
+<p>
+The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.
+</p>
+<p class="chaphead"><a name="doc_chap4"></a><span class="chapnum">4. </span>Running Zumastor</p>
+<p class="secthead"><a name="doc_chap4_sect1">Boot the New Kernel</a></p>
+<p>
+Now it is time to reboot in to the new kernel you've built. Once you
+have, test out the zumastor init script by starting and stopping
+it. You can check it's status while running like so:
+</p>
+<a name="doc_chap4_pre1"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.1: Checking that Zumastor is running</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">zumastor status --usage</span>
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|-- cron/
+|-- mount/
+|-- running
+`-- servers/
+</pre></td></tr>
+</table>
+<p>
+If all works well, you can add it to your default run level.
+</p>
+<a name="doc_chap4_pre2"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.2: Adding Zumastor to Default Runlevel</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">rc-update add zumastor default</span>
+</pre></td></tr>
+</table>
+<p class="secthead"><a name="doc_chap4_sect2">Start Snapshotting</a></p>
+<p>
+First you need to define your volume:
+</p>
+<a name="doc_chap4_pre3"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.3: Define your volume</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize</span>
+js_bytes was 512000, bs_bits was 12 and cs_bits was 12
+cs_bits 14
+chunk_size is 16384 &amp; js_chunks is 32
+Initializing 5 bitmap blocks...
+pid = 5879
+Thu May 10 13:45:54 2007: [5880] snap_server_setup: ddsnapd server bound to socket /var/run/zumastor/servers/testvol
+pid = 5881
+Successfully created and initialized volume 'testvol'.
+You can now create a filesystem on /dev/mapper/testvol
+</pre></td></tr>
+</table>
+<p>
+Next you create a filesystem of your choice on the volume:
+</p>
+<a name="doc_chap4_pre4"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.4: Create a filesystem on testvol</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">mkfs.ext3 /dev/mapper/testvol</span>
+</pre></td></tr>
+</table>
+<p>
+Now lets set up automated daily snapshots:
+</p>
+<a name="doc_chap4_pre5"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.5: Automate hourly and daily snapshots</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">zumastor define master testvol -h 24 -d 7</span>
+</pre></td></tr>
+</table>
+<p>
+Now, you can verify the new setup by checking zumastor's status:
+</p>
+<a name="doc_chap4_pre6"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.6: Verifying automated snapshots</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">zumastor status --usage</span>
+
+VOLUME testvol:
+Data chunk size: 16384
+Used data: 0
+Free data: 0
+Metadata chunk size: 16384
+Used metadata: 56
+Free metadata: 2621384
+Origin size: 21474836480
+Write density: 0
+Creation time: Tue May 15 18:33:23 2007
+  Snap            Creation time   Chunks Unshared   Shared
+totals                                 0        0        0
+Status: running
+Configuration:
+/var/lib/zumastor/volumes/testvol
+|-- device/
+|   |-- origin -&gt; /dev/sysvg/test
+|   `-- snapstore -&gt; /dev/sysvg/test_snap
+|-- master/
+|   |-- next
+|   |-- schedule/
+|   |   |-- daily
+|   |   `-- hourly
+|   |-- snapshots/
+|   `-- trigger|
+`-- targets/
+
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|   `-- testvol=
+|-- cron/
+|   `-- testvol
+|-- mount/
+|   `-- testvol/
+|-- running
+`-- servers/
+    `-- testvol=
+</pre></td></tr>
+</table>
+<p>
+As time progresses, you should see the snapshots appear in the Configuration section under master/snapshot.
+</p>
+<p class="secthead"><a name="doc_chap4_sect3">Trust But Verify</a></p>
+<p>
+Now let's see if the snapshots are really working. Let's put a testfile on the volume:
+</p>
+<a name="doc_chap4_pre7"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.7: Add a test file</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">date &gt;&gt; /var/run/zumastor/mount/testvol/testfile; sync</span>
+</pre></td></tr>
+</table>
+<p>
+Now we'll force a snapshot:
+</p>
+<a name="doc_chap4_pre8"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.8: Force an hourly style snapshot</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+zumastor snapshot testvol hourly
+</pre></td></tr>
+</table>
+<p>
+Now we'll overwrite the contents of the file and take another snapshot.
+</p>
+<a name="doc_chap4_pre9"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.9: Mutate and snapshot again</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">date &gt;&gt; /var/run/zumastor/mount/testvol/testfile</span>
+# <span class="code-input">zumastor snapshot testvol hourly</span>
+</pre></td></tr>
+</table>
+<p>
+Since we can see each of the snapshots, let's take a look at what is there:
+</p>
+<a name="doc_chap4_pre10"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 4.10: Compare snapshots</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">diff /var/run/zumastor/mount/testvol\(2\)/testfile /var/run/zumastor/mount/testvol\(2\)/testfile</span>
+1a2
+&gt; Wed Nov 21 16:29:25 PST 2007
+</pre></td></tr>
+</table>
+<p class="chaphead"><a name="doc_chap5"></a><span class="chapnum">5. </span>Remote Replication</p>
+<p class="secthead"><a name="doc_chap5_sect1">Get SSH setup</a></p>
+<p>
+ On each machine, run ssh-keygen as root. Copy the .ssh/id_dsa.pub
+ file from each account to .ssh/authorized_keys on the other. This
+ authorizes root on each machine to connect without a password to the
+ other. More restricted access may be used in actual deployment.
+</p>
+<p class="secthead"><a name="doc_chap5_sect2">Setup Master</a></p>
+<p>
+Now you need to define a target to replicate to.
+</p>
+<a name="doc_chap5_pre1"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.1: Define target on master</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">zumastor define target testvol sparticus:11235 -p 30</span>
+</pre></td></tr>
+</table>
+<p>
+This tells our master to replicate to port 11235 on sparticus every 30 seconds. Don't forget the "-p 30", otherwise replication will not happen. You should now see something like:
+</p>
+<a name="doc_chap5_pre2"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.2: Evidence of replication</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+...
+`-- targets/
+    `-- sparticus/
+        |-- period
+        |-- port
+        `-- trigger|
+...
+</pre></td></tr>
+</table>
+<p>
+In your zumastor status.
+</p>
+<p class="secthead"><a name="doc_chap5_sect3">Setup Slave</a></p>
+<p>
+Now let's set up sparticus:
+</p>
+<a name="doc_chap5_pre3"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.3: Define volume and configure source on target</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+# <span class="code-input">ssh sparticus</span>
+Last login: Wed Nov 21 16:20:11 2007 from lentulus
+sparticus ~ # <span class="code-input">zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize</span>
+sparticus ~ # <span class="code-input">zumastor define source testvol lentulus --period 600</span>
+</pre></td></tr>
+</table>
+<p class="secthead"><a name="doc_chap5_sect4">Let's Replicate</a></p>
+<p>
+Let's get this party started:
+</p>
+<a name="doc_chap5_pre4"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.4: Start replication</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+sparticus ~ # <span class="code-input">zumastor start source testvol</span>
+</pre></td></tr>
+</table>
+<p>
+Alternatively, you may kick off replication manually each time from the master.
+</p>
+<a name="doc_chap5_pre5"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.5: Start replication from the master</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+lentulus ~ # <span class="code-input">zumastor replicate testvol sparticus</span>
+</pre></td></tr>
+</table>
+<p>
+ Once initial replication is started, ddsnap processes should begin
+ consuming CPU cycles and moving tens of megabits per second between
+ the nodes. Initially, the entire origin device will need to be moved,
+ so wait 15 minutes before looking on the target for snapshots. When
+ replication is complete, df on the slave should show the same
+ /var/run/zumstor/testvol volume locally mounted.
+</p>
+<p class="secthead"><a name="doc_chap5_sect5">Just To Be Sure</a></p>
+<p>
+You can't be too sure about these things, so let's make sure it is actually happening:
+</p>
+<a name="doc_chap5_pre6"></a><table class="ntable" width="100%" cellspacing="0" cellpadding="0" border="0">
+<tr><td bgcolor="#7a5ada"><p class="codetitle">Code Listing 5.6: Verify replication</p></td></tr>
+<tr><td bgcolor="#eeeeff" align="left" dir="ltr"><pre>
+lentulus ~ # <span class="code-input">date &gt;&gt; /var/run/master/mount/testvol/testfile</span>
+lentulus ~ # <span class="code-input">sleep 60</span>
+<span class="code-comment">(Waiting for data to replicate)</span>
+lentulus ~ # <span class="code-input">ssh sparticus cat /var/run/zumastor/mount/testvol/testfile</span>
+Wed Nov 21 18:44:01 2007
+</pre></td></tr>
+</table>
+<br><p class="copyright">
+    The contents of this document are licensed under the <a href="http://creativecommons.org/licenses/by-sa/2.5">Creative Commons -
+    Attribution / Share Alike</a> license.
+  </p>
+<!--
+  <rdf:RDF xmlns="http://web.resource.org/cc/"
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <License rdf:about="http://creativecommons.org/licenses/by-sa/2.5/">
+     <permits rdf:resource="http://web.resource.org/cc/Reproduction" />
+     <permits rdf:resource="http://web.resource.org/cc/Distribution" />
+     <requires rdf:resource="http://web.resource.org/cc/Notice" />
+     <requires rdf:resource="http://web.resource.org/cc/Attribution" />
+     <permits rdf:resource="http://web.resource.org/cc/DerivativeWorks" />
+     <requires rdf:resource="http://web.resource.org/cc/ShareAlike" />
+  </License>
+  </rdf:RDF>
+--><br>
+</td>
+<td width="1%" bgcolor="#dddaec" valign="top"><table border="0" cellspacing="4px" cellpadding="4px">
+<tr><td class="topsep" align="center"><p class="altmenu"><a title="View a printer-friendly version" class="altlink" href="/doc/gentoo_zumastor_guide.xml?style=printable">Print</a></p></td></tr>
+<tr><td class="topsep" align="center"><p class="alttext">Updated November 20, 2007</p></td></tr>
+<tr><td class="topsep" align="left"><p class="alttext"><b>This translation is not maintained anymore</b></p></td></tr>
+<tr><td class="topsep" align="left"><p class="alttext"><b>Summary: </b>
+This guide shows you how to get a basic zumastor master node with
+snapshots running on Gentoo, and then how to replicate that to a
+second slave server. Actual deployments may be more complex - the goal
+here is to get up and running as simply as possible.
+</p></td></tr>
+<tr><td align="left" class="topsep"><p class="alttext">
+  <a href="mailto:cbsmith@gmail.com" class="altlink"><b>Christopher Smith</b></a>
+<br><i>Author</i><br></p></td></tr>
+<tr lang="en"><td align="center" class="topsep">
+<p class="alttext"><b>Donate</b> to support our development efforts.
+        </p>
+<form action="https://www.paypal.com/cgi-bin/webscr" method="post">
+<input type="hidden" name="cmd" value="_xclick"><input type="hidden" name="business" value="paypal@gentoo.org"><input type="hidden" name="item_name" value="Gentoo Linux Support"><input type="hidden" name="item_number" value="1000"><input type="hidden" name="image_url" value="/images/paypal.png"><input type="hidden" name="no_shipping" value="1"><input type="hidden" name="return" value="http://www.gentoo.org"><input type="hidden" name="cancel_return" value="http://www.gentoo.org"><input type="image" src="http://images.paypal.com/images/x-click-but21.gif" name="submit" alt="Donate to Gentoo">
+</form>
+</td></tr>
+<tr lang="en"><td align="center" class="topsep">
+<a href="http://www.vr.org"><img src="http://www.gentoo.org/images/vr-ad.png" width="125" height="144" alt="Gentoo Centric Hosting: vr.org" border="0"></a><p class="alttext"><a href="http://www.vr.org/">VR Hosted</a></p>
+</td></tr>
+<tr lang="en"><td align="center" class="topsep">
+<a href="http://www.tek.net" target="_top"><img src="http://www.gentoo.org/images/tek-gentoo.gif" width="125" height="125" alt="Tek Alchemy" border="0"></a><p class="alttext"><a href="http://www.tek.net/">Tek Alchemy</a></p>
+</td></tr>
+<tr lang="en"><td align="center" class="topsep">
+<a href="http://www.sevenl.net" target="_top"><img src="http://www.gentoo.org/images/sponsors/sevenl.gif" width="125" height="144" alt="SevenL.net" border="0"></a><p class="alttext"><a href="http://www.sevenl.net/">SevenL.net</a></p>
+</td></tr>
+<tr lang="en"><td align="center" class="topsep">
+<a href="http://www.gni.com" target="_top"><img src="http://www.gentoo.org/images/gni_logo.png" width="125" alt="Global Netoptex Inc." border="0"></a><p class="alttext"><a href="http://www.gni.com">Global Netoptex Inc.</a></p>
+</td></tr>
+<tr><td align="center" class="topsep"></td></tr>
+</table></td>
+</tr></table></td></tr>
+<tr><td colspan="2" align="right" class="infohead">
+Copyright 2001-2007 Gentoo Foundation, Inc. Questions, Comments? <a class="highlight" href="/main/en/contact.xml">Contact us</a>.
+</td></tr>
+</table></body>
+</html>
