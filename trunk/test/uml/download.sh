@@ -20,10 +20,16 @@ download() {
 			wget -c "$1"
 			popd
 			sha1sum --status -c $DOWNLOAD_CACHE/$file.sha1sum
-		 	[[ $? -ne 0 ]] && { echo -n "$file sha1 checksum mismatch! continue [N/y]? "; }
-			continue="N"
-			read continue
-			[[ $continue == "Y" ]] || [[ $continue == "y" ]] || { echo "Abort"; exit 1; }
+		 	if [[ $? -ne 0 ]]; then
+				echo "$file sha1 checksum mismatch! "
+		 		if [[ $SKIP_CHECKSUM_CHECKING == "yes" ]]; then
+					echo "SKIP_CHECKSUM_CHECKING is set, so continue"
+				else
+					echo "Please verify that correct file is downloaded from $1"
+					echo "You can overwrite the checksum checking option by setting SKIP_CHECKSUM_CHECKING=yes in config_uml"
+					exit 1
+				fi
+			fi
 		fi
 	fi
 }
