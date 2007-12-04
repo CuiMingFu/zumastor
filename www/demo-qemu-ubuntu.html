@@ -81,11 +81,11 @@ Password:
   Physical volume "/dev/hda3" successfully created
 # vgcreate sysvg /dev/hda3
   Volume group "sysvg" successfully created
-# lvcreate --name origin --size 5G sysvg
-  Logical volume "origin" created
-# lvcreate --name snapstore --size 5G sysvg
-  Logical volume "snapstore" created
-# zumastor define volume zumatest /dev/sysvg/origin /dev/sysvg/snapstore --initialize
+# lvcreate --name test --size 5G sysvg
+  Logical volume "test" created
+# lvcreate --name test_snap --size 5G sysvg
+  Logical volume "test_snap" created
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
 Wed Nov 21 19:32:58 2007: [3622] snap_server_setup: ddsnapd bound to socket /var/run/zumastor/servers/zumatest
 pid = 3623
 Successfully created and initialized volume 'zumatest'.
