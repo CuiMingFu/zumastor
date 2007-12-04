@@ -2,20 +2,16 @@
 To convert this document to HTML, use the command
  asciidoc -a toc -a numbered zumastor-howto.txt 
 
-Note 1: the asciidoc package in Ubuntu is 7.1.2, which 
+Note: the asciidoc package in Ubuntu is 7.1.2, which 
 doesn't produce working table of contents.
 Version 8.2.5 does; to install this, download
 http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz 
 and run its install.sh.  (I edited it to install into /usr/local/asciidoc
 to avoid confusing my package manager.)
-
-Note 2: asciitext seems a bit wonky; if I don't put a space at
-the beginning of the line "Zumastor HOWTO", it gives me a bunch
-of errors.  Go figure.
 ///////////////////
 
- Zumastor HOWTO
-=================
+Zumastor HOWTO
+==============
 Dan Kegel <dank@kegel.com>
 v0.0, Dec 2007
 
@@ -114,6 +110,11 @@ Zumastor commandline tool
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The sysadmin uses /bin/zumastor to configure snapshot stores,
 take or delete snapshots, and set up remote replication.
+See http://zumastor.org/man/zumastor.8.html[the zumastor man page] for more information.
+
+The zumastor command is really just a very fancy wrapper around 
+the underlying command, ddsnap.  You probably won't ever need to 
+use ddsnap directly, but if you're curious, see http://zumastor.org/man/ddsnap.8.html[the ddsnap man page].
 
 Origin and Snapshot mount points
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -171,14 +172,23 @@ packages.
 You should probably play with it in a virtual environment
 first.  (You can even do this on Windows!)
 See http://zumastor.org/demo-vmware-ubuntu.html[] for
-a walkthrough using VMware, and
+a walkthrough using VMware, 
 http://zumastor.org/demo-qemu-ubuntu.html[] for a
-walkthrough using QEMU.  (We should unify these and fold them
-into this HOWTO.  At the moment, the VMware walkthrough is more complete.)
+walkthrough using QEMU, and 
+http://zumastor.googlecode.com/svn/trunk/doc/install.html[] for
+a writeup that builds the .deb's from source and installs on a real machine.
+(We should unify these and fold them into this HOWTO, the duplication is crazy.)
 
 Gentoo
 ~~~~~~
-Coming soon.  Bug us about it if you're impatient.
+Coming soon.  
+You can see a preview of the recipe at http://zumastor.googlecode.com/svn/branches/gentoo/doc/gentoo_zumastor_guide.html[here] if you're curious.
+
+Source
+~~~~~~
+If you use a distro not covered above, you can install if you're 
+willing to patch your kernel and compile everything manually.  See
+the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
 
 UML
 ~~~

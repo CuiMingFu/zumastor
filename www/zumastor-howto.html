@@ -375,11 +375,11 @@ function generateToc(toclevels) {
 }
 /*]]>*/
 </script>
-<title> Zumastor HOWTO</title>
+<title>Zumastor HOWTO</title>
 </head>
 <body>
 <div id="header">
-<h1> Zumastor HOWTO</h1>
+<h1>Zumastor HOWTO</h1>
 <span id="author">Dan Kegel</span><br />
 <span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
 <span id="revision">version 0.0,</span>
@@ -485,7 +485,11 @@ reboot, Zumastor can't mount them automatically; you have to set them up
 and then restart Zumastor with the command <tt>/etc/init.d/zumastor restart</tt>.</p></div>
 <h3 id="_zumastor_commandline_tool">6.2. Zumastor commandline tool</h3><div style="clear:left"></div>
 <div class="para"><p>The sysadmin uses /bin/zumastor to configure snapshot stores,
-take or delete snapshots, and set up remote replication.</p></div>
+take or delete snapshots, and set up remote replication.
+See <a href="http://zumastor.org/man/zumastor.8.html">the zumastor man page</a> for more information.</p></div>
+<div class="para"><p>The zumastor command is really just a very fancy wrapper around
+the underlying command, ddsnap.  You probably won't ever need to
+use ddsnap directly, but if you're curious, see <a href="http://zumastor.org/man/ddsnap.8.html">the ddsnap man page</a>.</p></div>
 <h3 id="_origin_and_snapshot_mount_points">6.3. Origin and Snapshot mount points</h3><div style="clear:left"></div>
 <div class="para"><p>Zumastor deals with two kinds of volumes: <em>origin</em> volumes
 and <em>snapshot</em> volumes.  Simply put, origin volumes are what you
@@ -535,13 +539,20 @@ packages.</p></div>
 <div class="para"><p>You should probably play with it in a virtual environment
 first.  (You can even do this on Windows!)
 See <a href="http://zumastor.org/demo-vmware-ubuntu.html">http://zumastor.org/demo-vmware-ubuntu.html</a> for
-a walkthrough using VMware, and
+a walkthrough using VMware,
 <a href="http://zumastor.org/demo-qemu-ubuntu.html">http://zumastor.org/demo-qemu-ubuntu.html</a> for a
-walkthrough using QEMU.  (We should unify these and fold them
-into this HOWTO.  At the moment, the VMware walkthrough is more complete.)</p></div>
+walkthrough using QEMU, and
+<a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html">http://zumastor.googlecode.com/svn/trunk/doc/install.html</a> for
+a writeup that builds the .deb's from source and installs on a real machine.
+(We should unify these and fold them into this HOWTO, the duplication is crazy.)</p></div>
 <h3 id="_gentoo">7.2. Gentoo</h3><div style="clear:left"></div>
-<div class="para"><p>Coming soon.  Bug us about it if you're impatient.</p></div>
-<h3 id="_uml">7.3. UML</h3><div style="clear:left"></div>
+<div class="para"><p>Coming soon.
+You can see a preview of the recipe at <a href="http://zumastor.googlecode.com/svn/branches/gentoo/doc/gentoo_zumastor_guide.html">here</a> if you're curious.</p></div>
+<h3 id="_source">7.3. Source</h3><div style="clear:left"></div>
+<div class="para"><p>If you use a distro not covered above, you can install if you're
+willing to patch your kernel and compile everything manually.  See
+the writeup at <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL">http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL</a>.</p></div>
+<h3 id="_uml">7.4. UML</h3><div style="clear:left"></div>
 <div class="para"><p>Developers who wish to contribute changes to Zumastor should
 make sure that our UML test suite passes before and after
 their changes.  The UML test suite is in our SVN tree under
@@ -551,7 +562,7 @@ See also <a href="http://zumastor.org/demo-uml-ubuntu.html">http://zumastor.org/
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-03 07:06:00 PDT
+Last updated 2007-12-03 22:09:42 PDT
 </div>
 </div>
 </body>
