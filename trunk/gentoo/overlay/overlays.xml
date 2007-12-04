@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<layman>
+<overlay
+    type = "svn"
+    src  = "http://zumastor.googlecode.com/svn/branches/gentoo/overlay"
+    contact = "zumastor@googlegroups.com"
+    name = "zumastor"
+    status = "unofficial">
+  <link>
+    http://zumastor.org/
+  </link>
+  <description>
+    This is an overlay for Zumastor.
+  </description>
+</overlay>
+</layman>
