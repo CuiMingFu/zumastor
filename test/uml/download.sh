@@ -20,7 +20,10 @@ download() {
 			wget -c "$1"
 			popd
 			sha1sum --status -c $DOWNLOAD_CACHE/$file.sha1sum
-		 	[[ $? -ne 0 ]] && { echo "$file sha1 checksum mismatch"; exit 1; }
+		 	[[ $? -ne 0 ]] && { echo -n "$file sha1 checksum mismatch! continue [N/y]? "; }
+			continue="N"
+			read continue
+			[[ $continue == "Y" ]] || [[ $continue == "y" ]] || { echo "Abort"; exit 1; }
 		fi
 	fi
 }
@@ -36,7 +39,7 @@ if [ -f $fs_image ]; then
 	echo Using existing Debian uml root file system image.
 else
 	echo -n Getting Debian uml root file system image...
-	download http://uml.nagafix.co.uk/Debian-3.1/${fs_image}.bz2 c9842a6e7fb0892b1377dfe6239e6c0ff2252f1e
+	download http://uml.nagafix.co.uk/Debian-3.1/${fs_image}.bz2 c7bf74efc4a39ceb2ca1561e9f732853093777e5
 	echo -e "done.\n"
 fi
 

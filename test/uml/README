@@ -36,20 +36,11 @@ Usage
     from a different place, please copy all the files in this directory to your
     working directory and change $ZUMA_REPOSITORY in config_uml to the path where 
     zumastor repository locates.
-  * For security reason, we recommend you to run uml tests as a normal user.
-    Here are the steps to set up a uml environment for zumastor replication test
-    as a normal user. Below, steps 2, 4, 5, and 7 require root previlige. 
-        step 1: sudo apt-get install devscripts fakeroot debhelper
-                sudo apt-get install uml-utilities; sudo chmod a+rx /usr/lib/uml/uml_net
-        step 2: ./download.sh  # download the linux source tarball and Debian root image.
-        step 3: ./build_fs.sh uml_fs1
-        step 4: sudo ./build_fs_root.sh uml_fs1
-        step 5: sudo ./setup_network_root.sh 192.168.100.1 192.168.100.111 uml_1 uml_fs1
-                (If it is single uml test, go directly to step 6)
-        step 6: cp uml_fs1 uml_fs2; chmod a+rw uml_fs2
-        step 7: sudo ./setup_network_root.sh 192.168.100.2 192.168.100.111 uml_2 uml_fs2
-        step 8: ./test_xxx.sh
-    Above, uml_fs1 is the file name of the source uml file system image, uml_fs2 is 
+  * For security reason, we recommend you to run uml tests as a normal user. Have a 
+    look at demo.sh for the steps of setting up a uml environment for zumastor tests.
+    Here is how to try it:
+        sh demo.sh 
+    In demo.sh, uml_fs1 is the file name of the source uml file system image, uml_fs2 is 
     the file name of the target uml file system image, 192.168.100.1 is the virtual 
     IP assigned to source uml, 192.168.100.2 is the virtual IP assigned to target uml, 
     uml_1 is the host name assigned to source uml, uml_2 is the host name assigned 

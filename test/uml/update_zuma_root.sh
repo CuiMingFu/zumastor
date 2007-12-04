@@ -10,7 +10,7 @@
 uml_fs=$1
 
 echo -n Upgrading ddsnap and zumastor...
-mount -o loop $uml_fs /mnt || exit 1
+mount -o loop $WORKDIR/$uml_fs /mnt || exit 1
 pushd $ZUMA_REPOSITORY/ddsnap
 make install prefix=/mnt
 popd
