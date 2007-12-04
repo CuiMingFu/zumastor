@@ -336,7 +336,7 @@ function run_target {
 
 	if [[ ! -z $period ]]; then
 		if verify_valid_number $period; then
-			(zumastor replicate $vol $host &) # double fork to prevent sigchld interrupting read
+			(zumastor replicate $vol $host --nowait &) # double fork to prevent sigchld interrupting read
 		else
 			log "invalid period '$period' specified" $log
 			return 1
@@ -401,7 +401,7 @@ function run_target {
 			fi
 			# background this so the master and target daemons can't both block
 			log "scheduling replication cycle in ${delay}s" $log
-			(zumastor replicate $vol $host --delay $delay &) # double fork to prevent sigchld interrupting read
+			(zumastor replicate $vol $host --delay $delay --nowait &) # double fork to prevent sigchld interrupting read
 		fi
 	done &
 }
@@ -518,7 +518,7 @@ function define_target {
 		echo $period > $path/period || return 1
 		if [[ $new == 0 ]]; then
 			pkill -f "zumastor replicate $vol $host --delay"
-			zumastor replicate $vol $host --delay $period & # FIXME calculate delay based on last replication time
+			zumastor replicate $vol $host --delay $period --nowait & # FIXME calculate delay based on last replication time
 		fi
 			
 	fi
@@ -1137,11 +1137,12 @@ snapshot)
 	;;
 replicate)
 	declare name="$0 $1"
-	declare usage="Usage: $name <vol> <host> [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-h|--help]"
+	declare usage="Usage: $name <vol> <host> [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
 	declare snap delay
+	declare wait=1
 
 	shift 1
-	args=`getopt -os:d:hi -l size:,delay:,help, -n"$name" -- "$@"` || { echo $usage; exit 2; }
+	args=`getopt -os:d:hinw -l size:,delay:,help,nowait,wait -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 	eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -1152,9 +1153,13 @@ replicate)
 			echo "  -h, --help            show this help"
 			echo "  -s, --snapnum <snap>  send specified snapshot (otherwise take a new snapshot)"
 			echo "  -d, --delay <seconds> wait specified number of seconds before replicating (default is 0)"
+			echo "  -n, --nowait          don't wait for replication to complete"
+			echo "  -w, --wait            wait for replication to complete (default)"
 			exit;;
 		-s|--snapnum) snap=$2; shift 1;;
 		-d|--delay) delay=$2; shift 1;;
+		-n|--nowait) wait=0;;
+		-w|--wait) wait=1;;
 		*) echo whoops; exit 9;;
 		esac
 		shift 1
@@ -1163,6 +1168,8 @@ replicate)
 	[[ $# -eq 2 ]] || { echo $usage; exit 2; }
 	declare vol=$1
 	declare host=$2
+	declare -r target_dir=$VOLUMES/$vol/targets/$host
+	declare hold newhold
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 	verify_existing_target $vol $host || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
@@ -1172,9 +1179,25 @@ replicate)
 		sleep $delay
 	fi
 
+	# Get the current hold file contents.
+	hold=`cat $target_dir/hold 2>/dev/null`
+
 	# <snap> is optional and a new snapshot is taken if omitted
 	trigger_replication $vol $host $snap
-	exit $?
+
+	[[ $? -ne 0 ]] || [[ $wait -eq 0 ]] && exit
+
+	# Wait for the replicate to finish.
+	while /bin/true; do
+		newhold=`cat $target_dir/hold 2>/dev/null`
+		# If the hold file changed, the transfer finished. 
+		if [[ "$newhold" != "" ]] && [[ "$newhold" != "$hold" ]]; then
+			break;
+		fi
+		sleep 5
+	done
+
+	exit
 	;;
 status)
 	declare name="$0 $1"
