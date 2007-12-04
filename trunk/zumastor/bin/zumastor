@@ -1139,7 +1139,7 @@ replicate)
 	declare name="$0 $1"
 	declare usage="Usage: $name <vol> <host> [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
 	declare snap delay
-	declare wait=1
+	declare wait=0
 
 	shift 1
 	args=`getopt -os:d:hinw -l size:,delay:,help,nowait,wait -n"$name" -- "$@"` || { echo $usage; exit 2; }
