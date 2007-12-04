@@ -198,3 +198,68 @@ their changes.  The UML test suite is in our SVN tree under
 tests/uml.  The file to run there is *http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[demo.sh]*.
 See also http://zumastor.org/demo-uml-ubuntu.html[].
 
+Examples
+--------
+
+
+Verify that LVM2 is installed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many of these examples require LVM, so install that first if it's not already.
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.)
+........
+$ sudo apt-get install lvm2
+$ sudo /etc/init.d/lvm start
+$ pvcreate
+........
+If pvcreate complains 'No program "pvcreate" found for your current version of LVM', you probably forgot to start the lvm service.
+
+
+Verify that Zumastor is installed and started
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+............
+$ zumastor
+Usage: /bin/zumastor {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]
+............
+
+Note: this doesn't yet complain properly if you forgot to reboot
+into a kernel that supports zumastor.  (It will later, when you try to
+define a volume.)
+
+Create a simple snapshotted volume on a loopback file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before you go messing with real devices, it's useful
+to experiment with plain old files dressed up to look
+like devices via the loopback device.  
+
+Annoyingly, the loopback device naming scheme varies; sometimes the first
+one is called /dev/loop/0, sometimes /dev/loop0. 
+
+...........
+# LOOP=/dev/loop
+# test -e ${LOOP}/0 && LOOP=${LOOP}/
+# dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+# losetup -d ${LOOP}0 || true
+# losetup ${LOOP}0 /media/vg.img
+# pvcreate ${LOOP}0
+# vgcreate sysvg ${LOOP}0
+# lvcreate --name test --size 100MB sysvg
+# lvcreate --name test_snap --size 100MB sysvg
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+..........
+If this complains 
+..........
+/bin/zumastor[889]: error: dmsetup returned 1
+create failed
+/bin/zumastor: define volume 'zumatest' failed
+..........
+you may have forgotten to reboot into the Zumastor-enabled kernel
+you installed earlier.
+
+Remove the volume and loopback file created above
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.........
+# zumastor forget volume zumatest
+# lvremove sysvg
+# losetup -d ${LOOP}0
+# rm /media/vg.img
+.........

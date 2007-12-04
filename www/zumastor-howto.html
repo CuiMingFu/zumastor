@@ -559,10 +559,68 @@ their changes.  The UML test suite is in our SVN tree under
 tests/uml.  The file to run there is <strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">demo.sh</a></strong>.
 See also <a href="http://zumastor.org/demo-uml-ubuntu.html">http://zumastor.org/demo-uml-ubuntu.html</a>.</p></div>
 </div>
+<h2 id="_examples">8. Examples</h2>
+<div class="sectionbody">
+<h3 id="_verify_that_lvm2_is_installed">8.1. Verify that LVM2 is installed</h3><div style="clear:left"></div>
+<div class="para"><p>Many of these examples require LVM, so install that first if it's not already.
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.)</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo apt-get install lvm2
+$ sudo /etc/init.d/lvm start
+$ pvcreate</tt></pre>
+</div></div>
+<div class="para"><p>If pvcreate complains <em>No program "pvcreate" found for your current version of LVM</em>, you probably forgot to start the lvm service.</p></div>
+<h3 id="_verify_that_zumastor_is_installed_and_started">8.2. Verify that Zumastor is installed and started</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ zumastor
+Usage: /bin/zumastor {define|forget|start|stop|snapshot|replicate|status} [&lt;subarguments&gt;...]</tt></pre>
+</div></div>
+<div class="para"><p>Note: this doesn't yet complain properly if you forgot to reboot
+into a kernel that supports zumastor.  (It will later, when you try to
+define a volume.)</p></div>
+<h3 id="_create_a_simple_snapshotted_volume_on_a_loopback_file">8.3. Create a simple snapshotted volume on a loopback file</h3><div style="clear:left"></div>
+<div class="para"><p>Before you go messing with real devices, it's useful
+to experiment with plain old files dressed up to look
+like devices via the loopback device.</p></div>
+<div class="para"><p>Annoyingly, the loopback device naming scheme varies; sometimes the first
+one is called /dev/loop/0, sometimes /dev/loop0.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># LOOP=/dev/loop
+# test -e ${LOOP}/0 &amp;&amp; LOOP=${LOOP}/
+# dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+# losetup -d ${LOOP}0 || true
+# losetup ${LOOP}0 /media/vg.img
+# pvcreate ${LOOP}0
+# vgcreate sysvg ${LOOP}0
+# lvcreate --name test --size 100MB sysvg
+# lvcreate --name test_snap --size 100MB sysvg
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize</tt></pre>
+</div></div>
+<div class="para"><p>If this complains</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/bin/zumastor[889]: error: dmsetup returned 1
+create failed
+/bin/zumastor: define volume 'zumatest' failed</tt></pre>
+</div></div>
+<div class="para"><p>you may have forgotten to reboot into the Zumastor-enabled kernel
+you installed earlier.</p></div>
+<h3 id="_remove_the_volume_and_loopback_file_created_above">8.4. Remove the volume and loopback file created above</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor forget volume zumatest
+# lvremove sysvg
+# losetup -d ${LOOP}0
+# rm /media/vg.img</tt></pre>
+</div></div>
+</div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-03 22:09:42 PDT
+Last updated 2007-12-04 07:41:55 PDT
 </div>
 </div>
 </body>
