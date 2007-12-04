@@ -2223,7 +2223,6 @@ static int copyout(struct superblock *sb, chunk_t chunk, chunk_t exception)
 	sb->copy_chunks = 1;
 	sb->source_chunk = chunk;
 	sb->dest_exception = exception;
-	finish_copyout(sb);
 #else
 	int is_snap = sb->source_chunk >> chunk_highbit;
 	chunk_t source = chunk & ~((1ULL << chunk_highbit) - 1);
