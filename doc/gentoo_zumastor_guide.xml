@@ -90,7 +90,7 @@ URL's for addtional overlays belong on their own line. So, to add our overlay li
 </p>
 <pre caption="Edited layman.cfg fragment">
 overlays   : http://www.gentoo.org/proj/en/overlays/layman-global.txt
-             <i>http://zumastor.googlecode.com/svn/branches/gentoo/overlay/overlays.xml</i>
+             <i>http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml</i>
 </pre>
 <p>
 You've now added Zumastor's overlay listing to layman. Now you need to
@@ -125,6 +125,24 @@ Now we emerge the packages:
 <pre caption="Emerging Zumastor">
 # <i>emerge zumastor-sources zumastor</i>
 </pre>
+</body>
+</section>
+<section>
+<title>Configuring/Building A Zumastor Kernel</title>
+<body>
+<p>
+If you are running Gentoo, you've built/configured a kernel
+before. Doing the same with the zumastor-source package is really no
+different. All you need change is adding the CONFIG_DM_DDSNAP option
+(as module or otherwise). CONFIG_DM_DDSNAP is located under "Device
+Drivers" -> "Multi-device support" -> "Distributed Data Snapshot
+target".
+</p>
+<p>
+The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.
+</p>
 </body>
 </section>
 </chapter>
