@@ -519,14 +519,10 @@ and improve local usability of snapshots.</p></div>
 in the vanilla kernel, so a patched kernel is required.
 You can install Zumastor on any recent distribution if you're
 willing to do it by hand.  Automated installation is available
-for Debian / Ubuntu and soon also for Gentoo.  (RHEL, Fedora, and Suse
+for Debian / Ubuntu and Gentoo.  (RHEL, Fedora, and Suse
 are probably next on our list of distros to support, please
 let us know if you're willing to contribute RPM .spec files.)
-For developers, we also support automated installation
-with UML.
-And for anyone who just wants to try out Zumastor without modifying
-their system, we have tutorials showing how to install it in VMware
-and QEMU.</p></div>
+For developers, we also support automated installation with UML.</p></div>
 <h3 id="_debian_ubuntu">7.1. Debian / Ubuntu</h3><div style="clear:left"></div>
 <div class="para"><p>Prebuilt kernel packages for recent Debian / Ubuntu systems
 are available.
@@ -535,19 +531,161 @@ and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">htt
 The directories there are named by branch and svn revision,
 e.g. 0.4-r999 is the 0.4 branch as of svn revision 999.
 Once you've picked a version, download and install its four .deb
-packages.</p></div>
+packages, along with dmsetup (which it depends on).  For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo apt-get install dmsetup
+$ wget -m -np zumastor.org/downloads/snapshots/0.5-r1004
+$ mv zumastor.org/downloads/snapshots/0.5-r1004 .
+$ rm -rf zumastor.org
+$ sudo dpkg -i 0.5-r1004/*.deb</tt></pre>
+</div></div>
+<div class="para"><p>The install takes several minutes.
+Ignore the warnings about deleting symbolic links <tt>&#8230;/build</tt> and <tt>&#8230;/source</tt>.</p></div>
 <div class="para"><p>You should probably play with it in a virtual environment
-first.  (You can even do this on Windows!)
-See <a href="http://zumastor.org/demo-vmware-ubuntu.html">http://zumastor.org/demo-vmware-ubuntu.html</a> for
-a walkthrough using VMware,
-<a href="http://zumastor.org/demo-qemu-ubuntu.html">http://zumastor.org/demo-qemu-ubuntu.html</a> for a
-walkthrough using QEMU, and
-<a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html">http://zumastor.googlecode.com/svn/trunk/doc/install.html</a> for
-a writeup that builds the .deb's from source and installs on a real machine.
-(We should unify these and fold them into this HOWTO, the duplication is crazy.)</p></div>
+first.  (You can even do this on Windows!)</p></div>
+<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_vmware_player">7.1.1. Example: installing Zumastor on Ubuntu inside a VMWare player</h4>
+<div class="olist"><ol>
+<li>
+<p>
+Install vmware player on your machine.  (If you're using Ubuntu,
+it might be as simple as <tt>apt-get install vmware-player</tt>.)
+</p>
+</li>
+<li>
+<p>
+Download a vmware image with Ubuntu preinstalled.  For instance, go to
+<a href="http://www.thoughtpolice.co.uk/vmware">http://www.thoughtpolice.co.uk/vmware</a>,
+choose the Ubuntu Server 6.06 download, click
+on the "fast torrent!" link, and tell Firefox to open the torrent file;
+this should pop up kTorrent to download the 189 megabyte image.
+The image is several files zipped together, so unzip it before trying to use it (e.g. <tt>unzip ~/ubuntu-server-6.06-i386.zip</tt>).
+</p>
+</li>
+<li>
+<p>
+Start up vmware player (Applications / System Tools / VMWare Player)
+and tell it to load the .vmx file in the directory where you unpacked the vmware image.
+</p>
+</li>
+<li>
+<p>
+Inside vmware, log in to the virtual ubuntu box
+(using the username and password from the site where you downloaded the image).
+</p>
+</li>
+<li>
+<p>
+Inside vmware, download and install dmsetup and the Zumastor packages
+as described above.
+</p>
+</li>
+<li>
+<p>
+Halt the virtual machine (e.g. <tt>sudo halt</tt>).
+</p>
+</li>
+<li>
+<p>
+Work around a problem with VMWare and newer kernels by
+editing the file ubuntu-server-6.06.1-i386.vmx to replace <em>lsilogic</em> on line 4 with <em>buslogic</em>.
+(Thanks to <a href="http://gentoo-wiki.com/HOWTO_Install_Gentoo_on_VMware">the gentoo doc</a> for that tip.)
+</p>
+</li>
+<li>
+<p>
+Boot the virtual machine again.  (If booting fails with
+the error "Unable to find volume group <em>Ubuntu</em>", perhaps you
+skipped step seven?)
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
+<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">7.1.2. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h4>
+<div class="olist"><ol>
+<li>
+<p>
+Install qemu on your machine.  (If you're using Ubuntu,
+it might be as simple as <tt>apt-get install qemu</tt>.)
+</p>
+</li>
+<li>
+<p>
+Download an Ubuntu or Debian installation CD image.  Use one
+of the more complete images if you don't want to configure network
+access for the test image.  Here are links to download Ubuntu Dapper
+via
+<a href="http://mirrors.kernel.org/ubuntu-releases/dapper/ubuntu-6.06.1-server-i386.iso">http</a>
+or
+<a href="http://torrent.ubuntu.com:6969/file?info_hash=%0F%EF%D4K%9DW%B9%99w%0A%00%DB%60%21%CF%EBV%87%7Bq">torrent</a>.
+</p>
+</li>
+<li>
+<p>
+Create an empty file to become the image's block device using either dd or qemu-img:
+<tt>dd if=/dev/zero bs=1M seek=10k count=0 of=zqemu.raw</tt>
+</p>
+</li>
+<li>
+<p>
+Start qemu, booting from CD the first time to install a base system:
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot d</tt>
+</p>
+</li>
+<li>
+<p>
+Chose manual partitioning, create a 2G partition for / on /dev/sda and
+leave the rest unallocated.  You may or may not want a 1G swap.
+Create any user you wish and remember the password.
+</p>
+</li>
+<li>
+<p>
+Boot again off the newly install disk image, this time with userspace
+networking enabled:
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot c -net user -net nic</tt>
+</p>
+</li>
+<li>
+<p>
+Log in to the virtual machine, and inside it, download and install dmsetup and the Zumastor packages
+as described above.
+</p>
+</li>
+<li>
+<p>
+Boot the virtual machine again.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
+<h4 id="_building_ubuntu_packages_from_source">7.1.3. Building Ubuntu packages from source</h4>
+<div class="para"><p>Most people won't need to do this, but just in case, here's how to build our Ubuntu packages:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Make sure you have the necessary build tools installed:
+<tt>aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion</tt>
+</p>
+</li>
+<li>
+<p>
+Get the latest code: <tt>svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</tt>
+</p>
+</li>
+<li>
+<p>
+Run the build script: <tt>cd zumastor; ./buildcurrent kernel/config/full</tt>
+This builds three Debian packages: one for the kernel, one for ddsnap, and one for zumastor.
+It will download the required kernel tarball from kernel.org (currently 2.6.22.10).
+Note: The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in <tt>kernel/config/full</tt>.  If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP</tt> to be <tt>(y or m)</tt>
+</p>
+</li>
+</ol></div>
 <h3 id="_gentoo">7.2. Gentoo</h3><div style="clear:left"></div>
-<div class="para"><p>Coming soon.
-You can see a preview of the recipe at <a href="http://zumastor.googlecode.com/svn/branches/gentoo/doc/gentoo_zumastor_guide.html">here</a> if you're curious.</p></div>
+<div class="para"><p>See the Zumastor installation guide for Gentoo at
+<a href="http://zumastor.googlecode.com/svn/trunk/gentoo/doc/gentoo_zumastor_guide.html">http://zumastor.googlecode.com/svn/trunk/gentoo/doc/gentoo_zumastor_guide.html</a>.</p></div>
+<div class="para"><p>Note: the Gentool vmware image it refers to isn't online quite yet&#8230;</p></div>
 <h3 id="_source">7.3. Source</h3><div style="clear:left"></div>
 <div class="para"><p>If you use a distro not covered above, you can install if you're
 willing to patch your kernel and compile everything manually.  See
@@ -570,7 +708,7 @@ See also <a href="http://zumastor.org/demo-uml-ubuntu.html">http://zumastor.org/
 $ sudo /etc/init.d/lvm start
 $ pvcreate</tt></pre>
 </div></div>
-<div class="para"><p>If pvcreate complains <em>No program "pvcreate" found for your current version of LVM</em>, you probably forgot to start the lvm service.</p></div>
+<div class="para"><p>If pvcreate complains <tt>No program "pvcreate" found for your current version of LVM</tt>, you probably forgot to start the lvm service.</p></div>
 <h3 id="_verify_that_zumastor_is_installed_and_started">8.2. Verify that Zumastor is installed and started</h3><div style="clear:left"></div>
 <div class="literalblock">
 <div class="content">
@@ -620,7 +758,7 @@ you installed earlier.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-04 07:41:55 PDT
+Last updated 2007-12-04 14:32:19 PDT
 </div>
 </div>
 </body>
