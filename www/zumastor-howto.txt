@@ -265,10 +265,14 @@ This builds three Debian packages: one for the kernel, one for ddsnap, and one f
 It will download the required kernel tarball from kernel.org (currently 2.6.22.10).  
 Note: The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in +kernel/config/full+.  If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+ to be +(y or m)+
 
+(Also, pcquiles mentioned in http://zumastor.org/irclogs/2007-12-04.txt[irc] that he is working on Ubuntu packaging for a Xen+Zumastor kernel; if you were thinking of integrating Zumastor into upstream Debian or Ubuntu, check out his work first.)
+
 Gentoo
 ~~~~~~
 See the Zumastor installation guide for Gentoo at
 http://zumastor.googlecode.com/svn/trunk/doc/gentoo_zumastor_guide.html[].
+
+FIXME: move the replication documentation from the Gentoo guide into this HOWTO.
 
 Example: installing Zumastor on Gentoo inside a VMWare player
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
