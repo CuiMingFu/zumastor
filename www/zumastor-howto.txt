@@ -123,6 +123,11 @@ and 'snapshot' volumes.  Simply put, origin volumes are what you
 take snapshots of.
 Zumastor mounts these volumes for you in appropriately named 
 subdirectories of /var/mount/zumastor.
+In other words, you do not need to add any of these to /etc/fstab.  
+The zumastor init script will mount the volume and all its snapshots 
+automatically at boot time.
+
+Now do some IO on the filesystem, then look at df again:
 
 Snapshot volumes have the same name as their origin volumes, but
 with a snapshot number in parenthesis after it.
@@ -263,9 +268,15 @@ Note: The script takes a parameter which is a .config file for the kernel.  Ther
 Gentoo
 ~~~~~~
 See the Zumastor installation guide for Gentoo at
-http://zumastor.googlecode.com/svn/trunk/gentoo/doc/gentoo_zumastor_guide.html[].
+http://zumastor.googlecode.com/svn/trunk/doc/gentoo_zumastor_guide.html[].
 
-Note: the Gentool vmware image it refers to isn't online quite yet...
+Example: installing Zumastor on Gentoo inside a VMWare player
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Refer to the "Ubuntu inside VMWare" example and the Gento guide
+above, but use the Gentoo vmware image at http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z[].  You'll need to unpack that image with
+7zip (believe it or not, compressing with 7zip saved a lot
+more space than with rzip, and lrzip crashed on it.  Go figure.)
+FIXME: add a real example here.
 
 Source
 ~~~~~~
@@ -313,17 +324,16 @@ Before you go messing with real devices, it's useful
 to experiment with plain old files dressed up to look
 like devices via the loopback device.  
 
-Annoyingly, the loopback device naming scheme varies; sometimes the first
-one is called /dev/loop/0, sometimes /dev/loop0. 
+Annoyingly, the loopback device naming scheme changed at some point; 
+on some systems it's /dev/loop/0, on others it's /dev/loop0. 
+You may need to adjust the path to suit your version of Linux.
 
 ...........
-# LOOP=/dev/loop
-# test -e ${LOOP}/0 && LOOP=${LOOP}/
 # dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
-# losetup -d ${LOOP}0 || true
-# losetup ${LOOP}0 /media/vg.img
-# pvcreate ${LOOP}0
-# vgcreate sysvg ${LOOP}0
+# losetup -d /dev/loop/0 || true
+# losetup /dev/loop/0 /media/vg.img
+# pvcreate /dev/loop/0
+# vgcreate sysvg /dev/loop/0
 # lvcreate --name test --size 100MB sysvg
 # lvcreate --name test_snap --size 100MB sysvg
 # zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
@@ -337,13 +347,125 @@ create failed
 you may have forgotten to reboot into the Zumastor-enabled kernel
 you installed earlier.
 
+What if Zumastor can't mount the devices at boot time?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Starting with the previous example, 
+reboot the virtual machine and log back in as root.  
+Notice that +df+ doesn't show any Zumastor volumes mounted.
+That's because when Zumastor started at boot time, it
+couldn't see the loopback device, because we didn't arrange 
+for it to be set up automatically at boot time.  
+(This won't happen with real devices!)
+So do it manually now, then tell LVM about it, then tell Zumastor about it:
+.....
+$ sudo sh
+# losetup /dev/loop/0 /media/vg.img
+# vgchange -ay
+# bash /etc/init.d/zumastor restart
+# df | grep zumatest
+.....
+You should now see the expected set of volumes and snapshots mounted.
+
+If vgchange -ay doesn't detect your volume group, do +rm /etc/lvm/.cache+
+and try again.
+
+
 Remove the volume and loopback file created above
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .........
 # zumastor forget volume zumatest
 # lvremove sysvg
-# losetup -d ${LOOP}0
+# losetup -d /dev/loop/0
 # rm /media/vg.img
 .........
 
 
+Create a single snapshotted volume on a real device
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Find an big empty partition. Let's say it's a 10GB /dev/hda3.
+Here's how to use LVM to put a volume and its snapshot store onto it:
+
+........
+# pvcreate /dev/hda3
+  Physical volume "/dev/hda3" successfully created
+# vgcreate sysvg /dev/hda3
+  Volume group "sysvg" successfully created
+# lvcreate --name test --size 5G sysvg
+  Logical volume "test" created
+# lvcreate --name test_snap --size 5G sysvg
+  Logical volume "test_snap" created
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+Wed Nov 21 19:32:58 2007: [3622] snap_server_setup: ddsnapd bound to socket /var/run/zumastor/servers/zumatest
+pid = 3623
+Successfully created and initialized volume 'zumatest'.
+# mkfs.ext3 /dev/mapper/zumatest
+........
+
+You now have an unmounted filesystem which can be snapshotted.
+
+Mount a new volume and set up periodic snapshots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To mount the new volume you created in the previous example,
+and set up hourly snapshots, do:
+........
+# zumastor define master zumatest --hourly 24
+........
+Setting this volume as a "master" causes it be to mounted on 
+/var/run/zumastor/mount/zumatest.
+The +--hourly 24+ specifies that we want to keep the 24 most recent hourly snapshots (a days worth).
+A snapshot will be created once an hour via the zumastor hourly cron
+script.  We can accelerate this by manually telling zumastor to take an
+"hourly" snapshot right now, with the +zumastor snapshot+ command:
+
+........
+# zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest(0)
+..........
+
+If you do some IO on the filesystem you should notice only the origin device, mounted on +/var/run/zumastor/mount/zumatest+ changes:
+.....
+# echo "This is the first file!" > /var/run/zumastor/zumatest/foo.txt
+# df | grep zumatest
+/dev/mapper/zumatest  99150       4128   89902   5% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/mount/zumatest(0)
+.....
+
+As expected, the origin's "Used" block count goes up by one,
+but the snapshot's doesn't change.
+
+Now take another snapshot, and look at df again:
+......
+# zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest  99150    4128   89902   5% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/mount/zumatest(0)
+/dev/mapper/zumatest(2)  99150    4128   89902   5% /var/run/zumastor/mount/zumatest(0)
+......
+Notice that the first snapshot was named 
++zumatest(0)+, but the new one is named +zumatest(2)+.
+(Why the gap?  Zumastor uses another snapshot internally during
+replication.  Yes, this is a bit of a rough edge.)
+
+Where do old snapshots go?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Assuming you've set up a volume to keep 24 hourly snapshots
+around with the command +zumastor define master zumatest --hourly 24+
+as in the last example, what happens when the 25th snapshot is taken?
+
+To find out, you can run a loop that takes lots of snapshots.
+Run it, then use df to see how many snapshots are around afterwards:
+.......
+# num=0
+# while test $num -lt 50
+  do 
+    zumastor snapshot zumatest hourly
+    num=`expr $num + 1`
+    echo $num
+  done
+# df -P | grep zumatest
+.......
+You should see 24 snapshots (the limit set when we did the +zumastor define master+)
+plus the origin volume.  Each time you run +zumastor snapshot ...+
+it creates a new snapshot, and deletes any that are 'too old'.

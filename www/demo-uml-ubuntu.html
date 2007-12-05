@@ -9,35 +9,6 @@
 
 <h2>Ubuntu walkthrough on Usermode Linux</h2>
 
-First, find an Ubuntu system with at least 3.5 gigabytes of free space!
-<p>
-Second, grab the Zumastor sources:
-<pre>
-svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
-</pre>
-and have a look at the files in test/uml, particularly demo.sh.
-That script downloads kernel sources and a Debian system image,
-then builds UML and Zumastor, and runs a bunch of simple tests
-of Zumastor inside one or two UML images.
-<p>
-It's intended to be simple to run; the most complicated part
-is that it uses sudo to get root privileges when needed.
-<p>
-Here's how to try it:
-<pre>
-cd zumastor/test/uml
-bash demo.sh
-</pre>
-<p>
-It's a bit rough yet - you may see a bunch of spurious error messages,
-but each test will output PASS if it finishes successfully, and
-you should see "All tests complete" if everything passes.
-<p>
-If that works, Zumastor is set up properly in your UML instances,
-and you can run individual tests outside of demo.sh.
-This is a convenient way to develop and test Zumastor changes.
-<p>
-<hr>
-<center>&copy; 2007 Google</center>
+This content has been moved into <a href="zumastor-howto.html">the Zumastor Howto</a>.
 </body>
 </html>
