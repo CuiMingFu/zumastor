@@ -68,7 +68,7 @@ echo IPADDR=${IPADDR}
 echo control/tmp dir=${tmpdir}
 
 
-# scrape HDBSIZE and HDCSIZE from the test script, create,
+# scrape HD[BCD]SIZE from the test script, create,
 # and store qemu parameters in $qemu_hd and $qemu2_hd in the $tmpdir.
 for f in ${execfiles}
 do
@@ -82,6 +82,12 @@ do
   if [ "x$hdcsize" != "x" ] ; then
     if [ "$hdcsize" -ge "$largest_hdcsize" ] ; then
       largest_hdcsize=$hdcsize
+    fi
+  fi
+  hdcsize=`awk -F = '/^HDDSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hddsize" != "x" ] ; then
+    if [ "$hddsize" -ge "$largest_hddsize" ] ; then
+      largest_hddsize=$hddsize
     fi
   fi
 done
@@ -100,6 +106,14 @@ if [ "x$largest_hdcsize" != "x" ] ; then
   if [ "x$MACADDR2" != "x" ] ; then
     qemu-img create ${tmpdir}/hdc2.img ${largest_hdcsize}G
     qemu2_hd="${qemu2_hd} -hdc ${tmpdir}/hdc2.img"
+  fi
+fi
+if [ "x$largest_hddsize" != "x" ] ; then
+  qemu-img create ${tmpdir}/hdd.img ${largest_hddsize}G
+  qemu_hd="${qemu_hd} -hdd ${tmpdir}/hdd.img"
+  if [ "x$MACADDR2" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdd2.img ${largest_hddsize}G
+    qemu2_hd="${qemu2_hd} -hdd ${tmpdir}/hdd2.img"
   fi
 fi
 
