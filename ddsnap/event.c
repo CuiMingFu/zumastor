@@ -7,7 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../ddsnap/kernel/dm-ddsnap.h"   /* for csnap_codes */
+#include "dm-ddsnap.h"   /* for csnap_codes */
 #include "event.h"
 #include "trace.h"
 
