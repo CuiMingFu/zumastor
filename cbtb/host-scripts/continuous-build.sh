@@ -46,9 +46,9 @@ if [ ! -f zumastor/Changelog ] ; then
 fi
 
 oldrevision=
-if [ -f buildrev ]
+if [ -f ${top}/zumastor/build/buildrev ]
 then
-  read oldrevision <buildrev
+  read oldrevision <${top}/zumastor/build/buildrev
 fi
 
 
