@@ -432,7 +432,17 @@ efficiently than rsync can.</p></div>
 <div class="sectionbody">
 <div class="para"><p>Zumastor is licensed under GPLv2.</p></div>
 </div>
-<h2 id="_status">4. Status</h2>
+<h2 id="_development">4. Development</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor development happens on an svn repository, mailing list, irc
+channel, and issue tracker linked to from our home page at
+<a href="http://zumastor.org">http://zumastor.org</a>.</p></div>
+<div class="para"><p>Most development is done by a small group of contributors
+(Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, and Chris Smith), but we welcome patches from the community.
+(Jonathan Van Eenwyk contributed a cool offline backup feature,
+but <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">his patch</a> has not yet been merged.  Let us know if you need this.)</p></div>
+</div>
+<h2 id="_status">5. Status</h2>
 <div class="sectionbody">
 <div class="para"><p>Zumastor has a stable release (0.4) which is limited (e.g. only supports 2TB
 volumes) but very stable.  We are focusing on documentation
@@ -442,30 +452,26 @@ via the issue tracker, mailing list, or IRC channel at <a href="http://zumastor.
 <div class="para"><p>We have a number of kernel patches, and will push them upstream as
 soon as possible.  See <a href="http://zumastor.org">http://zumastor.org</a> for a list.</p></div>
 </div>
-<h2 id="_limitations">5. Limitations</h2>
+<h2 id="_limitations">6. Limitations</h2>
 <div class="sectionbody">
-<h3 id="_volume_size">5.1. Volume Size</h3><div style="clear:left"></div>
+<h3 id="_volume_size">6.1. Volume Size</h3><div style="clear:left"></div>
 <div class="para"><p>We have verified that Zumastor can handle 1TB volumes.
-<a href="http://code.google.com/p/zumastor/issues/detail?id=10">As of 0.5-r997</a>,
-it should be able to handle volumes up to
-64TB.  We are now verifying that it can handle 3TB volumes.
-(QEMU has trouble with volumes larger than about 4TB, which complicates testing.)</p></div>
-<h3 id="_snapshot_count">5.2. Snapshot Count</h3><div style="clear:left"></div>
+As of 0.5-r997, it should be able to handle volumes of dozens of terabytes.
+We are now verifying that it can handle 3TB volumes.
+See <a href="http://code.google.com/p/zumastor/issues/detail?id=10">bug 10</a>.</p></div>
+<h3 id="_snapshot_count">6.2. Snapshot Count</h3><div style="clear:left"></div>
 <div class="para"><p>Each volume can have at most 64 snapshots.  This arbitrary limit may
-be fixed in future releases.</p></div>
-<h3 id="_performance">5.3. Performance</h3><div style="clear:left"></div>
+be fixed in future releases; see <a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
+<h3 id="_performance">6.3. Performance</h3><div style="clear:left"></div>
 <div class="para"><p>On a single spindle, compared to a non-Zumastor volume, writes to an origin
 volume under Zumastor can require five times as many seeks.
 Multiple spindles and disk controller caches can reduce this problem
 somewhat.  This performance penalty may be eased in future releases.
 Until then, Zumastor is best suited for read-mostly applications.</p></div>
-</div>
-<h2 id="_development">6. Development</h2>
-<div class="sectionbody">
-<div class="para"><p>Most of Zumastor development is done by a small group of contributors
-(Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, and Chris Smith), but we welcome patches from the community.
-(Jonathan Van Eenwyk contributed a cool offline backup feature,
-but <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">his patch</a> has not yet been merged.  Let us know if you need this.)</p></div>
+<h3 id="_ram">6.4. RAM</h3><div style="clear:left"></div>
+<div class="para"><p>Zumastor requires about 1MB of RAM per gigabyte of disk space to
+hold an internal index.
+A future release may reduce this requirement; see <a href="http://code.google.com/p/zumastor/issues/detail?id=5">bug 5</a>.</p></div>
 </div>
 <h2 id="_zumastor_user_interface">7. Zumastor User Interface</h2>
 <div class="sectionbody">
@@ -889,7 +895,7 @@ it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-05 23:11:23 PDT
+Last updated 2007-12-05 23:25:30 PDT
 </div>
 </div>
 </body>
