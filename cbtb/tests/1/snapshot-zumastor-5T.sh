@@ -2,12 +2,11 @@
 #
 # $Id$
 #
-# Make use of large, extra devices on /dev/sdb and /dev/sdc to test
-# terabyte-sized zumastor filesystems.  Other than not using LVM and using
-# very large devices, this is the same as the snapshot-zumastor.sh test.
-# To reduce the runtime of this test, only the XFS filesystem is tested.
-# mkfs.ext3 takes on the order of a couple of hours to run under emulation
-# on a filesystem of this size.
+# Make use of large, extra devices on /dev/sd[bcd] to test
+# multi-terabyte-sized zumastor filesystems.  RAID0 and LVM are used to
+# create the large filesystems from 2047G disks provided by qemu (the
+# largest supported by the qcow2 disk backing format).
+# This is otherwise the same as the snapshot-zumastor-xfs.sh test
 #
 # Copyright 2007 Google Inc.  All rights reserved
 # Author: Drake Diedrich (dld@google.com)
@@ -20,10 +19,11 @@ set -e
 # Read only by the test harness.
 EXPECT_FAIL=1
 
-# The required sizes of the sdb and sdc devices in G.
+# The required sizes of the sd[bcd] devices in G.
 # Read only by the test harness.
-HDBSIZE=5124
-HDCSIZE=5124
+HDBSIZE=2047
+HDCSIZE=2047
+HDDSIZE=2047
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
@@ -34,9 +34,21 @@ SLEEP=5
 aptitude install xfsprogs
 modprobe xfs
 
+# create a MD RAID0 of hdb, hdc, and hdd
+aptitude install mdadm
+mdadm --create /dev/md0 --level=0 --raid-devices=3 /dev/sd[bcd]
+
+# create LVM VG sysvg
+pvcreate -ff /dev/md0
+vgcreate sysvg /dev/md0
+
+# create volumes 5T origin and .5T snapshot
+lvcreate --size 5124G -n test sysvg
+lvcreate --size 512G -n test_snap sysvg
+
 echo "1..6"
 
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 mkfs.xfs /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
