@@ -57,6 +57,9 @@ Usage
   * If you want to run large volume replication tests, you can create four logical 
     volumes on the host with 'lvcreate', and replace $source_ubdb_dev, $source_ubdc_dev,
     $target_ubdb_dev, and $target_ubdc_dev with these lvms in config_replication.
+  * We use environment variable $ITERATIONS to control how many cycles a test executes.
+    demo.sh set $ITERATIONS to 1 to check if the uml environment is successfully build.
+    You may want to run a test for many cycles, say 10000, for retrieving subtle bugs.
   * The built root file system image contains basic packages required to run a 
     zumastor test. For developers, you can run update_zuma_root.sh to install your own 
     ddsnap and zumastor code from a local zumastor source repository. Before doing

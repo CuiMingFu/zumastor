@@ -17,11 +17,12 @@ echo -e "done.\n"
 sleep 30
 
 up_time=60
-DOWN_TIME="10 20 30 40 50 60 120 180 300 600 900 1200 1800 2400"
+DOWNMAX=100
 
 last_mod_time=$(ssh $SSH_OPTS $source_uml_host stat -c %Y $VOLUMES/$vol/targets/$target_uml_host)
+count=0
 noprogress_count=0
-for down_time in $DOWN_TIME; do
+while [[ $count -lt $ITERATIONS ]]; do
         while true; do
         	sleep $up_time
 		mod_time=$(ssh $SSH_OPTS $source_uml_host stat -c %Y $VOLUMES/$vol/targets/$target_uml_host/send)
@@ -38,11 +39,13 @@ for down_time in $DOWN_TIME; do
         	fi
         done
         last_mod_time=$mod_time
+	down_time=$(( RANDOM * DOWNMAX / 32768 ))
         echo unplug $down_time seconds
 	echo 0 > /proc/sys/net/ipv4/ip_forward
         sleep $down_time
 	echo resume
 	echo 1 > /proc/sys/net/ipv4/ip_forward
+	count=$(( count+1 ))
 done
 
 ./stop_replication.sh || { echo FAIL; exit 1; }
