@@ -27,8 +27,6 @@ if [ "x$SVNREV" = "x" ] ; then
   popd
 fi
 ARCH=i386
-DEBVERS="${VERSION}-r${SVNREV}"
-KVERS="${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0"
 
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='timeout -14 1800 scp -o StrictHostKeyChecking=no'
@@ -131,19 +129,19 @@ ${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
 # copy the debs that were built in the build directory
 # onto the new zuma template instance
 for f in \
-    ddsnap_${DEBVERS}_${ARCH}.deb \
-    zumastor_${DEBVERS}_${ARCH}.deb \
-    kernel-headers-${KVERS}_${ARCH}.deb \
-    kernel-image-${KVERS}_${ARCH}.deb
+    ddsnap_build_${ARCH}.deb \
+    zumastor_build_${ARCH}.deb \
+    kernel-headers-build_${ARCH}.deb \
+    kernel-image-build_${ARCH}.deb
 do
   ${SCP} $f root@${IPADDR}:/tmp || retval=$?
 done
 
 # install the copied debs in the correct order
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} aptitude install -y tree || retval=$?
-${KINSTTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/kernel-image-${KVERS}_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/ddsnap_${DEBVERS}_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_${DEBVERS}_${ARCH}.deb || retval=$?
+${KINSTTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/kernel-image-build_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/ddsnap_build_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_build_${ARCH}.deb || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm /tmp/*.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 
