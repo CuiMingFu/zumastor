@@ -8,7 +8,7 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-/* #include "../ddsnap/kernel/dm-ddsnap.h"   // for csnap_codes */
+/* #include "dm-ddsnap.h"   // for csnap_codes */
 
 /* Read fault injection options, set globals
  * FIXME: should read from commandline; for now env vars

@@ -13,8 +13,8 @@ echo -e "done.\n"
 
 echo Applying patches...
 cd linux-${KERNEL_VERSION} || exit 1
-cp $ZUMA_REPOSITORY/ddsnap/kernel/dm-ddsnap.* drivers/md/
-for patch in $ZUMA_REPOSITORY/zumastor/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/ddsnap/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/*; do
+cp $ZUMA_REPOSITORY/kernel/ddsnap/dm-ddsnap.* drivers/md/
+for patch in $ZUMA_REPOSITORY/kernel/zumastor-patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/kernel/ddsnap-patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/*; do
         echo "   $patch"
         < $patch patch -p1 || exit 1
 done
