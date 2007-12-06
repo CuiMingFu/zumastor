@@ -10,6 +10,28 @@
 # Copyright 2007 Google Inc. All rights reserved.
 # Author: Drake Diedrich (dld@google.com)
 
+buildkernel="true"
+kconfig=
+while [ $# -ge 1 ]
+do
+  case $1 in
+    --no-kernel)
+        buildkernel=false
+        ;;
+    *)
+      kconfig=$1
+      ;;
+  esac
+  shift
+done
+
+if [ -r "$kconfig" ]
+then
+  echo "Usage: $0 [--no-kernel] <path_to_kernel_config>"
+  exit 1
+fi
+
+
 
 KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' KernelVersion`
 if [ "x$KERNEL_VERSION" = "x" ] ; then
@@ -34,14 +56,10 @@ BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
 
-[[ -e $1 ]] || { echo "Usage: $0 <path_to_kernel_config> [revision]"; exit 1; }
-
-# [[ $# -eq 2 ]] && REV="-r $2"
-
 
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
-cp $1 $BUILD_DIR/$KERNEL_VERSION.config
+cp $kconfig $BUILD_DIR/$KERNEL_VERSION.config
 pushd $BUILD_DIR >> $LOG || exit 1
 
 
@@ -73,38 +91,42 @@ if [ -e linux-${KERNEL_VERSION} ] ; then
   mv linux-${KERNEL_VERSION} linux-${KERNEL_VERSION}.$TIME;
 fi
 
-if [ ! -f linux-${KERNEL_VERSION}.tar.bz2 ] ; then
-  wget -c http://www.kernel.org/pub/linux/kernel/v2.6/linux-${KERNEL_VERSION}.tar.bz2 >> $LOG || exit $?
-fi
 
-echo -n Unpacking kernel...
-tar xjf linux-${KERNEL_VERSION}.tar.bz2 || exit 1
-echo -e "done.\n"
+if [ "$buildkernel" = "true" ]
+then
+  if [ ! -f linux-${KERNEL_VERSION}.tar.bz2 ] ; then
+    wget -c http://www.kernel.org/pub/linux/kernel/v2.6/linux-${KERNEL_VERSION}.tar.bz2 >> $LOG || exit $?
+  fi
 
-echo -n "Setting .config ..."
-mv $KERNEL_VERSION.config linux-${KERNEL_VERSION}/.config
-echo -e "done.\n"
+  echo -n Unpacking kernel...
+  tar xjf linux-${KERNEL_VERSION}.tar.bz2 || exit 1
+  echo -e "done.\n"
 
-echo Applying patches...
-pushd linux-${KERNEL_VERSION} >> $LOG || exit 1
+  echo -n "Setting .config ..."
+  mv $KERNEL_VERSION.config linux-${KERNEL_VERSION}/.config
+  echo -e "done.\n"
 
-for patch in \
-    ${SRC}/kernel/zumastor-patches/${KERNEL_VERSION}/* \
-    ${SRC}/kernel/ddsnap-patches/${KERNEL_VERSION}/*
-do
+  echo Applying patches...
+  pushd linux-${KERNEL_VERSION} >> $LOG || exit 1
+
+  for patch in \
+      ${SRC}/kernel/zumastor-patches/${KERNEL_VERSION}/* \
+      ${SRC}/kernel/ddsnap-patches/${KERNEL_VERSION}/*
+  do
 	echo "   $patch"
 	< $patch patch -p1 >> $LOG || exit 1
-done
-echo -e "done.\n"
+  done
+  echo -e "done.\n"
 
-echo Adding ddsnap driver...
-cp -dpP ${SRC}/kernel/ddsnap/* ./drivers/md
-echo -e "done.\n"
+  echo Adding ddsnap driver...
+  cp -dpP ${SRC}/kernel/ddsnap/* ./drivers/md
+  echo -e "done.\n"
  
-echo -n Building kernel package...
-fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
-popd >> $LOG
-echo -e "done.\n"
+  echo -n Building kernel package...
+  fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
+  popd >> $LOG
+  echo -e "done.\n"
+fi
 
 popd >> $LOG
 echo zumastor packages successfully built in $BUILD_DIR/*.deb

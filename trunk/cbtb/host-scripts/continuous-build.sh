@@ -45,6 +45,13 @@ if [ ! -f zumastor/Changelog ] ; then
   exit 1
 fi
 
+oldrevision=
+if [ -f buildrev ]
+then
+  read oldrevision <buildrev
+fi
+
+
 pushd ${repo}
 
 # build and test the current working directory packages
@@ -56,7 +63,25 @@ if [ ! -d "build/r${revision}" ] ; then
   mkdir "build/r${revision}"
 fi
 
-time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh >${buildlog} 2>&1
+# set flags for the parts of the build that are unnecessary.  Currently
+# only check for kernel diffs
+echo -n "Rebuilding the kernel between $oldrevision and $revision "
+nobuild=
+if [ "x$oldrevision" != "x" ]
+then
+  pushd kernel
+    diff=`mktemp`
+    svn diff -r$oldrevision >$diff
+    if [ ! -s "$diff" ]
+    then
+      nobuild="--no-kernel $nobuild"
+      echo "is unnecessary"
+    fi
+  popd
+fi
+
+
+time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh $nobuild >${buildlog} 2>&1
 buildret=$?
 echo continuous dapper-build returned $buildret
 

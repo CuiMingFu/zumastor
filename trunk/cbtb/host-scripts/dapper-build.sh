@@ -17,6 +17,20 @@
 # License: GPLv2
 
 set -e
+
+buildflags=
+buildkernel="true"
+while [ $# -ge 1 ]
+do
+  case $1 in
+    --no-kernel)
+        buildflags="$buildflags --no-kernel"
+        buildkernel=false
+        ;;
+  esac
+  shift
+done
+
 rc=0
 
 KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' KernelVersion`
@@ -151,24 +165,30 @@ time ${CMDTIMEOUT} \
 
 # give the build 10 hours, then kill it.
 time ${BUILDTIMEOUT} \
-  ${SSH} build@${IPADDR} "cd zumastor && ./buildcurrent.sh $KERNEL_CONFIG" || \
+  ${SSH} build@${IPADDR} "cd zumastor && ./buildcurrent.sh $buildflags $KERNEL_CONFIG" || \
   rc=$?
 
 BUILDSRC="build@${IPADDR}:zumastor/build"
 DEBVERS="${VERSION}-r${SVNREV}"
 KVERS="${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0"
 
-for f in \
-    ${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.changes \
+files="${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.changes \
     ${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.deb \
     ${BUILDSRC}/ddsnap_${DEBVERS}.dsc \
     ${BUILDSRC}/ddsnap_${DEBVERS}.tar.gz \
     ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.changes \
     ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.deb \
     ${BUILDSRC}/zumastor_${DEBVERS}.dsc \
-    ${BUILDSRC}/zumastor_${DEBVERS}.tar.gz \
+    ${BUILDSRC}/zumastor_${DEBVERS}.tar.gz"
+
+if [ "$buildkernel" = "true" ]
+then
+  files="$files \
     ${BUILDSRC}/kernel-headers-${KVERS}_${ARCH}.deb \
-    ${BUILDSRC}/kernel-image-${KVERS}_${ARCH}.deb
+    ${BUILDSRC}/kernel-image-${KVERS}_${ARCH}.deb"
+fi
+
+for f in $files
 do
   time ${SCP} $f build/ || rc=$?
 done
@@ -178,8 +198,11 @@ if [ $rc -eq 0 ] ; then
   pushd build
   ln -sf ddsnap_${DEBVERS}_${ARCH}.deb ddsnap_build_${ARCH}.deb
   ln -sf zumastor_${DEBVERS}_${ARCH}.deb zumastor_build_${ARCH}.deb 
-  ln -sf kernel-headers-${KVERS}_${ARCH}.deb kernel-headers-build_${ARCH}.deb
-  ln -sf kernel-image-${KVERS}_${ARCH}.deb kernel-image-build_${ARCH}.deb
+  if [ "$buildkernel" = "true" ]
+  then
+    ln -sf kernel-headers-${KVERS}_${ARCH}.deb kernel-headers-build_${ARCH}.deb
+    ln -sf kernel-image-${KVERS}_${ARCH}.deb kernel-image-build_${ARCH}.deb
+  fi
   popd
 fi
 
