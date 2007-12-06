@@ -101,21 +101,23 @@ See http://code.google.com/p/zumastor/issues/detail?id=10[bug 10].
 
 Snapshot Count
 ~~~~~~~~~~~~~~
-Each volume can have at most 64 snapshots.  This arbitrary limit may
-be fixed in future releases; see http://code.google.com/p/zumastor/issues/detail?id=6[bug 6].
+Each volume can have at most 64 snapshots.  This limit may
+be raised or removed in future releases; see http://code.google.com/p/zumastor/issues/detail?id=6[bug 6].
 
 Performance
 ~~~~~~~~~~~
 On a single spindle, compared to a non-Zumastor volume, writes to an origin 
-volume under Zumastor can require five times as many seeks.
-Multiple spindles and disk controller caches can reduce this problem
-somewhat.  This performance penalty may be eased in future releases.
-Until then, Zumastor is best suited for read-mostly applications.
+volume under Zumastor can require six extra seeks, which
+can be a significant performance penalty for some applications.
+Multiple spindles and RAID controller caches can reduce this problem
+significantly.  Reducing the number of seeks is a high priority goal for 
+future releases.
+Until that happens, Zumastor is best suited for read-mostly applications.
 
 RAM
 ~~~
-Zumastor requires about 1MB of RAM per gigabyte of disk space to
-hold an internal index.  
+Zumastor uses about 1MB of RAM per gigabyte of disk space to hold an 
+internal index.  
 A future release may reduce this requirement; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
 
 Zumastor User Interface

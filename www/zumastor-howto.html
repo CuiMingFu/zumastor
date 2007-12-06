@@ -460,17 +460,19 @@ As of 0.5-r997, it should be able to handle volumes of dozens of terabytes.
 We are now verifying that it can handle 3TB volumes.
 See <a href="http://code.google.com/p/zumastor/issues/detail?id=10">bug 10</a>.</p></div>
 <h3 id="_snapshot_count">6.2. Snapshot Count</h3><div style="clear:left"></div>
-<div class="para"><p>Each volume can have at most 64 snapshots.  This arbitrary limit may
-be fixed in future releases; see <a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
+<div class="para"><p>Each volume can have at most 64 snapshots.  This limit may
+be raised or removed in future releases; see <a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
 <h3 id="_performance">6.3. Performance</h3><div style="clear:left"></div>
 <div class="para"><p>On a single spindle, compared to a non-Zumastor volume, writes to an origin
-volume under Zumastor can require five times as many seeks.
-Multiple spindles and disk controller caches can reduce this problem
-somewhat.  This performance penalty may be eased in future releases.
-Until then, Zumastor is best suited for read-mostly applications.</p></div>
+volume under Zumastor can require six extra seeks, which
+can be a significant performance penalty for some applications.
+Multiple spindles and RAID controller caches can reduce this problem
+significantly.  Reducing the number of seeks is a high priority goal for
+future releases.
+Until that happens, Zumastor is best suited for read-mostly applications.</p></div>
 <h3 id="_ram">6.4. RAM</h3><div style="clear:left"></div>
-<div class="para"><p>Zumastor requires about 1MB of RAM per gigabyte of disk space to
-hold an internal index.
+<div class="para"><p>Zumastor uses about 1MB of RAM per gigabyte of disk space to hold an
+internal index.
 A future release may reduce this requirement; see <a href="http://code.google.com/p/zumastor/issues/detail?id=5">bug 5</a>.</p></div>
 </div>
 <h2 id="_zumastor_user_interface">7. Zumastor User Interface</h2>
@@ -895,7 +897,7 @@ it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-05 23:25:30 PDT
+Last updated 2007-12-06 07:36:02 PDT
 </div>
 </div>
 </body>
