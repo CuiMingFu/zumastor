@@ -471,8 +471,9 @@ significantly.  Reducing the number of seeks is a high priority goal for
 future releases.
 Until that happens, Zumastor is best suited for read-mostly applications.</p></div>
 <h3 id="_ram">6.4. RAM</h3><div style="clear:left"></div>
-<div class="para"><p>Zumastor uses about 1MB of RAM per gigabyte of disk space to hold an
-internal index.
+<div class="para"><p>Zumastor uses about 1MB of RAM per gigabyte of disk space to cache an
+internal index.  This makes it impractical to use Zumastor for terabyte
+volumes on NAS appliances with little RAM.
 A future release may reduce this requirement; see <a href="http://code.google.com/p/zumastor/issues/detail?id=5">bug 5</a>.</p></div>
 </div>
 <h2 id="_zumastor_user_interface">7. Zumastor User Interface</h2>
@@ -897,7 +898,7 @@ it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-06 07:36:02 PDT
+Last updated 2007-12-06 10:31:16 PDT
 </div>
 </div>
 </body>

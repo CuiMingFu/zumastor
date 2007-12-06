@@ -116,8 +116,9 @@ Until that happens, Zumastor is best suited for read-mostly applications.
 
 RAM
 ~~~
-Zumastor uses about 1MB of RAM per gigabyte of disk space to hold an 
-internal index.  
+Zumastor uses about 1MB of RAM per gigabyte of disk space to cache an 
+internal index.  This makes it impractical to use Zumastor for terabyte
+volumes on NAS appliances with little RAM.
 A future release may reduce this requirement; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
 
 Zumastor User Interface
