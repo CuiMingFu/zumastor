@@ -10,6 +10,8 @@
 # Copyright 2007 Google Inc. All rights reserved.
 # Author: Drake Diedrich (dld@google.com)
 
+echo "$0 $*"
+
 buildkernel="true"
 kconfig=
 while [ $# -ge 1 ]
