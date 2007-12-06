@@ -27,11 +27,8 @@ do
   shift
 done
 
-if [ -r "$kconfig" ]
+if [ ! -r "$kconfig" ]
 then
-  pwd
-  ls -l $kconfig
-  cat $kconfig
   echo "Usage: $0 [--no-kernel] <path_to_kernel_config>"
   exit 1
 fi
