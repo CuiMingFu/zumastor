@@ -19,7 +19,7 @@ top="${PWD}"
 
 # obtain a lock on the repository to build, and a general build lock so
 # only one build runs at once
-replock=${repo}/lock
+repolock=${repo}/lock
 if [ "x$LOCKFILE" = "x" ] ; then
   locks="$repolock"
 else
