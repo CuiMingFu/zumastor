@@ -72,7 +72,7 @@ then
   pushd kernel
     diff=`mktemp`
     svn diff -r$oldrevision >$diff
-    if [ -s "$diff" ]
+    if [ ! -s "$diff" ]
     then
       nobuild="--no-kernel $nobuild"
       echo "is unnecessary"
