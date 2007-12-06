@@ -84,7 +84,7 @@ do
       largest_hdcsize=$hdcsize
     fi
   fi
-  hdcsize=`awk -F = '/^HDDSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  hddsize=`awk -F = '/^HDDSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hddsize" != "x" ] ; then
     if [ "$hddsize" -ge "$largest_hddsize" ] ; then
       largest_hddsize=$hddsize
@@ -99,6 +99,7 @@ if [ "x$largest_hdbsize" != "x" ] ; then
   if [ "x$MACADDR2" != "x" ] ; then
     qemu-img create ${tmpdir}/hdb2.img ${largest_hdbsize}G
     qemu2_hd="-hdb ${tmpdir}/hdb2.img"
+  fi
 fi
 if [ "x$largest_hdcsize" != "x" ] ; then
   qemu-img create ${tmpdir}/hdc.img ${largest_hdcsize}G
