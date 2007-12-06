@@ -30,7 +30,7 @@ pushd $WORKDIR
 [[ $ubdc_dev == /* ]] || ubdc_dev=../$ubdc_dev
 
 # killing any running linux umls with the same root file system image
-pkill -f './linux ubda=../$uml_fs' >& /dev/null
+pkill -f "./linux ubda=../$uml_fs" >& /dev/null
 # load uml. uml does not work properly when running in background, so use screen detach here.
 echo -n Bring up uml...
 cd linux-${KERNEL_VERSION}

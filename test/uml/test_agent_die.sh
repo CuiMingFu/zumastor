@@ -32,9 +32,10 @@ while [[ $count -lt $ITERATIONS ]]; do
 	(ssh $SSH_OPTS $uml_host "dd if=/dev/zero of=$mount_point/zero >& /dev/null" &)
 	sleep 6
 	ssh $SSH_OPTS $uml_host "pkill -f 'ddsnap agent'"
-	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor stop" >& $LOG || { echo "stop in origin test error $?"; echo FAIL; exit 1; }
+	sleep 1
 	ssh $SSH_OPTS $uml_host "pkill -f 'dd if'"
 	sleep 1
+	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor stop" || { echo "stop in origin test error $?"; echo FAIL; exit 1; }
 	ssh $SSH_OPTS $uml_host "dmsetup remove $vol"
 	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor start" >& $LOG || { echo "start in origin test error $?"; echo FAIL; exit 1; }
 	count=$(( count+1 ))
@@ -53,9 +54,10 @@ while [[ $count -lt $ITERATIONS ]]; do
 	(ssh $SSH_OPTS $uml_host "dd if=/dev/zero of=$mount_point/zero >& /dev/null" &)
 	sleep 6
 	ssh $SSH_OPTS $uml_host "pkill -f 'ddsnap agent'"
-	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor stop" >& $LOG || { echo "stop in snapshot test error $?"; echo FAIL; exit 1; }
+	sleep 1
 	ssh $SSH_OPTS $uml_host "pkill -f 'dd if'"
 	sleep 1
+	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor stop" || { echo "stop in snapshot test error $?"; echo FAIL; exit 1; }
 	ssh $SSH_OPTS $uml_host "umount /dev/mapper/$vol\(0\)" || echo "umount snapshot device error $?"
 	ssh $SSH_OPTS $uml_host "dmsetup remove $vol\(0\)" || echo "remove snapshot device error $?"
 	ssh $SSH_OPTS $uml_host "/etc/init.d/zumastor start" >& $LOG || { echo "start in snapshot test error $?"; echo FAIL; exit 1; }
