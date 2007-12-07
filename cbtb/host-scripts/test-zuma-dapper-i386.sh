@@ -122,6 +122,7 @@ if [ $largest_hddsize -gt 0 ] ; then
 fi
 
 ${rqemu_i386} \
+  -loadvm running \
   -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
@@ -133,7 +134,8 @@ ${rqemu_i386} \
 if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
-  ${qemu_i386} \
+  ${rqemu_i386} \
+    -loadvm running \
     -serial file:${SERIAL2} \
     -monitor unix:${MONITOR2},server,nowait \
     -vnc unix:${VNC2} \

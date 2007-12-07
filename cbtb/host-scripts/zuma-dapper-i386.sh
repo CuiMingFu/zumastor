@@ -156,25 +156,27 @@ time wait $qemu || retval=$?
 kill -0 $qemu && kill -9 $qemu
 
 
-if false
-then
+# restart qemu on the new image and boot until ssh is working
+# and then savevm running to create a snapshot named "running"
 
-  ${qemu_i386} \
-    -serial unix:${SERIAL},server,nowait \
-    -monitor unix:${MONITOR},server,nowait \
-    -vnc unix:${VNC} \
-    -net nic,macaddr=${MACADDR} -net tap,ifname=${IFACE},script=no \
-    -boot c -hda ${DISKIMG} -no-reboot & qemu=$!
+${rqemu_i386} -m 512 \
+  -serial unix:${SERIAL},server,nowait \
+  -monitor unix:${MONITOR},server,nowait \
+  -vnc unix:${VNC} \
+  -net nic,macaddr=${MACADDR},model=ne2k_pci \
+  -net tap,ifname=${IFACE},script=no \
+  -boot c -hda "${DISKIMG}" -no-reboot & qemu=$!
+  
 
-  while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
-  do
-    echo -n .
-    sleep 10
-  done
+# wait for ssh to work
+while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
+do
+  echo -n .
+  sleep 10
+done
 
   socat STDIN UNIX-CONNECT:${MONITOR} <<EOF
-stop
-savevm booted
+savevm running
 quit
 EOF
 
