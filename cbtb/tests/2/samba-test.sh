@@ -60,6 +60,7 @@ fi
 
 # update-inetd tries to do tricky things to /dev/tty
 rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd    
+apt-get update
 DEBIAN_FRONTEND=noninteractive aptitude install -y samba
 cat > /etc/samba/smb.conf << EOF
 [global]
