@@ -31,16 +31,12 @@ How to run nsnaps:
 1. CONFIGURE
 	- Go into your  ~/zumastor/zumastor/test/nsnaps directory
 	- Open up the configuration file, config.sh, and modify each of the variables according to your setup.
-	    For example:
-		VOLUME_NAME=vol
-		ORIGIN_MOUNT=/vol
+	  Please pay special attentions to the following variables. You need to config them according to your system setup.
 		TAR_DEV=/dev/tar
-		TAR_MNT=/tar
-		SOURCE_TAR=/zoo
-		KERNEL_TAR=linux-2.6.19.1.tar
 		ORIG_DEV=/dev/origin
 		SNAP_DEV=/dev/snap
 		META_DEV=/dev/meta
+		RAW_DEV=/dev/raw
 	
 	-  Edit the run_all_configurations function in nsnaps.sh to include the configurations
 	   you would like to run. To set the number of tests (snapshots), modify the num_tests 
