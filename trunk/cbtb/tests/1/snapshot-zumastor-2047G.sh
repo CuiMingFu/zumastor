@@ -17,8 +17,8 @@ set -e
 
 # The required sizes of the sdb and sdc devices in G.
 # Read only by the test harness.
-HDBSIZE=2020
-HDCSIZE=2020
+HDBSIZE=2030
+HDCSIZE=2030
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
