@@ -21,11 +21,11 @@ VOLUME_NAME=vol
 ORIGIN_MOUNT=/vol
 TAR_DEV=/dev/sdf1
 TAR_MNT=/blah
-SOURCE_TAR=/zoo
+SOURCE_TAR=${PWD}
 KERNEL_TAR=linux-2.6.19.1.tar
 ORIG_DEV=/dev/sdb2
 SNAP_DEV=/dev/sdc2
 META_DEV=/dev/umema
 RAW_DEV=/dev/sysvg1/datasrc
-SCRIPT_HOME=/root/zumastor/zumastor/test
-
+SCRIPT_HOME=${PWD}
+TEST_ROOT_DIR=${PWD}/output
