@@ -3,9 +3,9 @@
 echo set title \"Time to untar a kernel source tree vs Number of Snapshots\"
 echo set xlabel \"Number of Snapshots\"
 echo set ylabel \"Real time \(s\) to untar kernel and sync\"
-echo set key $X_COORD_PLOT_KEY, 100
-echo set terminal jpeg
-echo set output \"all_tests.jpg\"
+echo set key below
+echo set terminal postscript enhanced color
+echo set output \"all_tests.ps\"
 echo -n "plot "
 count=0
 for testfile in `ls *:*k`

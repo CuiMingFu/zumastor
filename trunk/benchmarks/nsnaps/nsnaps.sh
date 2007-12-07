@@ -9,10 +9,7 @@ SERVER_PIPE=/tmp/server
 
 . config.sh
 
-TEST_ROOT_DIR=~/zumastor/zumastor/test/nsnaps
-X_COORD_PLOT_KEY=0
 global_test_num=0
-
 
 function setup_tar() {
 	mkfs.ext3 $TAR_DEV || { echo "unable to mkfs tar device"; exit 1; }
@@ -24,7 +21,7 @@ function setup_tar() {
 function check_environment() {
 	[ -d $ORIGIN_MOUNT ] || mkdir -p $ORIGIN_MOUNT || { echo "$ORIGIN_MOUNT doesn't exists"; exit 1; }
 	[ -d $TAR_MNT ] || mkdir -p $TAR_MNT || { echo "$TAR_MNT doesn't exists"; exit 1; } 
-        [ -e ${SOURCE_TAR}/$KERNEL_TAR ] || { echo "${SOURCE_TAR}/$KERNEL_TAR tarball doesn't exits"; exit 1; }
+        [ -e ${SOURCE_TAR}/$KERNEL_TAR ] || { cd $SOURCE_TAR; wget http://www.kernel.org/pub/linux/kernel/v2.6/${KERNEL_TAR}.bz2; bunzip2 ${KERNEL_TAR}.bz2; cd $SCRIPT_HOME; }
 	[ -e $ORIG_DEV ] || { echo "$ORIG_DEV doesn't exists"; exit 1; }  
 	[ -e $SNAP_DEV ] || { echo "$SNAP_DEV doesn't exists"; exit 1; }  
 	[ -e $TAR_DEV ] || { echo "$TAR_DEV doesn't exists"; exit 1; }  
