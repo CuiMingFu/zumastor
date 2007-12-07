@@ -72,19 +72,19 @@ echo control/tmp dir=${tmpdir}
 # and store qemu parameters in $qemu_hd and $qemu2_hd in the $tmpdir.
 for f in ${execfiles}
 do
-  hdbsize=`awk -F = '/^HDBSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  hdbsize=`awk -F = '/^HDBSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hdbsize" != "x" ] ; then
     if [ "$hdbsize" -ge "$largest_hdbsize" ] ; then
       largest_hdbsize=$hdbsize
     fi
   fi
-  hdcsize=`awk -F = '/^HDCSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  hdcsize=`awk -F = '/^HDCSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hdcsize" != "x" ] ; then
     if [ "$hdcsize" -ge "$largest_hdcsize" ] ; then
       largest_hdcsize=$hdcsize
     fi
   fi
-  hddsize=`awk -F = '/^HDDSIZE=[0-9]$/ { print $2; }' ./${f} | tail -1`
+  hddsize=`awk -F = '/^HDDSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hddsize" != "x" ] ; then
     if [ "$hddsize" -ge "$largest_hddsize" ] ; then
       largest_hddsize=$hddsize
