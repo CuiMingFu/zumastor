@@ -201,7 +201,7 @@ function plot_data() {
         $SCRIPT_HOME/extract_data.pl
         echo "Plotting graphs with gnuplot."
         $SCRIPT_HOME/generate_all_gnuplot.sh | gnuplot
-        echo "Your tests have completed and your .jpg graph is available in your $PWD directory"
+        echo "Your tests have completed and your .ps graph is available in your $PWD directory"
 }
 
 # sets the x coordinate of the key for gnuplot based on the number
