@@ -49,13 +49,6 @@ function start_zumastor {
 		echo "Starting volume '$vol'"
 		zumastor start volume $vol >> $log 2>&1 || { echo start volume error; rm $LOCKFILE; return 1; }
 
-		list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
-		for id in $list; do
-			log "Mounting snapshot '$vol($id)'" $log
-			mount_device $vol $id >> $log 2>&1
-			export_snap $vol $id
-		done
-
 		if [ -x $VOLUMES/$vol/master ]; then
 			echo "Starting master"
 			zumastor start master $vol || { echo "starting master fail"; rm $LOCKFILE; exit 1; }

@@ -291,6 +291,13 @@ function run_master {
 	exec 0</dev/null 1>/dev/null 2>/dev/null
 
 	mount_device $vol -1 rw
+	list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
+	for id in $list; do
+		log "Mounting snapshot '$vol($id)'" $log
+		mount_device $vol $id >> $log 2>&1
+		log "Exporting snapshot '$vol($id)'" $log
+		export_snap $vol $id
+	done
 
 	# we reopen the log for each write so rotation works
 	pid=""
