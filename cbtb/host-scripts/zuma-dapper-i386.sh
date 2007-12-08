@@ -175,14 +175,13 @@ do
   sleep 10
 done
 
-  socat STDIN UNIX-CONNECT:${MONITOR} <<EOF
+  socat UNIX-CONNECT:${MONITOR} - <<EOF
 savevm running
 quit
 EOF
 
   time wait $qemu
 
-fi
 
 echo "Instance shut down, removing ssh hostkey"
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
