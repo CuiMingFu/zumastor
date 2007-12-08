@@ -242,6 +242,21 @@ function create_snapshot {
 	return $status
 }
 
+function mount_name {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r server=$SERVERS/$vol
+
+	if [[ $id = -1 ]]; then
+		echo ${MOUNTS}/$vol
+	else
+		ctime=`ddsnap status $server $id | tail -n 1 | cut -b 8-31`
+		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
+		echo ${MOUNTS}/$vol/@GMT-$stime
+	fi
+}
+
 # mount_device <vol> <id>
 # Given a volume <vol> and snapshot id <id>, mount the device
 function mount_device {
@@ -250,7 +265,7 @@ function mount_device {
 	local -r id=$2
 	local -r name=$(volume_name $vol $id)
 	local -r device=/dev/mapper/$name
-	local mount=${MOUNTS}/$name
+	local mount=$(mount_name $vol $id)
 	local options=ro
 	local fsopts=${VOLUMES}/$vol/filesystem/options
 
@@ -259,6 +274,8 @@ function mount_device {
 	[[ $3 == "rw" ]] && options="rw"
 	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
 
+	# mount the first snapshot only if we have multiple snapshots created in the same second
+	mountpoint -q $mount && return 0
 	test -d $mount || mkdir $mount || return 1
 
 	# additional per-filesystem mount options
@@ -279,13 +296,15 @@ function export_snap {
 	[[ $# -ge 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r snap=$2
+	local -r mount=$(mount_name $vol $snap)
 	local vfsid fsid
 
 	# FIXME: we should only export snapshots whose origin volume is exported.
 	# The problem is we can't learn this from exports because users may export a 
 	# dir linked to the origin volume and export_snap may be run before nfs starts
-	fsid=`echo "$vol$snap" | cksum | cut -d " " -f 1`
-	exportfs -oro -ofsid=$fsid *:$MOUNTS/$vol\($snap\)
+	# FIXME: cksum has high collision rate. Should use $volid$snapid once they are implemented
+	fsid=`echo "$vol$snap" | cksum | awk '{ printf "%d", ($1/2) }'`
+	exportfs -oro -ofsid=$fsid *:$mount
 }
 
 function umount_device {
@@ -294,12 +313,11 @@ function umount_device {
 	local -r id=$2
 	local -r option=$3
 	local -r name=$(volume_name $vol $id)
-	local -r mount=${MOUNTS}/$name
+	local -r mount=$(mount_name $vol $id)
 
 	umount $option /dev/mapper/$name
 	# nfs server hook: unexport the snapshot volume
-	[[ $id -eq -1 ]] || exportfs -u *:$MOUNTS/$name 2> /dev/null
-
+	[[ $id -eq -1 ]] || exportfs -u *:$mount 2> /dev/null
 	rmdir $mount 2> /dev/null
 }
 
