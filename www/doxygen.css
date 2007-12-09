@@ -333,7 +333,7 @@ TD {
 }
 DIV.section {
 	width: 100%;
-	text-align: justify;
+	text-align: left;
 	margin-top: 8px;
 	margin-bottom: 5px;
 	margin-left: 10px;
@@ -341,7 +341,7 @@ DIV.section {
 	padding: 2px;
 }
 DIV.subsection {
-	text-align: justify;
+	text-align: left;
 	margin-top: 4px;
 	margin-bottom: 4px;
 	margin-left: 15px;
