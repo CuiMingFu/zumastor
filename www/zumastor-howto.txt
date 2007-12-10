@@ -348,6 +348,18 @@ to that path and add it to `/etc/exports`.
 A future revision of Zumastor may allow you to specify an arbitrary mount
 point, eliminating the need for this symlink.
 
+Recovering files using a Zumastor snapshot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Mount the Zumastor snapshot volume exported above on an NFS client:
+--------------------------------------
+mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount/testvol.snapshots /mnt
+--------------------------------------
+
+There will be a number of snapshot directories under the `/mnt` directory.
+Each of these directories is named for the time at which that snapshot was
+taken.  To recover a file, find it in the appropriate snapshot directory and
+copy it to the desired location.
+
 Gentoo
 ~~~~~~
 The Zumastor project has a Gentoo overlay to simplify deployment of
