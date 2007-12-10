@@ -121,8 +121,9 @@ if [ $largest_hddsize -gt 0 ] ; then
   fi
 fi
 
+# TODO(dld): add back  -loadvm running  when method to deal with changed
+# ethernet/IP allocations is developed.
 ${rqemu_i386} \
-  -loadvm running \
   -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
@@ -134,8 +135,8 @@ ${rqemu_i386} \
 if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
+  # TODO(dld): See above.  -loadvm running
   ${rqemu_i386} \
-    -loadvm running \
     -serial file:${SERIAL2} \
     -monitor unix:${MONITOR2},server,nowait \
     -vnc unix:${VNC2} \
