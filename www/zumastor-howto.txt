@@ -350,18 +350,94 @@ point, eliminating the need for this symlink.
 
 Gentoo
 ~~~~~~
-See the Zumastor installation guide for Gentoo at
-http://zumastor.googlecode.com/svn/trunk/doc/gentoo_zumastor_guide.html[].
+The Zumastor project has a Gentoo overlay to simplify deployment of
+Zumastor using Gentoo's Portage package system. To use the overlay in
+an automated fashion you'll want to make sure you have the Gentoo
+overlay manager, layman, installed.
 
-FIXME: move the replication documentation from the Gentoo guide into this HOWTO.
+........
+# emerge layman
+# echo "source /usr/portage/local/layman/make.conf" >> /etc/make.conf
+........
+
+Next you'll want to add the Zumastor overlay diretory to layman's
+/etc/layman/layman.cfg. You want to update the "overlays"
+variable. Note that layman's config format want's each new entry in
+the overlays list to be on a new line. After you have updated it, the
+section of the file where overlays is set will look something like:
+
+........
+overlays	: http://www.gentoo.org/proj/en/overlays/layman-global.txt
+		  http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml
+........
+
+You will then want to add the Zumastor overlay to layman:
+
+........
+# layman -f -a zumastor
+........
+
+The zumastor ebuilds are currently masked, so the next think you'll
+need to do is to unmask them:
+
+........
+# echo "sys-kernel/zumastor-sources ~x86" >> /etc/portage/package.keywords
+# echo "sys-block/zumastor ~x86" >> /etc/portage/package.keywords
+........
+
+After all that preamble, we are now ready to install Zumastor and the
+Zumastor kernel sources:
+
+........
+# emerge zumastor-sources zumastor
+........
+
+Congratulations, you have now installed the zumastor software and
+kernel sources. You'll need to build a kernel as per usual, with one
+exception: you need to ensure that you enable the CONFIG_DM_DDSNAP
+kernel option when you configure your kernel. It can be found in
+"Device Drivers" -> "Multi-device support" -> "Distributed Data
+Snapshot target".
+
+The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.
 
 Example: installing Zumastor on Gentoo inside a VMWare player
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Refer to the "Ubuntu inside VMWare" example and the Gento guide
-above, but use the Gentoo vmware image at http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z[].  You'll need to unpack that image with
-7zip (believe it or not, compressing with 7zip saved a lot
-more space than with rzip, and lrzip crashed on it.  Go figure.)
-FIXME: add a real example here.
+We have a prebuilt Gentoo vmware image at
+http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z[].  You'll
+need to unpack that image with 7zip (believe it or not, compressing
+with 7zip saved a lot more space than with rzip, and lrzip crashed on
+it.  Go figure.)
+
+Be sure to check the settings to make sure that the RAM allocation is
+reasonable for your system. When you look at the settings you'll
+notice there are two SCSI drives installed on the image. The first one
+contains the Gentoo image, and the second is a blank, set aside for
+your Zumastor datastore. You may wish to resize the second one to
+better suit your needs.
+
+Power on the virtual image and select the Zumastor kernel. The root
+password on the image is set to "zumastor", so you should login as
+root and immediately change the password. You should also look at the
+contents of /etc/conf.d/clock to make sure that the timezone and clock
+settings are correct for your system. I'd also recommend syncing and
+updating through portage/layman, just to be sure you have the latest
+software.
+
+Once you've got the image the way you want it, it is time to set up
+the Zumastor storage space. You'll need to use lvm to create a
+physical volume and volume group:
+
+........
+# pvcreate /dev/sdb
+# vgcreate sysvg /dev/sdb
+# lvcreate --size 500MB -n test sysvg
+# lvcreate --size 1500MB -n test sysvg
+........
+
+Your Gentoo image is now ready for Zumastor.
 
 Source
 ~~~~~~
