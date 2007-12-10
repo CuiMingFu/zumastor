@@ -17,6 +17,7 @@
  <li><a href="#doc">Documentation</a></li>
  <li><a href="#downloads">Downloads</a></li>
  <li><a href="#development">Development</a></li>
+ <li><a href="#patches">Kernel Patches</a></li>
 </ul>
 </div>
 
@@ -129,7 +130,7 @@ and continues driving it forward today.
 </ul>
 
  <div class="subsection" id="patches">
- <h3>Patches</h3>
+ <h3>Kernel Patches</h3>
  Our kernel patches are online at
 <a
 href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/">http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/</a> and
@@ -139,7 +140,8 @@ Look at the latest kernel version there.  The most interesting patches are:
 <ul>
 <li> <a
 href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/2.6.22.10/bio.throttle.patch">Dan
-Phillips' bio throttling patch</a>, part of how we prevent deadlock during memory pressure
+Phillips' bio throttling patch</a>, part of how we prevent deadlock during memory pressure.  See <a href="http://marc.info/?l=linux-kernel&m=119689957014639&w=2">lkml discussion from 6 Dec 2007</a>.
+<li> <a href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/2.6.22.10/ddsnap.base.patch">Dan Phillips' PR_SET_MEMALLOC/PR_SET_LESS_THROTTLE patch</a>, other part of how we prevent deadlock during memory pressure.  (Any user app that's in the block writeout path needs to be written very carefully to avoid memory recursion deadlock; in particular, it should never allocate any memory while handling a write request (and probably use mlockall()), and it should set PF_LESS_THROTTLE|PF_MEMALLOC using prctl, as provided for by this patch.)  (Mixed in with the ddsnap stuff for now, sorry; ignore everything but the changes to include/linux/prctl.h and kernel/sys.c.)
 <li> <a href="http://zumastor.googlecode.com/svn/trunk/kernel/zumastor-patches/2.6.22.10/nfs_suspend">Jiaying Zhang's NFS suspend patch</a>, part of how we make new snapshots available via the NFS server as they arrive from remote sites
 </ul>
 </div>
