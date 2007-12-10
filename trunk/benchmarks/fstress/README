@@ -12,8 +12,8 @@ go to the fstress webpage at Duke: http://www.cs.duke.edu/ari/fstress/.
 2. CONFIGURE
 	Edit ~/.bashrc file, adding the following line:
 		export FSTRESS_HOME=/fstress
-	Fstress assumes csh path is /usr/local/bin/csh. Fix this with the following line
-		which csh | xargs -i ln -s {}
+	Edir ~/.ssh/environment, adding the following line:
+		FSTRESS_HOME=/fstress
 	Fstress allows using multiple clients during a test. A master machine starts executions 
 	on the specified client machines. To do this, the master needs to be able to execute 
 	command remotely. The default remote shell fstress uses is rsh. To use ssh instead, 
@@ -40,3 +40,12 @@ go to the fstress webpage at Duke: http://www.cs.duke.edu/ari/fstress/.
 4. VIEW RESULTS 
 	Run fstress_multistich.csh to view the results. output is the directory that contains the running results
 	/fstress/bin/fstress_multistich.csh output
+
+5. Evaluate ZUMASTOR PERFORMANCE
+	This directory includes an example script, run.sh, for comparing fstress performance with and without zumastor.
+	Have a look at the script and change the settings in it according to your nfs server setup. Then execute the
+	script to run the test:
+		./run.sh
+	After the tests finish, use another included script to view the results:
+		./generate_all_gnuplot.sh fstress-output | gnuplot
+	where fstress-output is the directory that contains the generated benchmark results.

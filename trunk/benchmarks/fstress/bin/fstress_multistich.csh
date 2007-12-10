@@ -1,4 +1,4 @@
-#!/usr/local/bin/tcsh -f
+#!/bin/tcsh -f
 
 set TMP = "/tmp/tmpstich"
 set SCALE = "1.0"
