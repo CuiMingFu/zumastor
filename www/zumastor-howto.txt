@@ -1,13 +1,17 @@
 ///////////////////
-To convert this document to HTML, use the command
- asciidoc -a toc -a numbered zumastor-howto.txt 
+This document is written in asciidoc format.
+To convert it to HTML (or pdf, or...), install asciidoc-8.2.5 as follows:
 
-Note: the asciidoc package in Ubuntu is 7.1.2, which 
-doesn't produce working table of contents.
-Version 8.2.5 does; to install this, download
-http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz 
-and run its install.sh.  (I edited it to install into /usr/local/asciidoc
-to avoid confusing my package manager.)
+ wget http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz
+ tar -xzvf asciidoc-8.2.5.tar.gz
+ cd asciidoc-8.2.5
+ perl -p -i -e 's,BINDIR=/usr/local/bin,BINDIR=/usr/local/asciidoc/bin,;s,MANDIR=/usr/local/man,MANDIR=/usr/local/asciidoc/man,' install.sh
+ sudo mkdir -p /usr/local/asciidoc/bin
+ sudo sh install.sh 
+
+Then use the command
+ /usr/local/asciidoc/bin/asciidoc -a toc -a numbered zumastor-howto.txt 
+to convert this document to HTML.
 ///////////////////
 
 Zumastor HOWTO
@@ -116,10 +120,11 @@ Until that happens, Zumastor is best suited for read-mostly applications.
 
 RAM
 ~~~
-Zumastor uses about 1MB of RAM per gigabyte of disk space to cache an 
-internal index.  This makes it impractical to use Zumastor for terabyte
-volumes on NAS appliances with little RAM.
-A future release may reduce this requirement; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
+Zumastor uses about 1MB of RAM per gigabyte of snapshot store to cache an internal index.  
+Having less RAM probably means Zumastor will perform poorly, but we have not measured this yet.
+This may mean that adding a 10 terabyte volume to a system also requires adding several gigabytes of RAM for acceptable performance.
+
+A future release may use a more compact index; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
 
 Zumastor User Interface
 -----------------------
