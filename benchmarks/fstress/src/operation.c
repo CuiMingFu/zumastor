@@ -57,7 +57,7 @@
 static int report_nfs_rexmits = 0; /* disable for better timings */
 static int report_nfs_errors = 0; /* disable for better timings */
 
-int rexmit_age = (2 * 1000); /* retransmit after N msecs. */
+int rexmit_age = (100 * 1000); /* retransmit after N msecs. */
 int rexmit_max = 2; /* cancel after N retransmissions. [EXPORTED] */
 
 /*
