@@ -429,9 +429,8 @@ Add the following lines to the <tt>/etc/exports</tt> file (where, again,
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><tt>/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,sync)
-/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,sync)
-/var/run/zumastor/mount/testvol.snapshots *(ro,fsid=1,nohide,no_subtree_check)</tt></pre>
+<pre><tt>/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,crossmnt)</tt></pre>
 </div></div>
 </li>
 <li>
@@ -529,7 +528,7 @@ kadmin.local: quit</tt></pre>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2007-12-10 14:45:47 PDT
+Last updated 2007-12-10 16:00:38 PDT
 </div>
 </div>
 </body>

@@ -46,9 +46,8 @@ On the server copy `/tmp/server-keytab` to `/etc/krb5.keytab`.
 'testvol' is the Zumastor volume to be exported):
 +
 --------------------------------------
-/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,sync)
-/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,sync)
-/var/run/zumastor/mount/testvol.snapshots *(ro,fsid=1,nohide,no_subtree_check)
+/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,crossmnt)
 --------------------------------------
 
 5. Add ``NEED_SVCGSSD=yes'' to the `/etc/default/nfs-kernel-server` script on

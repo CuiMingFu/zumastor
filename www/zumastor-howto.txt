@@ -318,21 +318,11 @@ Exporting a Zumastor volume via NFS
 # aptitude install nfs-common nfs-kernel-server
 --------------------------------------
 +
-3. Obtain and apply the Zumastor patch to `/etc/init.d/nfs-kernel-server`.
-+
---------------------------------------
-# cd /etc/init.d/
-# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
-# patch -p0 < nfs-kernel-server.patch
-# rm -f nfs-kernel-server.patch
---------------------------------------
-+
-4. Add the following lines to the NFS exports file `/etc/exports`
+3. Add the following lines to the NFS exports file `/etc/exports`
 (where 'testvol' is the Zumastor volume to be exported):
 +
 --------------------------------------
-/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check)
-/var/run/zumastor/mount/testvol.snapshots *(ro,fsid=1,nohide,no_subtree_check)
+/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
 --------------------------------------
 +
 The ``fsid=xxx'' option is required to ensure that the NFS server uses the same
@@ -340,6 +330,9 @@ file handle after a restart or remount of an exported volume.  If it is not
 specified, when the snapshot is remounted the file handle will change and the
 client will receive a stale file handle error. Any 32 bit number can be used for
 fsid value but it must be unique across all exported filesystems.
++
+The ``crossmnt'' option is required to allow client access to exported snapshot
+directories mounted under the Zumastor volume, see below.
 
 To export zumastor volumes from a different path, symlink the zumastor volumes
 to that path and add it to `/etc/exports`.
@@ -348,11 +341,20 @@ to that path and add it to `/etc/exports`.
 A future revision of Zumastor may allow you to specify an arbitrary mount
 point, eliminating the need for this symlink.
 
-Recovering files using a Zumastor snapshot
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Mount the Zumastor snapshot volume exported above on an NFS client:
+Recovering files through NFS using a Zumastor snapshot
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1. Obtain and apply the Zumastor patch to `/etc/init.d/nfs-kernel-server` on NFS server.
++
 --------------------------------------
-mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount/testvol.snapshots /mnt
+# cd /etc/init.d/
+# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
+# patch -p0 < nfs-kernel-server.patch
+# rm -f nfs-kernel-server.patch
+--------------------------------------
++
+2. Mount the Zumastor volume exported above on an NFS client:
+--------------------------------------
+mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount/testvol /mnt
 --------------------------------------
 
 There will be a number of snapshot directories under the `/mnt` directory.
