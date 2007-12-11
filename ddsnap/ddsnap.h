@@ -11,6 +11,8 @@
 #define u64 unsigned long long
 
 #define U64FMT "%llu"
+//short hand for "whatever printf("%llu") needs
+typedef unsigned long long llu_t;
 
 #define le_u32 u32
 #define le_u16 u16

@@ -307,7 +307,7 @@ static int parse_snaptag(char const *snapstr, u32 *snaptag)
 	if (*endptr != '\0')
 		return -1;
 
-	if (num >= (u32)~0UL)
+	if (num >= ULONG_MAX)
 		return -1;
 
 	*snaptag = num;
@@ -556,7 +556,7 @@ gen_compbuf_error:
 
 gen_compstream_error:
 	err = -ERANGE;
-	warn("invalid compression parameter level=%d delta_size=%llu in delta: %s", level, input_size, strerror(-err));
+	warn("invalid compression parameter level=%d delta_size=%Lu in delta: %s", level, input_size, strerror(-err));
 	return err;
 }
 
@@ -587,12 +587,12 @@ static struct status_reply *generate_status(int serv_fd, u32 snaptag)
 	}
 
 	if (head.length < sizeof(struct status_reply)) {
-		warn("status length mismatch: expected >=%u, actual %u", sizeof(struct status_reply), head.length);
+		warn("status length mismatch: expected >=%zu, actual %u", sizeof(struct status_reply), head.length);
 		return NULL;
 	}
 
 	if (!(reply = malloc(head.length))) {
-		warn("unable to allocate %u bytes for reply buffer", head.length);
+		warn("unable to allocate %Lu bytes for reply buffer", (llu_t) head.length);
 		return NULL;
 	}
 
@@ -626,7 +626,7 @@ static char *malloc_snapshot_name(const char *devstem, u32 id)
 		return NULL;
 	}
 
-	snprintf(snapshot_name, length, "%s(%u)", devstem, id);
+	snprintf(snapshot_name, length, "%s(%Lu)", devstem, (llu_t) id);
 
 	return snapshot_name;
 }
@@ -698,7 +698,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	struct delta_extent_header deh2 = { .magic_num = MAGIC_NUM, .mode = RAW };
 
 	trace_off(printf("dev1name: %s, dev2name: %s\n", dev1name, dev2name););
-	trace_off(printf("level: %d, chunksize bits: %u, chunk_count: "U64FMT"\n", level, cl->chunksize_bits, cl->count););
+	trace_off(printf("level: %d, chunksize bits: %Lu, chunk_count: %Lu\n", level, (llu_t) cl->chunksize_bits, (llu_t) cl->count););
 	trace_off(printf("starting delta generation, mode %u, chunksize %u\n", mode, chunk_size););
 
 	if (fd_size(snapdev2, &volume_size) < 0)
@@ -839,7 +839,7 @@ static int generate_delta(u32 mode, int level, struct change_list *cl, int delta
 	dh.src_snap = cl->src_snap;
 	dh.tgt_snap = cl->tgt_snap;
 
-	trace_off(fprintf(stderr, "writing delta file with chunk_num="U64FMT" chunk_size=%u mode=%u\n", dh.chunk_num, dh.chunk_size, mode););
+	trace_off(fprintf(stderr, "writing delta file with chunk_num=%Lu chunk_size=%Lu mode=%Lu\n", (llu_t) dh.chunk_num, (llu_t) dh.chunk_size, (llu_t) mode););
 
 	int err;
 	if ((err = fdwrite(deltafile, &dh, sizeof(dh))) < 0)
@@ -903,7 +903,7 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 	}
 
 	if (head.code != STREAM_CHANGELIST_OK) {
-		warn("unable to obtain changelist between snapshot %u and %u", src_snap, tgt_snap);
+		warn("unable to obtain changelist between snapshot %Lu and %Lu", (llu_t) src_snap, (llu_t) tgt_snap);
 		if (head.code != STREAM_CHANGELIST_ERROR) {
 			unknown_message_handler(serv_fd, &head);
 			return NULL;
@@ -916,7 +916,7 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 	struct changelist_stream cl_head;
 
 	if (head.length != sizeof(cl_head)) {
-		warn("change list length mismatch: expected %u, actual %u", sizeof(cl_head), head.length);
+		warn("change list length mismatch: expected %zu, actual %Lu", sizeof(cl_head), (llu_t) head.length);
 		return NULL;
 	}
 
@@ -940,7 +940,7 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 
 	if (cl->chunksize_bits == 0) {
 		/* FIXME: need to read the data anyway to clear the socket */
-		warn("invalid chunk size %u in REPLY_STREAM_CHANGE_LIST", cl->chunksize_bits);
+		warn("invalid chunk size %Lu in REPLY_STREAM_CHANGE_LIST", (llu_t) cl->chunksize_bits);
 		free(cl);
 		return NULL;
 	}
@@ -957,7 +957,7 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 		return NULL;
 	}
 
-	trace_off(printf("reading "U64FMT" chunk addresses (%u bits) from ddsnapd\n", cl->count, cl->chunksize_bits););
+	trace_off(printf("reading %Lu chunk addresses (%Lu bits) from ddsnapd\n", (llu_t) cl->count, (llu_t) cl->chunksize_bits););
 	if ((err = readpipe(serv_fd, cl->chunks, cl->count * sizeof(cl->chunks[0]))) < 0) {
 		warn("unable to read change list chunks: %s", strerror(-err));
 		free(cl->chunks);
@@ -992,7 +992,7 @@ static u64 get_origin_sectors(int serv_fd)
 	struct origin_sectors body;
 
 	if (head.length != sizeof(body)) {
-		warn("origin sector message length mismatch: expected %u, actual %u", sizeof(body), head.length);
+		warn("origin sector message length mismatch: expected %zu, actual %Lu", sizeof(body), (llu_t) head.length);
 		return 1;
 	}
 
@@ -1020,7 +1020,7 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 
 		err = -EINVAL;
 		struct status_reply *reply;
-		if (!(reply = generate_status(serv_fd, ~0UL))) {
+		if (!(reply = generate_status(serv_fd, ~((u32)0U)))) {
 			warn("cannot generate status");
 			goto out;
 		}
@@ -1035,9 +1035,9 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 		cl->chunks = NULL;
 		skip_chunks = cl->count - ((vol_size_bytes - start_addr) >> cl->chunksize_bits);
 	} else {
-		trace_off(printf("requesting changelist from snapshot %u to %u\n", src_snap, tgt_snap););
+		trace_off(printf("requesting changelist from snapshot %Lu to %Lu\n", (llu_t) src_snap, (llu_t) tgt_snap););
 		if ((cl = stream_changelist(serv_fd, src_snap, tgt_snap)) == NULL) {
-			warn("could not receive change list for snapshots %u and %u", src_snap, tgt_snap);
+			warn("could not receive change list for snapshots %Lu and %Lu", (llu_t) src_snap, (llu_t) tgt_snap);
 			err = -EINVAL;
 			goto out;
 		}
@@ -1304,7 +1304,7 @@ static int apply_delta(int deltafile, char const *devstem)
 	}
 
 	char *dev1name = NULL;
-	int err, fullvolume = (dh.src_snap == ~0UL);
+	int err, fullvolume = (dh.src_snap == ~0U);
 
 	/* check to see if the replication is full volume replication (dh.src_snap == -1)
 	 * or replication via snapshot. In case of full volume replication, pass NULL dev1name
@@ -1374,7 +1374,7 @@ static int list_snapshots(int serv_fd, int verbose, int onlylast)
 	}
 
 	if (head.length < sizeof(int32_t)) {
-		warn("snapshot list reply length mismatch: expected >=%u, actual %u", sizeof(int32_t), head.length);
+		warn("snapshot list reply length mismatch: expected >=%zu, actual %Lu", sizeof(int32_t), (llu_t) head.length);
 		return 1;
 	}
 
@@ -1386,7 +1386,7 @@ static int list_snapshots(int serv_fd, int verbose, int onlylast)
 	}
 
 	if (head.length != sizeof(int32_t) + count * sizeof(struct snapinfo)) {
-		warn("snapshot list reply length mismatch: expected %u, actual %u", sizeof(int32_t) + count * sizeof(struct snapinfo), head.length);
+		warn("snapshot list reply length mismatch: expected %zu, actual %Lu", sizeof(int32_t) + count * sizeof(struct snapinfo), (llu_t) head.length);
 		return 1;
 	}
 
@@ -1683,7 +1683,7 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
 		switch (message.head.code) {
 		case SEND_DELTA:
 			if (message.head.length < sizeof(body)) {
-				snprintf(err_msg, MAX_ERRMSG_SIZE, "incomplete SEND_DELTA request sent by client: length %u, size %u", message.head.length, sizeof(body));
+				snprintf(err_msg, MAX_ERRMSG_SIZE, "incomplete SEND_DELTA request sent by client: length %u, size %zu", message.head.length, sizeof(body));
 				err_msg[MAX_ERRMSG_SIZE-1] = '\0';
 				goto end_connection;
 			}
@@ -1786,7 +1786,7 @@ static u32 get_state(int serv_fd, u32 snaptag)
 	}
 
 	if (head.length != sizeof(struct state_message)) {
-		warn("state length mismatch: expected >=%u, actual %u", sizeof(struct state_message), head.length);
+		warn("state length mismatch: expected >=%zu, actual %u", sizeof(struct state_message), head.length);
 		return 9;
 	}
 
@@ -1892,14 +1892,14 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 		for (col = 0; col < snapshots; col++)
 			total_chunks += details->sharing[col];
 
-		printf(" %8llu", total_chunks);
-		printf(" %8llu", details->sharing[0]);
+		printf(" %8llu", (llu_t) total_chunks);
+		printf(" %8llu", (llu_t) details->sharing[0]);
 
 		if (verbose)
 			for (col = 1; col < snapshots; col++)
-				printf(" %8llu", details->sharing[col]);
+				printf(" %8llu", (llu_t) details->sharing[col]);
 		else
-			printf(" %8llu", total_chunks - details->sharing[0]);
+			printf(" %8llu", (llu_t)(total_chunks - details->sharing[0]));
 
 		printf("\n");
 	}
@@ -2636,7 +2636,7 @@ int main(int argc, char *argv[])
 
 			int sock = create_socket(sockname);
 
-			printf("%llu\n", get_origin_sectors(sock));
+			printf("%Lu\n", get_origin_sectors(sock));
 			close(sock);
 
 			return 0;
@@ -2689,7 +2689,7 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 			} else {
-				snaptag = ~0UL; /* meaning "all snapshots" */
+				snaptag = ~((u32)0U); /* meaning "all snapshots" */
 			}
 
 			int sock = create_socket(sockname);
@@ -2735,7 +2735,7 @@ int main(int argc, char *argv[])
 			gzip_level = MAX_GZIP_COMP;
 
 		u64 start_addr = 0;
-		if (resume && (!sscanf(resume, "%llu", &start_addr))) {
+		if (resume && (!sscanf(resume, "%Lu", &start_addr))) {
 			fprintf(stderr, "%s %s: Invalid resume position specified", argv[0], argv[1]);
 			poptPrintUsage(cdCon, stderr, 0);
 			poptFreeContext(cdCon);

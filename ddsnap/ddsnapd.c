@@ -418,19 +418,19 @@ static chunk_t count_free(struct superblock *sb, struct allocspace *alloc)
 static void check_freespace(struct superblock *sb)
 {
 	if (metafree(sb) != sb->metadata.asi->freechunks)
-		warn("metadata freechunks out of sync with used counts (%Li, %Li)", metafree(sb), sb->metadata.asi->freechunks);
+		warn("metadata freechunks out of sync with used counts (%Lu, %Li)", (llu_t) metafree(sb), sb->metadata.asi->freechunks);
 	chunk_t counted = count_free(sb, &sb->metadata);
 	if (counted != sb->metadata.asi->freechunks) {
-		warn("metadata free chunks count wrong: counted %Li, free = %Li", counted, sb->metadata.asi->freechunks);
+		warn("metadata free chunks count wrong: counted %Lu, free = %Li", (llu_t) counted, sb->metadata.asi->freechunks);
 		sb->metadata.asi->freechunks = counted;
 	}
 	if (combined(sb)) // !!! should be able to lose this now
 		return;
 	if (snapfree(sb) != sb->snapdata.asi->freechunks)
-		warn("snapdata freechunks out of sync with used counts (%Li, %Li)", snapfree(sb), sb->snapdata.asi->freechunks);
+		warn("snapdata freechunks out of sync with used counts (%Lu, %Li)", (llu_t) snapfree(sb), sb->snapdata.asi->freechunks);
 	counted = count_free(sb, &sb->snapdata);
 	if (counted != sb->snapdata.asi->freechunks) {
-		warn("snapdata free chunks count wrong: counted %Li, free = %Li", counted, sb->snapdata.asi->freechunks);
+		warn("snapdata free chunks count wrong: counted %Lu, free = %Li", (llu_t) counted, sb->snapdata.asi->freechunks);
 		sb->snapdata.asi->freechunks = counted;
 	}
 }
@@ -736,7 +736,7 @@ found:
  * exception or has the same exception as another snapshot.  In any case
  * if the chunk has an exception we need to know the exception address.
  */
-static int snapshot_chunk_unique(struct eleaf *leaf, u64 chunk, int snapbit, u64 *exception)
+static int snapshot_chunk_unique(struct eleaf *leaf, u64 chunk, int snapbit, chunk_t *exception)
 {
 	u64 mask = 1LL << snapbit;
 	unsigned i, target = chunk - leaf->base_chunk;
@@ -1109,7 +1109,7 @@ static int free_chunk(struct superblock *sb, struct allocspace *as, chunk_t chun
 			(bitmap_block << sb->metadata.chunk_sectors_bits));
 	
 	if (!buffer) {
-		warn("unable to free chunk "U64FMT, chunk);
+		warn("unable to free chunk %Lu", (llu_t) chunk);
 		return 0;
 	}
 	if (!get_bitmap_bit(buffer->data, chunk & bitmap_mask)) {
@@ -1379,7 +1379,7 @@ static void show_leaf_range(struct eleaf *leaf, chunk_t start, chunk_t finish)
 	for (int i = 0; i < leaf->count; i++) {
 		chunk_t addr = leaf->map[i].rchunk;
 		if (addr >= start && addr <= finish) {
-			printf("Addr %Lx: ", addr);
+			printf("Addr %zx: ", addr);
 			for (struct exception *p = emap(leaf, i); p < emap(leaf, i+1); p++)
 				printf("%Lx/%08llx, ", p->chunk, p->share);
 			printf("\n");
@@ -2729,7 +2729,7 @@ static struct snaplock *release_lock(struct superblock *sb, struct snaplock *loc
 		holdp = &(*holdp)->next;
 
 	if (!*holdp) {
-		trace_on(printf("chunk %Lx holder %Lx not found\n", lock->chunk, client->id););
+		trace_on(printf("chunk %Lx holder %Lx not found\n", (llu_t) lock->chunk, client->id););
 		return NULL;
 	}
 
@@ -2775,7 +2775,7 @@ static int release_chunk(struct superblock *sb, chunk_t chunk, struct client *cl
 	struct snaplock *next, *lock = *lockp;
 
 	if (!lock) {
-		trace_on(printf("chunk %Lx not locked\n", chunk););
+		trace_on(printf("chunk %Lx not locked\n", (llu_t) chunk););
 		return -1;
 	}
 
@@ -3697,7 +3697,7 @@ static int incoming(struct superblock *sb, struct client *client)
 					sb->snapdata.asi->allocsize_bits) < 0)
 			warn("unable to send reply to stream change list message");
 
-		trace_on(printf("streaming "U64FMT" chunk addresses\n", cl->count););
+		trace_on(printf("streaming %llu chunk addresses\n", (unsigned long long) cl->count););
 		if (writepipe(sock, cl->chunks, cl->count * sizeof(cl->chunks[0])) < 0)
 			warn("unable to send chunks for streaming change list");
 
