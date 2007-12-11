@@ -1144,7 +1144,7 @@ snapshot)
 	;;
 replicate)
 	declare name="$0 $1"
-	declare usage="Usage: $name <vol> <host> [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
+	declare usage="Usage: $name <vol> [<host>] [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
 	declare snap delay
 	declare wait=0
 
@@ -1172,19 +1172,36 @@ replicate)
 		shift 1
 	done
 	shift # remove --
-	[[ $# -eq 2 ]] || { echo $usage; exit 2; }
+	[[ $# -eq 1 ]] || [[ $# -eq 2 ]] || { echo $usage; exit 2; }
 	declare vol=$1
 	declare host=$2
 	declare -r target_dir=$VOLUMES/$vol/targets/$host
 	declare hold newhold
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-	verify_existing_target $vol $host || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
 	[[ -z $snap ]] || verify_existing_snap $vol $snap || { echo "$0: invalid snapshot '$snap' for volume '$vol'"; exit 1; }
 	if [[ ! -z $delay ]]; then
 		verify_valid_number $delay || { echo "$0: invalid delay '$delay' specified"; exit 1; }
 		sleep $delay
 	fi
+
+	# If no host was specified and we're a target for this volume, run
+	# the "zumastor replicate" on the source.
+	if [[ -z "$host" ]]; then
+		[[ -z "$snap" ]] || { echo "$0: can't specify a snapshot or delay here!"; exit 1; }
+		[[ -z "$delay" ]] || { echo "$0: can't specify a snapshot or delay here!"; exit 1; }
+		if [[ -f $VOLUMES/$vol/source/hostname ]]; then
+			read host <$VOLUMES/$vol/source/hostname
+			[[ $wait -eq 0 ]] && rwait="--nowait"
+			[[ $wait -ne 0 ]] && rwait="--wait"
+			run_remote $host "zumastor replicate $vol $MYHOSTNAME $rwait"
+			exit $?
+		fi
+		echo $usage
+		exit 2
+	fi
+
+	verify_existing_target $vol $host || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
 
 	# Get the current hold file contents.
 	hold=`cat $target_dir/hold 2>/dev/null`
