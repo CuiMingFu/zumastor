@@ -2,12 +2,9 @@
 #
 # $Id$
 #
-# Make use of large, extra devices on /dev/sdb and /dev/sdc to test
-# terabyte-sized zumastor filesystems.  Other than not using LVM and using
-# very large devices, this is the same as the snapshot-zumastor.sh test.
-# To reduce the runtime of this test, only the XFS filesystem is tested.
-# mkfs.ext3 takes on the order of a couple of hours to run under emulation
-# on a filesystem of this size.
+# Set up a sparse file backing a multi-terabyte filesystem and a
+# sysvg with a snapshot store, iterate through a few
+# snapshots to verify that each is unique and stable when taken.
 #
 # Copyright 2007 Google Inc.  All rights reserved
 # Author: Drake Diedrich (dld@google.com)
@@ -15,38 +12,25 @@
 
 set -e
 
-# The required sizes of the sdb and sdc devices in G.
-# Read only by the test harness.
-HDBSIZE=2040
-HDCSIZE=2040
-
-# Terminate test in 20 minutes.  Read by test harness.
+# Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=1200
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-aptitude install xfsprogs
-modprobe xfs
+EXPECT_FAIL=1
 
 echo "1..6"
 
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.xfs /dev/mapper/testvol
-
-  # TODO: make this part of the zumastor define master or define volume
-  mkdir /var/lib/zumastor/volumes/testvol/filesystem
-  echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
-
+lvcreate --size 1m -n test sysvg
+lvcreate --size 2m -n test_snap sysvg
+zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
-sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
-zumastor snapshot testvol hourly 
-sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
+sync ; zumastor snapshot testvol hourly 
 
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
@@ -67,11 +51,8 @@ else
   exit 3
 fi
 
-sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
-zumastor snapshot testvol hourly 
+sync ; zumastor snapshot testvol hourly 
 sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
 
 if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
   echo "ok 4 - second snapshot mounted"
