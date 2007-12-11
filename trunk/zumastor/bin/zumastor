@@ -788,7 +788,6 @@ define)
 		declare args metadev init
 		declare blocksize=4k
 		declare chunksize=16k
-		declare mountpoint=$(mount_name $vol -1)
 		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-p|--mountpoint <dir>] [-h|--help]"
 
 		shift 2
@@ -828,7 +827,9 @@ define)
 		verify_managed_vol $vol && { echo "$0: volume '$vol' is already configured"; exit 1; }
 		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
 		verify_valid_device $snapstore || { echo "$0: invalid device '$snapstore'"; exit 1; }
-		verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
+
+		[[ -z $mountpoint ]] || verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
+		[[ -z $mountpoint ]] && mountpoint=$(mount_name $vol -1)
 
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
