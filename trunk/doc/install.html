@@ -33,7 +33,9 @@
     There are three required packages to build: the patched kernel package, ddsnap (snapshot device userspace), and zumastor (management cli) package.
     <ol>
     <li> Make sure you have the necessary build tools install, including the following:<p>
-    <code>aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion</code><p>
+    <code>aptitude install debhelper devscripts fakeroot kernel-package \
+libc6-dev libevent-dev libkrb5-dev libkrb53 libldap2-dev libpopt-dev \
+ncurses-dev slang1-dev subversion zlib1g-dev</code><p>
 
     <li> Get the latest code:<p>
     <code>svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</code><p>
