@@ -714,79 +714,6 @@ Note: The script takes a parameter which is a .config file for the kernel.  Ther
 </li>
 </ol></div>
 <div class="para"><p>(Also, pcquiles mentioned in <a href="http://zumastor.org/irclogs/2007-12-04.txt">irc</a> that he is working on Ubuntu packaging for a Xen+Zumastor kernel; if you were thinking of integrating Zumastor into upstream Debian or Ubuntu, check out his work first.)</p></div>
-<h4 id="_exporting_a_zumastor_volume_via_nfs">8.1.4. Exporting a Zumastor volume via NFS</h4>
-<div class="olist"><ol>
-<li>
-<p>
-Install Zumastor using one of the methods above.
-</p>
-</li>
-<li>
-<p>
-Install the NFS server packages:
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><tt># aptitude install nfs-common nfs-kernel-server</tt></pre>
-</div></div>
-</li>
-<li>
-<p>
-Add the following lines to the NFS exports file <tt>/etc/exports</tt>
-(where <em>testvol</em> is the Zumastor volume to be exported):
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><tt>/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)</tt></pre>
-</div></div>
-<div class="para"><p>The &#8220;fsid=xxx&#8221; option is required to ensure that the NFS server uses the same
-file handle after a restart or remount of an exported volume.  If it is not
-specified, when the snapshot is remounted the file handle will change and the
-client will receive a stale file handle error. Any 32 bit number can be used for
-fsid value but it must be unique across all exported filesystems.</p></div>
-<div class="para"><p>The &#8220;crossmnt&#8221; option is required to allow client access to exported snapshot
-directories mounted under the Zumastor volume, see below.</p></div>
-</li>
-</ol></div>
-<div class="para"><p>To export zumastor volumes from a different path, symlink the zumastor volumes
-to that path and add it to <tt>/etc/exports</tt>.</p></div>
-<div class="admonitionblock">
-<table><tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">A future revision of Zumastor may allow you to specify an arbitrary mount
-point, eliminating the need for this symlink.</td>
-</tr></table>
-</div>
-<h4 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">8.1.5. Recovering files through NFS using a Zumastor snapshot</h4>
-<div class="olist"><ol>
-<li>
-<p>
-Obtain and apply the Zumastor patch to <tt>/etc/init.d/nfs-kernel-server</tt> on NFS server.
-</p>
-<div class="listingblock">
-<div class="content">
-<pre><tt># cd /etc/init.d/
-# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
-# patch -p0 &lt; nfs-kernel-server.patch
-# rm -f nfs-kernel-server.patch</tt></pre>
-</div></div>
-</li>
-<li>
-<p>
-Mount the Zumastor volume exported above on an NFS client:
-</p>
-</li>
-</ol></div>
-<div class="listingblock">
-<div class="content">
-<pre><tt>mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount/testvol /mnt</tt></pre>
-</div></div>
-<div class="para"><p>There will be a number of snapshot directories under the <tt>/mnt</tt> directory.
-Each of these directories is named for the time at which that snapshot was
-taken.  To recover a file, find it in the appropriate snapshot directory and
-copy it to the desired location.</p></div>
 <h3 id="_gentoo">8.2. Gentoo</h3><div style="clear:left"></div>
 <div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
 Zumastor using Gentoo's Portage package system. To use the overlay in
@@ -1034,11 +961,84 @@ Run it, then use df to see how many snapshots are around afterwards:</p></div>
 <div class="para"><p>You should see 24 snapshots (the limit set when we did the <tt>zumastor define master</tt>)
 plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
 it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
+<h3 id="_exporting_a_zumastor_volume_via_nfs">9.9. Exporting a Zumastor volume via NFS</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Install Zumastor using one of the methods above.
+</p>
+</li>
+<li>
+<p>
+Install the NFS server packages:
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><tt># aptitude install nfs-common nfs-kernel-server</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Add the following lines to the NFS exports file <tt>/etc/exports</tt>
+(where <em>testvol</em> is the Zumastor volume to be exported):
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><tt>/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)</tt></pre>
+</div></div>
+<div class="para"><p>The &#8220;fsid=xxx&#8221; option is required to ensure that the NFS server uses the same
+file handle after a restart or remount of an exported volume.  If it is not
+specified, when the snapshot is remounted the file handle will change and the
+client will receive a stale file handle error. Any 32 bit number can be used for
+fsid value but it must be unique across all exported filesystems.</p></div>
+<div class="para"><p>The &#8220;crossmnt&#8221; option is required to allow client access to exported snapshot
+directories mounted under the Zumastor volume, see below.</p></div>
+</li>
+</ol></div>
+<div class="para"><p>To export zumastor volumes from a different path, symlink the zumastor volumes
+to that path and add it to <tt>/etc/exports</tt>.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">A future revision of Zumastor may allow you to specify an arbitrary mount
+point, eliminating the need for this symlink.</td>
+</tr></table>
+</div>
+<h3 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">9.10. Recovering files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Obtain and apply the Zumastor patch to <tt>/etc/init.d/nfs-kernel-server</tt> on NFS server.
+</p>
+<div class="listingblock">
+<div class="content">
+<pre><tt># cd /etc/init.d/
+# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
+# patch -p0 &lt; nfs-kernel-server.patch
+# rm -f nfs-kernel-server.patch</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Mount the Zumastor volume exported above on an NFS client:
+</p>
+</li>
+</ol></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>mount -tnfs -o"ro" nfs-server:/var/run/zumastor/mount/testvol /mnt</tt></pre>
+</div></div>
+<div class="para"><p>There will be a number of snapshot directories under the <tt>/mnt</tt> directory.
+Each of these directories is named for the time at which that snapshot was
+taken.  To recover a file, find it in the appropriate snapshot directory and
+copy it to the desired location.</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-10 16:08:14 PDT
+Last updated 2007-12-10 18:30:24 PDT
 </div>
 </div>
 </body>
