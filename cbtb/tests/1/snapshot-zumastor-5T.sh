@@ -4,7 +4,7 @@
 #
 # Make use of large, extra devices on /dev/sd[bcd] to test
 # multi-terabyte-sized zumastor filesystems.  RAID0 and LVM are used to
-# create the large filesystems from 2047G disks provided by qemu (the
+# create the large filesystems from 2030G disks provided by qemu (the
 # largest supported by the qcow2 disk backing format).
 # This is otherwise the same as the snapshot-zumastor-xfs.sh test
 #
@@ -21,9 +21,9 @@ EXPECT_FAIL=1
 
 # The required sizes of the sd[bcd] devices in G.
 # Read only by the test harness.
-HDBSIZE=2047
-HDCSIZE=2047
-HDDSIZE=2047
+HDBSIZE=2030
+HDCSIZE=2030
+HDDSIZE=2030
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
