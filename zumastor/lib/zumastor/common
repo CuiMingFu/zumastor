@@ -99,6 +99,17 @@ function verify_valid_host {
 	return 0
 }
 
+function verify_valid_mountpoint {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r mpoint=$1
+
+	# Has to be a directory, can't already be mounted-on.
+	[[ -d $mpoint ]] || return 1
+	[[ mountpoint -q ${mpoint} ]] && return 1
+
+	return 0
+}
+
 function verify_valid_number {
 	[[ $# = 1 && $1 && ! $1 =~ [^0-9] ]]
 }
@@ -158,7 +169,7 @@ function start_volume {
 	local -r server=${SERVERS}/$vol
 	local -r agentlog=${LOGS}/${vol}/agent.log
 	local -r serverlog=${LOGS}/${vol}/server.log
-	
+
 	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
 	[[ -h $mdev ]] || mdev=""	
 
@@ -247,14 +258,21 @@ function mount_name {
 	local -r vol=$1
 	local -r id=$2
 	local -r server=$SERVERS/$vol
+	local -r mountpoint=$VOLUMES/$vol/filesystem/mountpoint
+	local -r oldmount=${MOUNTS}/$vol
+	local mpoint
 
-	if [[ $id = -1 ]]; then
-		echo ${MOUNTS}/$vol
+	if [[ -f $mountpoint ]]; then
+		read mpoint <$mountpoint
 	else
+		mpoint=$oldmount
+	fi
+	if [[ $id != -1 ]]; then
 		ctime=`ddsnap status $server $id | tail -n 1 | cut -b 8-31`
 		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
-		echo ${MOUNTS}/$vol/@GMT-$stime
+		mpoint=$mpoint/@GMT-$stime
 	fi
+	echo $mpoint
 }
 
 # mount_device <vol> <id>
@@ -270,7 +288,7 @@ function mount_device {
 	local fsopts=${VOLUMES}/$vol/filesystem/options
 
 	# to support mounting arbitrary snapshots to the unqualified volume mountpoint
-	[[ $3 == "unqualified" ]] && mount=${MOUNTS}/$vol
+	[[ $3 == "unqualified" ]] && mount=$(mount_name $vol -1)
 	[[ $3 == "rw" ]] && options="rw"
 	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
 
@@ -318,7 +336,7 @@ function umount_device {
 	umount $option /dev/mapper/$name
 	# nfs server hook: unexport the snapshot volume
 	[[ $id -eq -1 ]] || exportfs -u *:$mount 2> /dev/null
-	rmdir $mount 2> /dev/null
+	[[ $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
 }
 
 function remove_device {
@@ -452,4 +470,3 @@ function send_to_fifo {
 		echo $data >$fifo || { echo "error writing to $fifo"; return 1; }
 	fi
 }
-
