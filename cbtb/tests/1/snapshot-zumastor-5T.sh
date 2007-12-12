@@ -31,32 +31,28 @@ TIMEOUT=1200
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
+
+# function to return the mountpoint path of a particular snapshot of a volume
+# old function, pre-r1102
+snapmountpoint()
+{
+  echo "/var/run/zumastor/$1($2)"
+}
+
+
+# additional software requirements of this test
 aptitude install xfsprogs
 modprobe xfs
 
-# create a MD RAID0 of hdb, hdc, and hdd
-aptitude install mdadm
-mdadm --create /dev/md0 --level=0 --raid-devices=3 /dev/sd[bcd]
-
-date
-cat /proc/mdstat
-
 # create LVM VG sysvg
-pvcreate -ff /dev/md0
-date
-cat /proc/mdstat
-
-vgcreate sysvg /dev/md0
-
-date
-cat /proc/mdstat
+time pvcreate -ff /dev/hdb
+time pvcreate -ff /dev/hdc
+time pvcreate -ff /dev/hdd
+time vgcreate sysvg /dev/hdb /dev/hdc /dev/hdd
 
 # create volumes 5T origin and .5T snapshot
-lvcreate --size 5124G -n test sysvg
-lvcreate --size 512G -n test_snap sysvg
-
-date
-cat /proc/mdstat
+time lvcreate --size 5124G -n test sysvg
+time lvcreate --size 512G -n test_snap sysvg
 
 echo "1..6"
 
@@ -80,18 +76,21 @@ xfs_freeze -u /var/run/zumastor/mount/testvol
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
 
-if [ -d /var/run/zumastor/mount/testvol\(0\)/ ] ; then
+mountpoint0=$(snapmountpoint testvol 0)
+if [ -d "$mountpoint0" ] ; then
   echo "ok 2 - first snapshot mounted"
 else
   ls -lR /var/run/zumastor/mount
+  cat /proc/mount
   echo "not ok 2 - first snapshot mounted"
   exit 2
 fi
 
-if [ ! -f /var/run/zumastor/mount/testvol\(0\)/testfile ] ; then
+if [ ! -f "$mountpoint0/testfile" ] ; then
   echo "ok 3 - testfile not present in first snapshot"
 else
   ls -lR /var/run/zumastor/mount
+  cat /proc/mount
   echo "not ok 3 - testfile not present in first snapshot"
   exit 3
 fi
@@ -102,19 +101,22 @@ zumastor snapshot testvol hourly
 sleep $SLEEP
 xfs_freeze -u /var/run/zumastor/mount/testvol
 
-if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
+mountpoint2=$(snapmountpoint testvol 2)
+if [ -d "$mountpoint2" ] ; then
   echo "ok 4 - second snapshot mounted"
 else
   ls -lR /var/run/zumastor/mount
+  cat /proc/mounts
   echo "not ok 4 - second snapshot mounted"
   exit 4
 fi
 
 if diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
+    "$mountpoint2/testfile" 2>&1 >/dev/null ; then
   echo "ok 5 - identical testfile immediately after second snapshot"
 else
   ls -lR /var/run/zumastor/mount
+  cat /proc/mounts
   echo "not ok 5 - identical testfile immediately after second snapshot"
   exit 5
 fi
@@ -122,10 +124,11 @@ fi
 date >> /var/run/zumastor/mount/testvol/testfile
 
 if ! diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
+    "$mountpoint2/testfile" 2>&1 >/dev/null ; then
   echo "ok 6 - testfile changed between origin and second snapshot"
 else
   ls -lR /var/run/zumastor/mount
+  cat /proc/mounts
   echo "not ok 6 - testfile changed between origin and second snapshot"
   exit 6
 fi
