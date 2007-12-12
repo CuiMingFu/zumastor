@@ -38,13 +38,25 @@ modprobe xfs
 aptitude install mdadm
 mdadm --create /dev/md0 --level=0 --raid-devices=3 /dev/sd[bcd]
 
+date
+cat /proc/mdstat
+
 # create LVM VG sysvg
 pvcreate -ff /dev/md0
+date
+cat /proc/mdstat
+
 vgcreate sysvg /dev/md0
+
+date
+cat /proc/mdstat
 
 # create volumes 5T origin and .5T snapshot
 lvcreate --size 5124G -n test sysvg
 lvcreate --size 512G -n test_snap sysvg
+
+date
+cat /proc/mdstat
 
 echo "1..6"
 
@@ -52,7 +64,7 @@ zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 mkfs.xfs /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
-  mkdir /var/lib/zumastor/volumes/testvol/filesystem
+  # mkdir /var/lib/zumastor/volumes/testvol/filesystem
   echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
 
 zumastor define master testvol -h 24 -d 7
