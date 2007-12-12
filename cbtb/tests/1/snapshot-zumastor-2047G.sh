@@ -17,8 +17,8 @@ set -e
 
 # The required sizes of the sdb and sdc devices in G.
 # Read only by the test harness.
-HDBSIZE=2040
-HDCSIZE=2040
+HDBSIZE=2044
+HDCSIZE=2044
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
@@ -35,7 +35,7 @@ zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.xfs /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
-  mkdir /var/lib/zumastor/volumes/testvol/filesystem
+  # mkdir /var/lib/zumastor/volumes/testvol/filesystem
   echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
 
 zumastor define master testvol -h 24 -d 7
