@@ -45,10 +45,10 @@ aptitude install xfsprogs
 modprobe xfs
 
 # create LVM VG sysvg
-time pvcreate -ff /dev/hdb
-time pvcreate -ff /dev/hdc
-time pvcreate -ff /dev/hdd
-time vgcreate sysvg /dev/hdb /dev/hdc /dev/hdd
+time pvcreate -ff /dev/sdb
+time pvcreate -ff /dev/sdc
+time pvcreate -ff /dev/sdd
+time vgcreate sysvg /dev/sdb /dev/sdc /dev/sdd
 
 # create volumes 5T origin and .5T snapshot
 time lvcreate --size 5124G -n test sysvg
