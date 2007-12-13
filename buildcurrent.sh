@@ -84,6 +84,7 @@ echo ${SVNREV} >SVNREV
 [ -f debian/changelog ] && rm debian/changelog
 EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
+make genpatches
 popd >> $LOG
 mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}
 echo -e "done.\n"
@@ -112,18 +113,14 @@ then
   pushd linux-${KERNEL_VERSION} >> $LOG || exit 1
 
   for patch in \
-      ${SRC}/kernel/zumastor-patches/${KERNEL_VERSION}/* \
-      ${SRC}/kernel/ddsnap-patches/${KERNEL_VERSION}/*
+      ${SRC}/zumastor/patches/${KERNEL_VERSION}/* \
+      ${SRC}/ddsnap/patches/${KERNEL_VERSION}/*
   do
 	echo "   $patch"
 	< $patch patch -p1 >> $LOG || exit 1
   done
   echo -e "done.\n"
 
-  echo Adding ddsnap driver...
-  cp -dpP ${SRC}/kernel/ddsnap/* ./drivers/md
-  echo -e "done.\n"
- 
   echo -n Building kernel package...
   fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
   popd >> $LOG

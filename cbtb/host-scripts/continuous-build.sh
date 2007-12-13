@@ -69,15 +69,16 @@ echo -n "Rebuilding the kernel between $oldrevision and $revision "
 nobuild=
 if [ "x$oldrevision" != "x" ]
 then
-  pushd kernel
-    diff=`mktemp`
-    svn diff -r$oldrevision >$diff
-    if [ ! -s "$diff" ]
+  for kernel_dirs in kernel zumastor/patches ddsnap/patches ddsnap/kernel; do
+    pushd $kernel_dirs
+    if [ `svn diff -r$oldrevision | wc -c` -ne 0 ]
     then
       nobuild="--no-kernel $nobuild"
       echo "is unnecessary"
+      break
     fi
-  popd
+    popd
+  done
 fi
 
 
