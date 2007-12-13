@@ -569,6 +569,11 @@ Notice that the first snapshot was named
 (Why the gap?  Zumastor uses another snapshot internally during
 replication.  Yes, this is a bit of a rough edge.)
 
+[NOTE]
+If you want to export Zumastor snapshots via NFS or Samba, you need to use the +export+ or +samba+
+options with the +zumastor define master+ command. See sections "Exporting a Zumastor volume via NFS" 
+and "Exporting a Zumastor volume via Samba" for such examples.
+
 Where do old snapshots go?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Assuming you've set up a volume to keep 24 hourly snapshots
@@ -615,8 +620,15 @@ fsid value but it must be unique across all exported filesystems.
 The ``crossmnt'' option is required to allow client access to exported snapshot
 directories mounted under the Zumastor volume, see below.
 +
-3. If you want to also export zumastor *snapshots*, 
-you'll need to modify your system's NFS startup script to
+3. If you want to also export zumastor *snapshots*, you'll need to use
+the +--export+ option with the command +zumastor define master+ described in section
+"Mount a new volume and set up periodic snapshots" above.
++
+--------------------------------------
+zumastor define master zumatest --hourly 24 --export
+--------------------------------------
++
+You'll also need to modify your system's NFS startup script to
 reread /etc/exports on restart.  For Ubuntu, we provide a patch that
 does this for you:
 +
@@ -636,20 +648,86 @@ point, eliminating the need for this symlink.
 
 Recovering files through NFS using a Zumastor snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-First, make sure you have modified your NFS server's startup script
+First, make sure you have used the +--export+ option with the +zumastor define master+ 
+command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.
 
 Then mount the Zumastor volume as normal on an NFS client, for instance:
 --------------------------------------
 mount -tnfs nfs-server:/var/run/zumastor/mount/testvol /mnt
+ls /mnt/.snapshot
 --------------------------------------
 
-There will be a number of snapshot directories under the mount point.
+There will be a number of snapshot directories under /mnt/.snapshot.
 Each of these directories is named for the time at which that snapshot was
 taken.  To recover a file, find it in the appropriate snapshot directory and
 copy it to the desired location.
 
 [NOTE]
 A future revision of Zumastor may add options to make the snapshots
-visible inside the origin volume, which would let you access them
-without explicitly mounting them.
+visible inside each directory, which would let you access them from any
+place under the mount point.
+
+Exporting a Zumastor volume via Samba
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here is an example of setting up Samba on Zumastor using the USER authentication flavor.
+
+1. Install the Samba server packages:
++
+--------------------------------------
+# aptitude install samba
+--------------------------------------
++
+2. Edit file `/etc/samba/smb.conf`, configuring the ``workgroup'' option according to your domain setup, 
+commenting out the ``obey pam restrictions = yes'' option, and adding the following lines 
+(where 'testvol' is the Zumastor volume to be exported and 'homevol' is the name of 
+the exported Samba volume):
++
+--------------------------------------
+[homevol]
+
+path = /var/run/zumastor/mount/testvol
+comment = test volume
+browseable = yes
+case sensitive = no
+read only = no
+vfs objects = shadow_copy
+--------------------------------------
++
+The ``vfs objects = shadow_copy'' option is required for accessing snapshot directories via
+CIFS's *previous version* interface, see below.
++
+3. Setup smbpasswd for the volume 'homevol'. Please replace 'testuser' with the user name you want to 
+use for accessing the exported Samba volume from a client. You don't need the +useradd+ command if 
+'testuser' has already existed on the Samba server.
++
+--------------------------------------
+#useradd testuser
+#smbpasswd -a testuser
+New SMB password: your-secure-passwd
+Retype new SMB password: your-secure-passwd 
+--------------------------------------
++
+4. If you want to also export zumastor *snapshots* via CIFS's *previous version* interface, you'll need to use
+the +--samba+ option with the command +zumastor define master+ described in section
+"Mount a new volume and set up periodic snapshots" above.
++
+--------------------------------------
+zumastor define master zumatest --hourly 24 --samba
+--------------------------------------
+
+Recovering files through Samba using a Zumastor snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First, make sure you have used the +samba+ option with the +zumastor define master+
+command as described in the section "Exporting a Zumastor volume via Samba" above.
+Then you can recover files from a Windows Samba client as follows.
+
+1. Open Windows Explorer and enter the Samba server name followed by the exported volume name in the explorer bar, e.g.,
++\\samba-server\homevol\+. Enter 'testuser' and 'your-secure-passwd' in the poped up authtication window, where 'testuser'
+and 'your-secure-passwd' are the username and password your have set up on the Samba server, as described in section
+"Exporting a Zumastor volume via Samba" above.
+
+2. Go to the file or directory you want to recover. Right click it and select +Properties+. You will see the
++Previous versions+ tab appear on the top. Select it and you will see a list of snapshots in the window.
+Select a snapshot. Then you can view, copy, or restore any file from that snapshot.
