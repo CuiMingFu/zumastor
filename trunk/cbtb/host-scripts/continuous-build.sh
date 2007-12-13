@@ -66,14 +66,14 @@ fi
 # set flags for the parts of the build that are unnecessary.  Currently
 # only check for kernel diffs
 echo -n "Rebuilding the kernel between $oldrevision and $revision "
-nobuild=
+nobuild="--no-kernel "
 if [ "x$oldrevision" != "x" ]
 then
   for kernel_dirs in kernel zumastor/patches ddsnap/patches ddsnap/kernel; do
     pushd $kernel_dirs
     if [ `svn diff -r$oldrevision | wc -c` -ne 0 ]
     then
-      nobuild="--no-kernel $nobuild"
+      nobuild=
       echo "is unnecessary"
       break
     fi
