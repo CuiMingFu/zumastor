@@ -146,7 +146,7 @@ static int recv_fd(int sock, char *bogus, unsigned *len)
 
 static void kick(struct block_device *dev)
 {
-	request_queue_t *q = bdev_get_queue(dev);
+	struct request_queue *q = bdev_get_queue(dev);
 	if (q->unplug_fn)
 		q->unplug_fn(q);
 }
