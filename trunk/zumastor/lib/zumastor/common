@@ -270,9 +270,18 @@ function mount_name {
 	if [[ $id != -1 ]]; then
 		ctime=`ddsnap status $server $id | tail -n 1 | cut -b 8-31`
 		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
-		mpoint=$mpoint/@GMT-$stime
+		mpoint=$mpoint/.snapshot/$stime
 	fi
 	echo $mpoint
+}
+
+function samba_name {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r mount=$2
+	local -r mpoint=$(mount_name $vol -1)
+	ctime=`basename $mount`
+	echo ${mpoint}/@GMT-$ctime
 }
 
 # mount_device <vol> <id>
@@ -286,13 +295,14 @@ function mount_device {
 	local mount=$(mount_name $vol $id)
 	local options=ro
 	local fsopts=${VOLUMES}/$vol/filesystem/options
+	local -r samba=$VOLUMES/$vol/filesystem/samba
+	local -r export=$VOLUMES/$vol/filesystem/export
 
 	# to support mounting arbitrary snapshots to the unqualified volume mountpoint
 	[[ $3 == "unqualified" ]] && mount=$(mount_name $vol -1)
 	[[ $3 == "rw" ]] && options="rw"
 	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
 
-	# mount the first snapshot only if we have multiple snapshots created in the same second
 	mountpoint -q $mount && return 0
 	test -d $mount || mkdir $mount || return 1
 
@@ -307,6 +317,15 @@ function mount_device {
 	umount $device && \
 	mount -o $options $device $mount || \
 		{ echo "unable to mount $device on $mount"; return 1; }
+
+	# samba hook: bind mount the snapshot if samba option is specified
+	if [[ -f $samba ]] && [[ id -ne -1 ]]; then
+		local -r samba_mount=$(samba_name $vol $mount)
+		mkdir -p $samba_mount
+		mount --bind $mount $samba_mount
+	fi
+	# nfs hook: export the snapshot volume
+	[[ -f $export ]] && [[ id -ne -1 ]] && export_snap $vol $id
 }
 
 # nfs server hook: export the snapshot volume with unique fsid
@@ -333,9 +352,14 @@ function umount_device {
 	local -r name=$(volume_name $vol $id)
 	local -r mount=$(mount_name $vol $id)
 
-	umount $option /dev/mapper/$name
+	# samba hook: umount the bind mount
+	if [[ $id -ne -1 ]]; then
+		local -r samba_mount=$(samba_name $vol $mount)
+		mountpoint -q $samba_mount && umount $samba_mount && rmdir $samba_mount
+	fi
 	# nfs server hook: unexport the snapshot volume
 	[[ $id -eq -1 ]] || exportfs -u *:$mount 2> /dev/null
+	umount $option /dev/mapper/$name 2> /dev/null
 	[[ $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
 }
 

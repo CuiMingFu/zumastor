@@ -68,6 +68,7 @@ function new_snapshot {
 	local -r listfile=$master/snapshots/$kind
 	local -a snapshots
 	local max next num oldest
+	local -r snapmount=$VOLUMES/$vol/filesystem/snapmount
 
 	log "new '$kind' snapshot requested for volume '$vol'"
 
@@ -93,8 +94,7 @@ function new_snapshot {
 	create_device $vol $next || { log "device creation failed for $next"; return 1; }
 
 	[[ $kind == "/manual" ]] && return 0
-	mount_device $vol $next
-	export_snap $vol $next
+	[[ -f $snapmount ]] && mount_device $vol $next
 
 	if [[ $num -ge $max ]]; then
 		oldest=${snapshots[0]}
@@ -283,6 +283,7 @@ function run_master {
 	local -r log=${LOGS}/$vol/master.log
 	local -r cron=${CRONS}/$vol
 	local kind
+	local -r snapmount=$VOLUMES/$vol/filesystem/snapmount
 
 	[ -r $fifo ] && [ -p $fifo ] || { echo "$0: master snapshot trigger '$fifo' is missing"; return 1; }
 	touch ${CRONS}/$vol || return 1
@@ -291,13 +292,15 @@ function run_master {
 	exec 0</dev/null 1>/dev/null 2>/dev/null
 
 	mount_device $vol -1 rw
-	list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
-	for id in $list; do
-		log "Mounting snapshot '$vol($id)'" $log
-		mount_device $vol $id >> $log 2>&1
-		log "Exporting snapshot '$vol($id)'" $log
-		export_snap $vol $id
-	done
+	if [[ -f $snapmount ]]; then
+		local -r mpoint=$(mount_name $vol -1)
+		mkdir -p $mpoint/.snapshot
+		list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
+		for id in $list; do
+			log "Mounting snapshot '$vol($id)'" $log
+			mount_device $vol $id >> $log 2>&1
+		done
+	fi
 
 	# we reopen the log for each write so rotation works
 	pid=""
@@ -788,6 +791,7 @@ define)
 		declare args metadev init
 		declare blocksize=4k
 		declare chunksize=16k
+		declare mountpoint
 		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-p|--mountpoint <dir>] [-h|--help]"
 
 		shift 2
@@ -884,12 +888,13 @@ define)
 		exit $? ;;
 	master)
 		declare args arg kind count delta=0
+		declare snapmount="yes" export samba
 		declare -a token value
+		declare usage="Usage: $name [-h|--hourly <n>] [-d|--daily <n>] [-w|--weekly <n>] [-m|--monthly <n>] [-c|--custom <name> <n>] [-e|--export] [-n|--no-snapmount] [-p|--samba] [-h|--help]"
 
 		declare name="$0 $1 $2"
 		shift 2
-		args=`getopt -oh:d:w:m:c::y -l help,hourly:,daily:,weekly:,monthly:,custom:,yes -n"$name" -- "$@"` || \
-			{ echo "usage: $name <vol> [Options]"; exit 2; }
+		args=`getopt -oh:d:w:m:c::ynep -l help,hourly:,daily:,weekly:,monthly:,custom:,no-snapmount,export,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -905,6 +910,9 @@ define)
 				echo "  -w, --weekly <n>         set weekly snapshot limit"
 				echo "  -m, --monthly <n>        set monthly snapshot limit"
 				echo "  -c, --custom <name>,<n>  set snapshot limit for custom rotation named <name>"
+				echo "  -n, --no-snapmount       don't mount snapshots"
+				echo "  -e, --export             export snapshot directories over nfs"
+				echo "  -p, --samba              support previous version feature of samba"
 				echo "  -y, --yes                answer yes to all prompts"
 				exit;;
 			-h|--hourly) kind=hourly;;
@@ -915,6 +923,9 @@ define)
 				find_in $kind hourly daily weekly monthly /manual && { echo "illegal custom snapshot rotation '$kind'"; exit 1; }
 				verify_valid_volname $kind || { echo "$0: invalid custom rotation name '$kind'"; exit 1; }
 				count=${count/*,/};;
+			-n|--no-snapmount) snapmount="no"; shift 1; continue;;
+			-e|--export) export="yes"; shift 1; continue;;
+			-p|--samba) samba="yes"; shift 1; continue;;
 			-y|--yes) yes_to_all=1; shift 1; continue;;
 			*) echo whoops; exit 9;;
 			esac
@@ -941,6 +952,12 @@ define)
 			echo error: master configuration would exceed snapshots limit of $MAX_SNAPSHOTS
 			exit 3
 		fi
+
+		declare -r fpath=$VOLUMES/$vol/filesystem
+		rm -f $fpath/snapmount $fpath/export $fpath/samba  # reset the configuration
+		[[ $export = "yes" ]] && echo $export > $fpath/export
+		[[ $samba = "yes" ]] && echo $samba > $fpath/samba
+		[[ $snapmount = "yes" ]] && echo $snapmount > $fpath/snapmount
 
 		if [ ! -e $VOLUMES/$vol/master ]; then
 			define_master $vol || exit $?
