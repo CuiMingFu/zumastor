@@ -10,7 +10,7 @@ ifndef mandir
 mandir=usr/share/man
 endif
 
-kernel=../kernel/ddsnap
+kernel=./kernel
 instdir=$(prefix)/$(bindir)
 deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
 ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h
@@ -82,6 +82,9 @@ install:
 	cp $(binaries) $(instdir)
 	gzip -c ./man/ddsnap.8 > $(prefix)/$(mandir)/man8/ddsnap.8.gz
 .PHONY: install
+
+genpatches:
+	./scripts/genallpatches.sh
 
 build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps) 
 	rm -f $@

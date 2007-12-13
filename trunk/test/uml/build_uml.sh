@@ -11,10 +11,14 @@ echo -n Unpacking kernel...
 tar xjfk $DOWNLOAD_CACHE/linux-${KERNEL_VERSION}.tar.bz2 || exit 1
 echo -e "done.\n"
 
+echo Generating patches...
+pushd $ZUMA_REPOSITORY/ddsnap
+make genpatches
+popd
+
 echo Applying patches...
 cd linux-${KERNEL_VERSION} || exit 1
-cp $ZUMA_REPOSITORY/kernel/ddsnap/dm-ddsnap.* drivers/md/
-for patch in $ZUMA_REPOSITORY/kernel/zumastor-patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/kernel/ddsnap-patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/*; do
+for patch in $ZUMA_REPOSITORY/zumastor/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/ddsnap/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/*; do
         echo "   $patch"
         < $patch patch -p1 || exit 1
 done
