@@ -44,19 +44,19 @@ snapmountpoint()
 aptitude install xfsprogs
 modprobe xfs
 
-# create LVM VG sysvg
+# create LVM VG testvg
 time pvcreate -ff /dev/sdb
 time pvcreate -ff /dev/sdc
 time pvcreate -ff /dev/sdd
-time vgcreate sysvg /dev/sdb /dev/sdc /dev/sdd
+time vgcreate testvg /dev/sdb /dev/sdc /dev/sdd
 
 # create volumes 5T origin and .5T snapshot
-time lvcreate --size 5124G -n test sysvg
-time lvcreate --size 512G -n test_snap sysvg
+time lvcreate --size 5124G -n test testvg
+time lvcreate --size 512G -n test_snap testvg
 
 echo "1..6"
 
-zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define volume testvol /dev/testvg/test /dev/testvg/test_snap --initialize
 mkfs.xfs /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
