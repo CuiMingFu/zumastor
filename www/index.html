@@ -135,17 +135,17 @@ and continues driving it forward today.
  <h3>Kernel Patches</h3>
  Our kernel patches are online at
 <a
-href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/">http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/</a> and
+href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/">http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/</a> and
 <a
-href="http://zumastor.googlecode.com/svn/trunk/kernel/zumastor-patches/">http://zumastor.googlecode.com/svn/trunk/kernel/zumastor-patches/</a>.
+href="http://zumastor.googlecode.com/svn/trunk/zumastor/patches/">http://zumastor.googlecode.com/svn/trunk/zumastor/patches/</a>.
 Look at the latest kernel version there.  The most interesting patches are:
 <ul>
-<li> <a href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/2.6.22.10/bio.throttle.patch">Dan Phillips' bio throttling patch</a>,
+<li> <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/2.6.22.10/bio.throttle.patch">Dan Phillips' bio throttling patch</a>,
 part of how we prevent deadlock during memory pressure.  See 
 <a href="http://marc.info/?l=linux-kernel&m=119689957014639&w=2">lkml discussion from 6 Dec 2007</a> and 
 <a href="http://lwn.net/SubscriberLink/261626/f608ccfe3ce19d28/">coverage at LWN.NET</a>.
-<li> <a href="http://zumastor.googlecode.com/svn/trunk/kernel/ddsnap-patches/2.6.22.10/ddsnap.base.patch">Dan Phillips' PR_SET_MEMALLOC/PR_SET_LESS_THROTTLE patch</a>, other part of how we prevent deadlock during memory pressure.  (Any user app that's in the block writeout path needs to be written very carefully to avoid memory recursion deadlock; in particular, it should probably use mlockall, never allocate any memory while handling a write request (modulo a few KB of Heisenslop), and it should set PF_LESS_THROTTLE|PF_MEMALLOC using prctl, as provided for by this patch.)  (Mixed in with the ddsnap stuff for now, sorry; ignore everything but the changes to include/linux/prctl.h and kernel/sys.c.)
-<li> <a href="http://zumastor.googlecode.com/svn/trunk/kernel/zumastor-patches/2.6.22.10/nfs_suspend">Jiaying Zhang's NFS suspend patch</a>, part of how we make new snapshots available via the NFS server as they arrive from remote sites
+<li> <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/2.6.22.10/ddsnap.base.patch">Dan Phillips' PR_SET_MEMALLOC/PR_SET_LESS_THROTTLE patch</a>, other part of how we prevent deadlock during memory pressure.  (Any user app that's in the block writeout path needs to be written very carefully to avoid memory recursion deadlock; in particular, it should probably use mlockall, never allocate any memory while handling a write request (modulo a few KB of Heisenslop), and it should set PF_LESS_THROTTLE|PF_MEMALLOC using prctl, as provided for by this patch.)  (Mixed in with the ddsnap stuff for now, sorry; ignore everything but the changes to include/linux/prctl.h and kernel/sys.c.)
+<li> <a href="http://zumastor.googlecode.com/svn/trunk/zumastor/patches/2.6.22.10/nfs_suspend">NFS suspend patch</a>, part of how we make new snapshots available via the NFS server as they arrive from remote sites
 </ul>
 </div>
 
