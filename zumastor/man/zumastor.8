@@ -8,7 +8,7 @@ zumastor \- block device snapshot and replication management
 .I volume_name snapshot_device origin_device \fP[\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadata_device\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP]
 .br
 .B zumastor define master
-.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
+.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-n\fP|\fB--no-snapmount\fP]
 .br
 .B zumastor define source
 .I volume_name \fP\fIhost\fP [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
@@ -56,9 +56,11 @@ of two will be used instead.
 
 A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Snapshot volumes will be mounted on directories below that point.
 .IP \fBdefine\ \fBmaster\fP
-.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
+.I volume_name \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-n\fP|\fB--no-snapmount\fP]
 .br
 Used after \fBdefine\fP \fBvolume\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If this volume was previously a replication target, removes the \fBsource\fP definition, since it is now a master. If \fIvolume_name\fP is already defined, just updates the rotation limits.
+
+By default, each newly created snapshot is mounted under .snapshot directory in the volume mount point, with each snapshot named for its creation time. But if the \fBno-snapmount\fP option is specified, the newly created snapshot will NOT be mounted. If the \fBexport\fP option is used, each mounted snapshot will be exported via NFS. If the \fBsamba\fP option is used, each mounted snapshot will be bind mounted to a directory following Samba's '@GMT-creation-time' naming convention under the volume mount point, and will be accessible via Samba's previous version interface. If the \fBno-snapmount\fP option is specified, the \fBexport\fP and \fBsamba\fP options will be ignored.
 .IP \fBdefine\ source\fP
 .I volume_name
 \fIhost\fP[\fI:port\fP]] [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
