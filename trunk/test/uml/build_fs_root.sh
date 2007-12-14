@@ -22,6 +22,7 @@ chroot /mnt sh /etc/init.d/ssh stop
 # to get rid of the need for initial confirmation
 grep "StrictHostKeyChecking no" /mnt/etc/ssh/ssh_config >& /dev/null || echo "    StrictHostKeyChecking no" >> /mnt/etc/ssh/ssh_config
 grep "VerifyHostKeyDNS yes" /mnt/etc/ssh/ssh_config >& /dev/null || echo "    VerifyHostKeyDNS yes" >> /mnt/etc/ssh/ssh_config
+grep "UseDNS no" /mnt/etc/ssh/sshd_config >& /dev/null || echo ""UseDNS no" >> /mnt/etc/ssh/sshd_config
 echo -e "done.\n"
 
 # Turn off unnecessary services
