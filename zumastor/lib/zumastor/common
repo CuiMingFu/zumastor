@@ -103,9 +103,8 @@ function verify_valid_mountpoint {
 	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r mpoint=$1
 
-	# Has to be a directory, can't already be mounted-on.
+	# Has to be a directory.
 	[[ -d $mpoint ]] || return 1
-	mountpoint -q ${mpoint} && return 1
 
 	return 0
 }
@@ -253,6 +252,20 @@ function create_snapshot {
 	return $status
 }
 
+function mounted_vol_status {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r name=$(volume_name $vol -1)
+	local -r device=/dev/mapper/$name
+
+	# Is it mounted?
+	mline=`mount | grep -w $device` || { echo "unmounted"; return 1; }
+	# It's mounted.  Is it rw or ro?
+	echo $mline | grep -w rw >/dev/null 2>&1 && { echo "rw"; return 0; }
+	echo "ro"
+	return 0
+}
+
 function mount_name {
 	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
@@ -294,7 +307,7 @@ function mount_device {
 	local -r device=/dev/mapper/$name
 	local mount=$(mount_name $vol $id)
 	local options=ro
-	local fsopts=${VOLUMES}/$vol/filesystem/options
+	local mntopts=${VOLUMES}/$vol/filesystem/mountopts
 	local -r samba=$VOLUMES/$vol/filesystem/samba
 	local -r export=$VOLUMES/$vol/filesystem/export
 
@@ -306,9 +319,9 @@ function mount_device {
 	mountpoint -q $mount && return 0
 	test -d $mount || mkdir $mount || return 1
 
-	# additional per-filesystem mount options
-	if [[ -r $fsopts ]]; then
-		read opts <$fsopts
+	# additional mount options
+	if [[ -r $mntopts ]]; then
+		read opts <$mntopts
 		options="$options,$opts"
 	fi
 
@@ -360,7 +373,31 @@ function umount_device {
 	# nfs server hook: unexport the snapshot volume
 	[[ $id -eq -1 ]] || exportfs -u *:$mount 2> /dev/null
 	umount $option /dev/mapper/$name 2> /dev/null
-	[[ $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
+	[[ $id -ne -1 || $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
+}
+
+# remount_device <vol> <id> [rw]
+# Given a volume <vol> and snapshot id <id>, remount the device with -o remount
+function remount_device {
+	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r state=$3
+	local -r name=$(volume_name $vol $id)
+	local -r device=/dev/mapper/$name
+	local mount=$(mount_name $vol $id)
+	local mntopts=${VOLUMES}/$vol/filesystem/mountopts
+	local opts options="remount"
+
+	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
+
+	# Get mount options if any
+	[[ -r $mntopts ]] && read opts <$mntopts
+	[[ -z $opts ]] || options="$options,$opts"
+
+	# Do the remount
+	mount -o $options $device $mount || \
+		{ echo "unable to remount $device on $mount"; return 1; }
 }
 
 function remove_device {

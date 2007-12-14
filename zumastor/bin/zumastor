@@ -453,12 +453,13 @@ function stop_target {
 }
 
 function define_volume {
-	[ $# -eq 4 ] || [ $# -eq 5 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[ $# -eq 5 ] || [ $# -eq 6 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r odev=$2
 	local -r mountpoint=$3
-	local -r sdev=$4
-	local -r mdev=$5
+	local -r mountopts=$4
+	local -r sdev=$5
+	local -r mdev=$6
 	local -r path=$VOLUMES/$vol
 	local -r sock=${SERVERS}/$vol
 
@@ -469,8 +470,9 @@ function define_volume {
 	ln -sf $sdev $path/device/snapstore || return 1
 	[ -z $mdev ] || ln -sf $mdev $path/device/meta || return 1
 	mkdir $path/targets || return 1
-	mkdir $path/filesystem
+	mkdir $path/filesystem || return 1
 	echo $mountpoint >$path/filesystem/mountpoint
+	[[ $mountopts = "-" ]] || echo $mountopts >$path/filesystem/mountopts
 
 	start_volume $vol || { echo start failed; return 1; }
 	create_device $vol -1 || { echo create failed; return 1; }
@@ -792,10 +794,10 @@ define)
 		declare blocksize=4k
 		declare chunksize=16k
 		declare mountpoint
-		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-p|--mountpoint <dir>] [-h|--help]"
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-h|--help]"
 
 		shift 2
-		args=`getopt -ob:c:m:hip: -l blocksize:,chunksize:,help,metadev:,initialize,mountpoint: -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -ob:c:m:hio:p: -l blocksize:,chunksize:,help,metadev:,initialize,mountpoint:,mountopts: -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -808,14 +810,15 @@ define)
 				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
-			#	echo "  -o, --mountopts <string> sets mount options for the volume"
-				echo "  -p, --mountpoint <dir>  sets the volume mountpoint (default is $MOUNTS)"
+				echo "  -o, --mountopts <list>	sets mount options for the volume (no default)"
+				echo "  -p, --mountpoint <dir>  sets the volume mountpoint (default is $MOUNTS/<vol>)"
 				exit;;
 
 			-i|--initialize) init="yes";;
 			-m|--metadev) metadev=$2; shift 1;;
 			-b|--blocksize) blocksize=$2; shift 1;;
 			-c|--chunksize) chunksize=$2; shift 1;;
+			-o|--mountopts) mountopts=$2; shift 1;;
 			-p|--mountpoint) mountpoint=$2; shift 1;;
 			*) echo whoops; exit 9;;
 			esac
@@ -834,10 +837,11 @@ define)
 
 		[[ -z $mountpoint ]] || verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
 		[[ -z $mountpoint ]] && mountpoint=$(mount_name $vol -1)
+		[[ -z $mountopts ]] && mountopts="-"
 
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
-		define_volume $vol $origin $mountpoint $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
+		define_volume $vol $origin $mountpoint $mountopts $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"
@@ -1379,23 +1383,44 @@ receive)
 	exit
 	;;
 remount)
-	[[ $# -eq 3 ]] || { echo "usage: $0 remount <vol> <directory>"; exit 2; }
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "usage: $0 remount <vol> <directory> [<mount options>]"; exit 2; }
 	declare vol=$2
 	declare mountpoint=$3
+	declare mountopts=$4
 	declare mount=$(mount_name $vol -1)
 	declare -r mpath=$VOLUMES/$vol/filesystem
+	declare mflag="unqualified"
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
-	[[ $mountpoint = $mount ]] && { echo "$0: volume '$vol' is already mounted on $mount"; exit 1; }
+	mountstate=`mounted_vol_status $vol`
+	[[ $mountpoint = "-" ]] || verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
 	mkdir -p $mpath
-	echo $mountpoint >$mpath/mountpoint
+	# If mountpoint specified, update it.
+	[[ $mountpoint = "-" ]] || [[ $mountpoint = $mount ]] || echo $mountpoint >$mpath/mountpoint
+	# If mount options specified, update them.
+	[[ -z $mountopts ]] || [[ $mountopts = "-" ]] || echo $mountopts >$mpath/mountopts
+	# If mount options to be removed, do so.
+	[[ $mountopts = "-" ]] && rm -f $mpath/mountopts
 
-	umount_device $vol -1 2>/dev/null
-	mount_device $vol -1 rw
+	# If it's not mounted, we're done.
+	[[ $mountstate = "unmounted" ]] && exit 0
+
+	# Override ro/rw if specified options reverse it.
+	[[ $mountopts =~ "\<ro\>" ]] && mountstate="ro"
+	[[ $mountopts =~ "\<rw\>" ]] && mountstate="rw"
+
+	# If we're not changing the mountpoint, use remount, else unmount and
+	# remount it.
+	if [[ $mountpoint = "-" || $mountpoint = $mount ]]; then
+		remount_device $vol -1 $mountstate
+	else
+		umount_device $vol -1 2>/dev/null
+		mount_device $vol -1 $mountstate
+	fi
 	exit $?
 	;;
 esac
 
 [ $# -gt 0 ] && echo "Error in command: $@"
-echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]"
+echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|remount|status} [<subarguments>...]"
 exit 2
