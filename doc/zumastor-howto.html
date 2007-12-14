@@ -798,9 +798,85 @@ the writeup at <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL"
 <h3 id="_uml">8.4. UML</h3><div style="clear:left"></div>
 <div class="para"><p>Developers who wish to contribute changes to Zumastor should
 make sure that our UML test suite passes before and after
-their changes.  The UML test suite is in our SVN tree under
-tests/uml.  The file to run there is <strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">demo.sh</a></strong>.
-See also <a href="http://zumastor.org/demo-uml-ubuntu.html">http://zumastor.org/demo-uml-ubuntu.html</a>.</p></div>
+their changes.
+The UML test suite is in our SVN tree under tests/uml.
+The file to run there is <strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">demo.sh</a></strong>.
+It's somewhat Ubuntu/Debian specific, but could probably be made compatible
+with rpm-based distos (patches gratefully accepted).</p></div>
+<div class="para"><p>Before you run demo.sh, you should look through it.
+It starts off by doing six configuration steps, three of
+which use sudo to gain root privs:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+As root, it installs any missing packages with apt-get.
+</p>
+</li>
+<li>
+<p>
+It downloads some large files (Linux sources, UML system images)
+which can take quite a while on a slow connection.
+These files are cached in the <em>build</em> subdirectory at the
+top of the zumastor tree so they don't need to be downloaded again.
+</p>
+</li>
+<li>
+<p>
+It builds UML in the directory <em>working/linux-2.6.xxx</em> if it's
+not present.
+</p>
+</li>
+<li>
+<p>
+It creates a root filesystem for UML.
+</p>
+</li>
+<li>
+<p>
+As root, it configures the UML root filesystem.
+</p>
+</li>
+<li>
+<p>
+As root, it runs <em>setup_network_root.sh</em> to configure your system
+to allow ssh to the UML instances.  For instance, it modifies /etc/hosts
+to include the lines
+</p>
+</li>
+</ol></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>192.168.100.1 uml_1
+192.168.100.2 uml_2</tt></pre>
+</div></div>
+<div class="para"><p>Finally, after all that setup, it starts running the UML tests (whew!).</p></div>
+<div class="para"><p>If you want to do a squeaky-clean run, do "rm -rf working".
+Otherwise demo.sh will reuse the UML and images in that directory
+to save time.</p></div>
+<div class="para"><p>You may want to do <em>sudo true</em> before running demo.sh just
+to make sure sudo has your password, so the sudo in the
+middle of the script doesn't prompt you and hang forever.</p></div>
+<div class="para"><p>Also, you may want to add ", timestamp_timeout=100" to the
+end of the Defaults line in your /etc/sudoers file so
+sudo doesn't time out so quickly.</p></div>
+<div class="para"><p>Now that you've read all of the above :-), go ahead and run "bash demo.sh" now.
+On my oldish Athlon 64 3000, it takes 23 minutes (plus download time)
+on the first run, and 10 minutes on the second run.</p></div>
+<div class="para"><p>Once demo.sh passes, or even if it doesn't quite, you might
+want to start and log in to a UML instance manually.
+demo.sh shows how to do this.  For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>. config_uml
+. config_single
+./start_uml.sh $uml_fs $ubdb_dev $ubdc_dev $uml_host
+ssh $SSH_OPTS $uml_host</tt></pre>
+</div></div>
+<div class="para"><p>When you're done, stop the UML instance with</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>./stop_uml.sh $uml_host $uml_fs</tt></pre>
+</div></div>
 </div>
 <h2 id="_examples">9. Examples</h2>
 <div class="sectionbody">
@@ -1140,7 +1216,7 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-13 14:57:50 PDT
+Last updated 2007-12-14 13:49:43 PDT
 </div>
 </div>
 </body>
