@@ -409,9 +409,71 @@ UML
 ~~~
 Developers who wish to contribute changes to Zumastor should
 make sure that our UML test suite passes before and after
-their changes.  The UML test suite is in our SVN tree under
-tests/uml.  The file to run there is *http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[demo.sh]*.
-See also http://zumastor.org/demo-uml-ubuntu.html[].
+their changes.  
+The UML test suite is in our SVN tree under tests/uml.  
+The file to run there is *http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[demo.sh]*.  
+It's somewhat Ubuntu/Debian specific, but could probably be made compatible
+with rpm-based distos (patches gratefully accepted).
+
+Before you run demo.sh, you should look through it.  
+It starts off by doing six configuration steps, three of 
+which use sudo to gain root privs:
+
+1. As root, it installs any missing packages with apt-get.
+
+2. It downloads some large files (Linux sources, UML system images)
+which can take quite a while on a slow connection.
+These files are cached in the 'build' subdirectory at the
+top of the zumastor tree so they don't need to be downloaded again.
+
+3. It builds UML in the directory 'working/linux-2.6.xxx' if it's
+not present.
+
+4. It creates a root filesystem for UML.
+
+5. As root, it configures the UML root filesystem.
+
+6. As root, it runs 'setup_network_root.sh' to configure your system
+to allow ssh to the UML instances.  For instance, it modifies /etc/hosts 
+to include the lines
+...................
+192.168.100.1 uml_1
+192.168.100.2 uml_2
+...................
+
+Finally, after all that setup, it starts running the UML tests (whew!).
+
+If you want to do a squeaky-clean run, do "rm -rf working".
+Otherwise demo.sh will reuse the UML and images in that directory
+to save time.
+
+You may want to do 'sudo true' before running demo.sh just
+to make sure sudo has your password, so the sudo in the
+middle of the script doesn't prompt you and hang forever.
+
+Also, you may want to add ", timestamp_timeout=100" to the
+end of the Defaults line in your /etc/sudoers file so
+sudo doesn't time out so quickly.
+
+Now that you've read all of the above :-), go ahead and run "bash demo.sh" now.
+On my oldish Athlon 64 3000, it takes 23 minutes (plus download time)
+on the first run, and 10 minutes on the second run.
+
+Once demo.sh passes, or even if it doesn't quite, you might
+want to start and log in to a UML instance manually.
+demo.sh shows how to do this.  For instance:
+...................................................
+. config_uml
+. config_single
+./start_uml.sh $uml_fs $ubdb_dev $ubdc_dev $uml_host
+ssh $SSH_OPTS $uml_host
+...................................................
+
+When you're done, stop the UML instance with
+...................................................
+./stop_uml.sh $uml_host $uml_fs
+...................................................
+
 
 Examples
 --------
