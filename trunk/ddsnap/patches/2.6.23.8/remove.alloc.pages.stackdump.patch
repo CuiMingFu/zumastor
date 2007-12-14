@@ -1,0 +1,13 @@
+diff -urpN linux-2.6.23.8-clean/mm/page_alloc.c linux-2.6.23.8-patched/mm/page_alloc.c
+--- linux-2.6.23.8-clean/mm/page_alloc.c	2007-10-12 11:43:44.000000000 -0500
++++ linux-2.6.23.8-patched/mm/page_alloc.c	2007-11-21 11:40:53.000000000 -0600
+@@ -1392,7 +1392,7 @@ nofail_alloc:
+ 	}
+ 
+ nopage:
+-	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
++	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+ 			" order:%d, mode:0x%x\n",
+ 			p->comm, order, gfp_mask);
+

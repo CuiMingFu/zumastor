@@ -1581,10 +1581,18 @@ int __init dm_ddsnap_init(void)
 	int err = -ENOMEM;
 	char *what = "Cache create";
 	if (!(pending_cache = kmem_cache_create("ddsnap-pending",
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
++		sizeof(struct pending), __alignof__(struct pending), 0, NULL)))
+#else
 		sizeof(struct pending), __alignof__(struct pending), 0, NULL, NULL)))
+#endif
 		goto bad1;
 	if (!(end_io_cache = kmem_cache_create("ddsnap-endio",
-		sizeof(struct hook), __alignof__(struct hook), 0, NULL, NULL)))
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
++		sizeof(struct hook), __alignof__(struct hook), 0, NULL)))
+#else
+		sizeof(struct hook), __alignof__(struct pending), 0, NULL, NULL)))
+#endif
 		goto bad2;
 	what = "register";
 	if ((err = dm_register_target(&ddsnap)))
