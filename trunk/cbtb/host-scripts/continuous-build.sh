@@ -74,7 +74,7 @@ then
     if [ `svn diff -r$oldrevision | wc -c` -ne 0 ]
     then
       nobuild=
-      echo "is unnecessary"
+      popd
       break
     fi
     popd
