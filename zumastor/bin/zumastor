@@ -54,6 +54,23 @@ function umount_drop_snapshot {
 	drop_snapshot $vol $snap || return 1
 }
 
+function update_symlinks {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r kind=$2
+	local mount=$(mount_name $vol -1)
+	local snapmount count=0 id
+	local -a idlist
+
+	read -a idlist < $VOLUMES/$vol/master/snapshots/$kind
+	for snap in $(seq $((${#idlist[@]} - 1)) -1 0); do
+		id=${idlist[$snap]}
+		snapmount=$(mount_name $vol $id)
+		ln -sfn $(basename $snapmount) $mount/.snapshot/$kind.$count
+		let count++
+	done
+}
+
 # new_snapshot <volume name> <kind>
 #  Create a new snapshot for <volume>'s interval <kind> and rotate out old
 #  snapshots as necessary.  Called from the zumastor master when triggered with
@@ -96,6 +113,10 @@ function new_snapshot {
 	[[ $kind == "/manual" ]] && return 0
 	[[ -f $snapmount ]] && mount_device $vol $next
 
+	echo ${snapshots[@]} >$listfile
+	log "'$kind' snapshot list is now: ${snapshots[*]}"
+	[[ -f $snapmount ]] && update_symlinks $vol $kind
+
 	if [[ $num -ge $max ]]; then
 		oldest=${snapshots[0]}
 
@@ -107,8 +128,6 @@ function new_snapshot {
 		#ddsnap delete $sock $oldest
 		unset snapshots[0]
 	fi
-	echo ${snapshots[@]} >$listfile
-	log "'$kind' snapshot list is now: ${snapshots[*]}"
 }
 
 # new_target_snapshot <volume> <hostname>
@@ -282,7 +301,7 @@ function run_master {
 	local -r fifo=$VOLUMES/$vol/master/trigger
 	local -r log=${LOGS}/$vol/master.log
 	local -r cron=${CRONS}/$vol
-	local kind
+	local kind mpoint
 	local -r snapmount=$VOLUMES/$vol/filesystem/snapmount
 
 	[ -r $fifo ] && [ -p $fifo ] || { echo "$0: master snapshot trigger '$fifo' is missing"; return 1; }
@@ -292,13 +311,18 @@ function run_master {
 	exec 0</dev/null 1>/dev/null 2>/dev/null
 
 	mount_device $vol -1 rw
+	mpoint=$(mount_name $vol -1)
+	# first clean up everything that might be left
+	rm -f $mpoint/.snapshot/hourly.* $mpoint/.snapshot/daily.* $mpoint/.snapshot/weekly.* >& /dev/null
 	if [[ -f $snapmount ]]; then
-		local -r mpoint=$(mount_name $vol -1)
 		mkdir -p $mpoint/.snapshot
 		list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
 		for id in $list; do
 			log "Mounting snapshot '$vol($id)'" $log
 			mount_device $vol $id >> $log 2>&1
+		done
+		for kind in $(ls $VOLUMES/$vol/master/snapshots/ 2>/dev/null); do
+			update_symlinks $vol $kind
 		done
 	fi
 
