@@ -81,7 +81,7 @@ if [ -d "$mountpoint0" ] ; then
   echo "ok 2 - first snapshot mounted"
 else
   ls -lR /var/run/zumastor/mount
-  cat /proc/mount
+  cat /proc/mounts
   echo "not ok 2 - first snapshot mounted"
   exit 2
 fi
@@ -90,7 +90,7 @@ if [ ! -f "$mountpoint0/testfile" ] ; then
   echo "ok 3 - testfile not present in first snapshot"
 else
   ls -lR /var/run/zumastor/mount
-  cat /proc/mount
+  cat /proc/mounts
   echo "not ok 3 - testfile not present in first snapshot"
   exit 3
 fi
