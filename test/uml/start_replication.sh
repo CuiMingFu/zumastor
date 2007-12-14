@@ -20,7 +20,7 @@ if [[ $status -ne 0 ]]; then
 	scp $SCP_OPTS /tmp/$source_uml_host.pub root@$target_uml_host:/root/.ssh/$source_uml_host.pub
 	rm -f /tmp/$source_uml_host.pub
 	ssh $SSH_OPTS $target_uml_host "cat /root/.ssh/$source_uml_host.pub >> /root/.ssh/authorized_keys"
-	ssh $SSH_OPTS $source_uml_host "echo $target_uml_ip $target_uml_host > /etc/hosts"
+	ssh $SSH_OPTS $source_uml_host "echo $target_uml_ip $target_uml_host >> /etc/hosts"
 
 	ssh $SSH_OPTS $target_uml_host "rm /root/.ssh/id_dsa; rm /root/.ssh/id_dsa.pub" >& /dev/null
 	ssh $SSH_OPTS $target_uml_host "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''"
@@ -28,7 +28,7 @@ if [[ $status -ne 0 ]]; then
 	scp $SCP_OPTS /tmp/$target_uml_host.pub root@$source_uml_host:/root/.ssh/$target_uml_host.pub
 	rm -f /tmp/$target_uml_host.pub
 	ssh $SSH_OPTS $source_uml_host "cat /root/.ssh/$target_uml_host.pub >> /root/.ssh/authorized_keys"
-	ssh $SSH_OPTS $target_uml_host "echo $source_uml_ip $source_uml_host > /etc/hosts"
+	ssh $SSH_OPTS $target_uml_host "echo $source_uml_ip $source_uml_host >> /etc/hosts"
 	echo -e "done.\n"
 fi
 

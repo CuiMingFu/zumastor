@@ -31,6 +31,7 @@ if [[ ! -z $uml_fs ]]; then
 	echo "gateway $host_tap_ip" >> /mnt/etc/network/interfaces
 	cp /etc/resolv.conf /mnt/etc/resolv.conf
 	echo $uml_host > /mnt/etc/hostname
+	grep `hostname` /etc/hosts | grep -v "127.0.0.1" >> /mnt/etc/hosts
 	umount /mnt
 	echo -e "done.\n"
 fi
