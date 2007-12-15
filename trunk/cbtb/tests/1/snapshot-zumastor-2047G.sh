@@ -51,15 +51,7 @@ xfs_freeze -u /var/run/zumastor/mount/testvol
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
 
-if [ -d /var/run/zumastor/mount/testvol\(0\)/ ] ; then
-  echo "ok 2 - first snapshot mounted"
-else
-  ls -lR /var/run/zumastor/mount
-  echo "not ok 2 - first snapshot mounted"
-  exit 2
-fi
-
-if [ ! -f /var/run/zumastor/mount/testvol\(0\)/testfile ] ; then
+if [ ! -f /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile ] ; then
   echo "ok 3 - testfile not present in first snapshot"
 else
   ls -lR /var/run/zumastor/mount
@@ -73,7 +65,7 @@ zumastor snapshot testvol hourly
 sleep $SLEEP
 xfs_freeze -u /var/run/zumastor/mount/testvol
 
-if [ -d /var/run/zumastor/mount/testvol\(2\)/ ] ; then
+if [ -e /var/run/zumastor/mount/testvol/.snapshot/hourly.1/ ] ; then
   echo "ok 4 - second snapshot mounted"
 else
   ls -lR /var/run/zumastor/mount
@@ -82,7 +74,7 @@ else
 fi
 
 if diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
+    /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile 2>&1 >/dev/null ; then
   echo "ok 5 - identical testfile immediately after second snapshot"
 else
   ls -lR /var/run/zumastor/mount
@@ -93,7 +85,7 @@ fi
 date >> /var/run/zumastor/mount/testvol/testfile
 
 if ! diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/mount/testvol\(2\)/testfile 2>&1 >/dev/null ; then
+    /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile 2>&1 >/dev/null ; then
   echo "ok 6 - testfile changed between origin and second snapshot"
 else
   ls -lR /var/run/zumastor/mount
