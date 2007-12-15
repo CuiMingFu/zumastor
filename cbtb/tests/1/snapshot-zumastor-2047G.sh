@@ -26,13 +26,10 @@ TIMEOUT=1200
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-aptitude install xfsprogs
-modprobe xfs
-
 echo "1..6"
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.xfs /dev/mapper/testvol
+mkfs.ext3 /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
   # mkdir /var/lib/zumastor/volumes/testvol/filesystem
@@ -43,10 +40,8 @@ zumastor define master testvol -h 24 -d 7
 echo ok 1 - testvol set up
 
 sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
 zumastor snapshot testvol hourly 
 sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
 
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
@@ -60,15 +55,13 @@ else
 fi
 
 sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
 zumastor snapshot testvol hourly 
 sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
 
 if [ -e /var/run/zumastor/mount/testvol/.snapshot/hourly.1/ ] ; then
   echo "ok 4 - second snapshot mounted"
 else
-  ls -lR /var/run/zumastor/mount
+  ls -laR /var/run/zumastor/mount
   echo "not ok 4 - second snapshot mounted"
   exit 4
 fi
