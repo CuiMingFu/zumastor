@@ -407,13 +407,18 @@ the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
 
 UML
 ~~~
-Developers who wish to contribute changes to Zumastor should
-make sure that our UML test suite passes before and after
-their changes.  
-The UML test suite is in our SVN tree under tests/uml.  
-The file to run there is *http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[demo.sh]*.  
+UML is potentially the fastest and easiest way to try out Zumastor,
+at least if you're a developer who likes working with the commandline.
+
+There is a simple shell script, 
+*http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[test/uml/demo.sh]*,
+which starts UML, runs a few simple tests to make sure Zumastor is 
+basically working, and shuts UML back down.
 It's somewhat Ubuntu/Debian specific, but could probably be made compatible
 with rpm-based distos (patches gratefully accepted).
+
+Developers who wish to contribute changes to Zumastor should
+make sure that demo.sh passes before and after their changes.  
 
 Before you run demo.sh, you should look through it.  
 It starts off by doing six configuration steps, three of 
@@ -461,19 +466,25 @@ on the first run, and 10 minutes on the second run.
 
 Once demo.sh passes, or even if it doesn't quite, you might
 want to start and log in to a UML instance manually.
-demo.sh shows how to do this.  For instance:
-...................................................
-. config_uml
-. config_single
-./start_uml.sh $uml_fs $ubdb_dev $ubdc_dev $uml_host
-ssh $SSH_OPTS $uml_host
-...................................................
+The four simple shell scripts, xssh.sh, xget.sh, xput.sh, and 
+xstop.sh, let you log in to, get a file from, put a file on, and stop 
+the uml instance set up by demo.sh.
+These are handy for poking at things manually.
 
-When you're done, stop the UML instance with
-...................................................
-./stop_uml.sh $uml_host $uml_fs
-...................................................
+Troubleshooting
+---------------
 
+When creating a new snapshot store on an existing device from a
+previous test runs, be sure to zero the snapshot store 
+by e.g. giving the -i option to "zumastor define volume".
+Otherwise creating the first snapshot may fail with "snapshot already exists".
+
+Many zumastor commands are not synchronous.  For instance,
+"zumastor snapshot" doesn't take effect right away; it can take
+several seconds for the snapshot to be taken and mounted.
+These nonsynchronous commands can't show any error messages directly,
+so you have to look in the log files /var/log/zumastor/VOLNAME/{master,server}
+for errors.
 
 Examples
 --------
@@ -657,6 +668,19 @@ Run it, then use df to see how many snapshots are around afterwards:
 You should see 24 snapshots (the limit set when we did the +zumastor define master+)
 plus the origin volume.  Each time you run +zumastor snapshot ...+
 it creates a new snapshot, and deletes any that are 'too old'.
+
+How can I run the above examples using UML?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First off, cd into test/uml.
+
+Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.
+
+Then you can easily start and log in to a UML instance by running ./xssh.sh.
+
+Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".
+
 
 Exporting a Zumastor volume via NFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

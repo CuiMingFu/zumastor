@@ -796,13 +796,16 @@ physical volume and volume group:</p></div>
 willing to patch your kernel and compile everything manually.  See
 the writeup at <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL">http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL</a>.</p></div>
 <h3 id="_uml">8.4. UML</h3><div style="clear:left"></div>
-<div class="para"><p>Developers who wish to contribute changes to Zumastor should
-make sure that our UML test suite passes before and after
-their changes.
-The UML test suite is in our SVN tree under tests/uml.
-The file to run there is <strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">demo.sh</a></strong>.
+<div class="para"><p>UML is potentially the fastest and easiest way to try out Zumastor,
+at least if you're a developer who likes working with the commandline.</p></div>
+<div class="para"><p>There is a simple shell script,
+<strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">test/uml/demo.sh</a></strong>,
+which starts UML, runs a few simple tests to make sure Zumastor is
+basically working, and shuts UML back down.
 It's somewhat Ubuntu/Debian specific, but could probably be made compatible
 with rpm-based distos (patches gratefully accepted).</p></div>
+<div class="para"><p>Developers who wish to contribute changes to Zumastor should
+make sure that demo.sh passes before and after their changes.</p></div>
 <div class="para"><p>Before you run demo.sh, you should look through it.
 It starts off by doing six configuration steps, three of
 which use sudo to gain root privs:</p></div>
@@ -864,23 +867,27 @@ On my oldish Athlon 64 3000, it takes 23 minutes (plus download time)
 on the first run, and 10 minutes on the second run.</p></div>
 <div class="para"><p>Once demo.sh passes, or even if it doesn't quite, you might
 want to start and log in to a UML instance manually.
-demo.sh shows how to do this.  For instance:</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>. config_uml
-. config_single
-./start_uml.sh $uml_fs $ubdb_dev $ubdc_dev $uml_host
-ssh $SSH_OPTS $uml_host</tt></pre>
-</div></div>
-<div class="para"><p>When you're done, stop the UML instance with</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>./stop_uml.sh $uml_host $uml_fs</tt></pre>
-</div></div>
+The four simple shell scripts, xssh.sh, xget.sh, xput.sh, and
+xstop.sh, let you log in to, get a file from, put a file on, and stop
+the uml instance set up by demo.sh.
+These are handy for poking at things manually.</p></div>
 </div>
-<h2 id="_examples">9. Examples</h2>
+<h2 id="_troubleshooting">9. Troubleshooting</h2>
 <div class="sectionbody">
-<h3 id="_verify_that_lvm2_is_installed">9.1. Verify that LVM2 is installed</h3><div style="clear:left"></div>
+<div class="para"><p>When creating a new snapshot store on an existing device from a
+previous test runs, be sure to zero the snapshot store
+by e.g. giving the -i option to "zumastor define volume".
+Otherwise creating the first snapshot may fail with "snapshot already exists".</p></div>
+<div class="para"><p>Many zumastor commands are not synchronous.  For instance,
+"zumastor snapshot" doesn't take effect right away; it can take
+several seconds for the snapshot to be taken and mounted.
+These nonsynchronous commands can't show any error messages directly,
+so you have to look in the log files /var/log/zumastor/VOLNAME/{master,server}
+for errors.</p></div>
+</div>
+<h2 id="_examples">10. Examples</h2>
+<div class="sectionbody">
+<h3 id="_verify_that_lvm2_is_installed">10.1. Verify that LVM2 is installed</h3><div style="clear:left"></div>
 <div class="para"><p>Many of these examples require LVM, so install that first if it's not already.
 (This example is for Debian / Ubuntu, but it's similar for Fedora et al.)</p></div>
 <div class="literalblock">
@@ -890,7 +897,7 @@ $ sudo /etc/init.d/lvm start
 $ pvcreate</tt></pre>
 </div></div>
 <div class="para"><p>If pvcreate complains <tt>No program "pvcreate" found for your current version of LVM</tt>, you probably forgot to start the lvm service.</p></div>
-<h3 id="_verify_that_zumastor_is_installed_and_started">9.2. Verify that Zumastor is installed and started</h3><div style="clear:left"></div>
+<h3 id="_verify_that_zumastor_is_installed_and_started">10.2. Verify that Zumastor is installed and started</h3><div style="clear:left"></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>$ zumastor
@@ -899,7 +906,7 @@ Usage: /bin/zumastor {define|forget|start|stop|snapshot|replicate|status} [&lt;s
 <div class="para"><p>Note: this doesn't yet complain properly if you forgot to reboot
 into a kernel that supports zumastor.  (It will later, when you try to
 define a volume.)</p></div>
-<h3 id="_create_a_simple_snapshotted_volume_on_a_loopback_file">9.3. Create a simple snapshotted volume on a loopback file</h3><div style="clear:left"></div>
+<h3 id="_create_a_simple_snapshotted_volume_on_a_loopback_file">10.3. Create a simple snapshotted volume on a loopback file</h3><div style="clear:left"></div>
 <div class="para"><p>Before you go messing with real devices, it's useful
 to experiment with plain old files dressed up to look
 like devices via the loopback device.</p></div>
@@ -926,7 +933,7 @@ create failed
 </div></div>
 <div class="para"><p>you may have forgotten to reboot into the Zumastor-enabled kernel
 you installed earlier.</p></div>
-<h3 id="_what_if_zumastor_can_t_mount_the_devices_at_boot_time">9.4. What if Zumastor can't mount the devices at boot time?</h3><div style="clear:left"></div>
+<h3 id="_what_if_zumastor_can_t_mount_the_devices_at_boot_time">10.4. What if Zumastor can't mount the devices at boot time?</h3><div style="clear:left"></div>
 <div class="para"><p>Starting with the previous example,
 reboot the virtual machine and log back in as root.
 Notice that <tt>df</tt> doesn't show any Zumastor volumes mounted.
@@ -946,7 +953,7 @@ So do it manually now, then tell LVM about it, then tell Zumastor about it:</p><
 <div class="para"><p>You should now see the expected set of volumes and snapshots mounted.</p></div>
 <div class="para"><p>If vgchange -ay doesn't detect your volume group, do <tt>rm /etc/lvm/.cache</tt>
 and try again.</p></div>
-<h3 id="_remove_the_volume_and_loopback_file_created_above">9.5. Remove the volume and loopback file created above</h3><div style="clear:left"></div>
+<h3 id="_remove_the_volume_and_loopback_file_created_above">10.5. Remove the volume and loopback file created above</h3><div style="clear:left"></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt># zumastor forget volume zumatest
@@ -954,7 +961,7 @@ and try again.</p></div>
 # losetup -d /dev/loop/0
 # rm /media/vg.img</tt></pre>
 </div></div>
-<h3 id="_create_a_single_snapshotted_volume_on_a_real_device">9.6. Create a single snapshotted volume on a real device</h3><div style="clear:left"></div>
+<h3 id="_create_a_single_snapshotted_volume_on_a_real_device">10.6. Create a single snapshotted volume on a real device</h3><div style="clear:left"></div>
 <div class="para"><p>Find an big empty partition. Let's say it's a 10GB /dev/hda3.
 Here's how to use LVM to put a volume and its snapshot store onto it:</p></div>
 <div class="literalblock">
@@ -974,7 +981,7 @@ Successfully created and initialized volume 'zumatest'.
 # mkfs.ext3 /dev/mapper/zumatest</tt></pre>
 </div></div>
 <div class="para"><p>You now have an unmounted filesystem which can be snapshotted.</p></div>
-<h3 id="_mount_a_new_volume_and_set_up_periodic_snapshots">9.7. Mount a new volume and set up periodic snapshots</h3><div style="clear:left"></div>
+<h3 id="_mount_a_new_volume_and_set_up_periodic_snapshots">10.7. Mount a new volume and set up periodic snapshots</h3><div style="clear:left"></div>
 <div class="para"><p>To mount the new volume you created in the previous example,
 and set up hourly snapshots, do:</p></div>
 <div class="literalblock">
@@ -1027,7 +1034,7 @@ options with the <tt>zumastor define master</tt> command. See sections "Exportin
 and "Exporting a Zumastor volume via Samba" for such examples.</td>
 </tr></table>
 </div>
-<h3 id="_where_do_old_snapshots_go">9.8. Where do old snapshots go?</h3><div style="clear:left"></div>
+<h3 id="_where_do_old_snapshots_go">10.8. Where do old snapshots go?</h3><div style="clear:left"></div>
 <div class="para"><p>Assuming you've set up a volume to keep 24 hourly snapshots
 around with the command <tt>zumastor define master zumatest &#8212;hourly 24</tt>
 as in the last example, what happens when the 25th snapshot is taken?</p></div>
@@ -1047,7 +1054,14 @@ Run it, then use df to see how many snapshots are around afterwards:</p></div>
 <div class="para"><p>You should see 24 snapshots (the limit set when we did the <tt>zumastor define master</tt>)
 plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
 it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
-<h3 id="_exporting_a_zumastor_volume_via_nfs">9.9. Exporting a Zumastor volume via NFS</h3><div style="clear:left"></div>
+<h3 id="_how_can_i_run_the_above_examples_using_uml">10.9. How can I run the above examples using UML?</h3><div style="clear:left"></div>
+<div class="para"><p>First off, cd into test/uml.</p></div>
+<div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.</p></div>
+<div class="para"><p>Then you can easily start and log in to a UML instance by running ./xssh.sh.</p></div>
+<div class="para"><p>Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".</p></div>
+<h3 id="_exporting_a_zumastor_volume_via_nfs">10.10. Exporting a Zumastor volume via NFS</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1108,7 +1122,7 @@ to that path and add it to <tt>/etc/exports</tt>.</p></div>
 point, eliminating the need for this symlink.</td>
 </tr></table>
 </div>
-<h3 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">9.10. Recovering files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">10.11. Recovering files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>&#8212;export</tt> option with the <tt>zumastor define master</tt>
 command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.</p></div>
@@ -1132,7 +1146,7 @@ visible inside each directory, which would let you access them from any
 place under the mount point.</td>
 </tr></table>
 </div>
-<h3 id="_exporting_a_zumastor_volume_via_samba">9.11. Exporting a Zumastor volume via Samba</h3><div style="clear:left"></div>
+<h3 id="_exporting_a_zumastor_volume_via_samba">10.12. Exporting a Zumastor volume via Samba</h3><div style="clear:left"></div>
 <div class="para"><p>Here is an example of setting up Samba on Zumastor using the USER authentication flavor.</p></div>
 <div class="olist"><ol>
 <li>
@@ -1191,7 +1205,7 @@ the <tt>&#8212;samba</tt> option with the command <tt>zumastor define master</tt
 </div></div>
 </li>
 </ol></div>
-<h3 id="_recovering_files_through_samba_using_a_zumastor_snapshot">9.12. Recovering files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recovering_files_through_samba_using_a_zumastor_snapshot">10.13. Recovering files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>samba</tt> option with the <tt>zumastor define master</tt>
 command as described in the section "Exporting a Zumastor volume via Samba" above.
 Then you can recover files from a Windows Samba client as follows.</p></div>
@@ -1216,7 +1230,7 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-14 13:49:43 PDT
+Last updated 2007-12-15 20:11:36 PDT
 </div>
 </div>
 </body>
