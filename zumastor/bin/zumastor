@@ -113,21 +113,17 @@ function new_snapshot {
 	[[ $kind == "/manual" ]] && return 0
 	[[ -f $snapmount ]] && mount_device $vol $next
 
+	if [[ $num -ge $max ]]; then
+		oldest=${snapshots[0]}
+		log "remove oldest $kind snapshot $oldest"
+		unset snapshots[0]
+	fi
 	echo ${snapshots[@]} >$listfile
 	log "'$kind' snapshot list is now: ${snapshots[*]}"
 	[[ -f $snapmount ]] && update_symlinks $vol $kind
-
-	if [[ $num -ge $max ]]; then
-		oldest=${snapshots[0]}
-
-		# this will umount, remove device, and delete snapshot if it
-		# is the only reference
-		umount_drop_snapshot $vol $oldest
-		#umount_device $vol $oldest
-		#remove_device $vol $oldest
-		#ddsnap delete $sock $oldest
-		unset snapshots[0]
-	fi
+	# unmount/delete a snapshot may take a while. We do it after updating
+	# symlinks to reduce the window that a symlink points to nowhere
+	[[ -z $oldest ]] || umount_drop_snapshot $vol $oldest
 }
 
 # new_target_snapshot <volume> <hostname>
