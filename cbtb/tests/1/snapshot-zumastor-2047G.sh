@@ -20,8 +20,8 @@ set -e
 HDBSIZE=2044
 HDCSIZE=2044
 
-# Terminate test in 20 minutes.  Read by test harness.
-TIMEOUT=1200
+# Terminate test in 40 minutes.  Read by test harness.
+TIMEOUT=2400
 
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
