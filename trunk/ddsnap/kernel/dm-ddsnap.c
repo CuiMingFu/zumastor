@@ -228,45 +228,6 @@ static struct kmem_cache *pending_cache;
 static struct kmem_cache *end_io_cache;
 static struct super_block *snapshot_super;
 
-/* We cache query results because we are greedy about speed */
-
-#ifdef CACHE
-static u64 *snap_map_cachep(struct address_space *mapping, chunk_t chunk, struct page **p)
-{
-	u32 page_index;
-	u32 page_pos;
-	struct page *page;
-	u64 *exceptions;
-
-	page_index = chunk / (PAGE_SIZE / sizeof(u64));
-	page_pos = chunk % (PAGE_SIZE / sizeof(u64));
-
-	page = find_or_create_page(mapping, page_index, GFP_KERNEL);
-	if (page) {
-		/* Clean page if it's a new one */
-		if (!Page_Uptodate(page)) {
-			memset(page_address(page), 0, PAGE_SIZE);
-			SetPageUptodate(page);
-		}
-
-		exceptions = page_address(page);
-		*p = page;
-		return &exceptions[page_pos];
-	}
-	return NULL;
-}
-
-static inline int get_unshared_bit(struct devinfo *info, chunk_t chunk)
-{
-	return (info->shared_bitmap[chunk >> 5] >> (chunk & 31)) & 1;
-}
-
-static inline void set_unshared_bit(struct devinfo *info, chunk_t chunk)
-{
-	info->shared_bitmap[chunk >> 5] |= 1 << (chunk & 31);
-}
-#endif
-
 /* Hash table matches up query replies to pending requests */
 
 struct pending {
@@ -496,10 +457,6 @@ found:
 
 		generic_make_request(bio);
 		submitted++;
-#ifdef CACHE
-		for (j = 0; j < p->chunks; j++)
-			set_unshared_bit(info, chunk + j);
-#endif
 		kmem_cache_free(pending_cache, pending);
 	}
 	if (submitted){
@@ -1138,27 +1095,6 @@ static int ddsnap_map(struct dm_target *target, struct bio *bio, union map_info 
 	chunk = bio->bi_sector >> info->chunkshift;
 	trace(warn("map %Lx/%x, chunk %Lx", (long long)bio->bi_sector, bio->bi_size, chunk);)
 	//assert(bio->bi_size <= 1 << info->chunksize_bits);
-#ifdef CACHE
-	if (is_snapshot(info)) { // !!! use page cache for both
-		struct page *page;
-		u64 *exception = snap_map_cachep(info->inode->i_mapping, chunk, &page);
-	
-		if (!exception) {
-			printk("Failed to get a page for sector %ld\n", bio->bi_sector);
-			return -1;
-		}
-
-		u64 exp_chunk = *exception;
-		UnlockPage(page);
-		if (exp_chunk) {
-			bio->bi_sector = bio->bi_sector + ((exp_chunk - chunk) << info->chunkshift);
-			return 1;
-		}
-	} else {
-		if (info->shared_bitmap && get_unshared_bit(info, chunk))
-			return 1;
-	}
-#endif
 
 	/* rob: check to see if the socket is connected, otherwise failed and don't place request on the queue */
 	pending = kmem_cache_alloc(pending_cache, GFP_NOIO|__GFP_NOFAIL);
@@ -1436,9 +1372,6 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 	struct devinfo *info;
 	int err, i, snap, flags = 0;
 	char *error;
-#ifdef CACHE
-	unsigned bm_size;
-#endif
 	/* 
 	 * We are holding the big kernel lock grabbed in do_ioctl
 	 * We doubt if BKL is required to prevent any races in device mapper methods
@@ -1494,16 +1427,6 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 		goto eek;
 	info->control_socket = fget(err);
 	sys_close(err);
-
-#ifdef CACHE
-	bm_size = round_up((target->len  + 7) >> (chunksize_bits + 3), sizeof(u32)); barf // !!! wrong
-	error = "Can't allocate bitmap for origin";
-	if (!(info->shared_bitmap = vmalloc(bm_size)))
-		goto eek;
-	memset(info->shared_bitmap, 0, bm_size);
-	if (!(info->inode = new_inode(snapshot_super)))
-		goto eek;
-#endif
 
 	error = "Can't start daemon";
 	if ((err = kernel_thread((void *)incoming, target, CLONE_FILES)) < 0)
@@ -1597,19 +1520,10 @@ int __init dm_ddsnap_init(void)
 	what = "register";
 	if ((err = dm_register_target(&ddsnap)))
 		goto bad3;
-#ifdef CACHE
-	err = -ENOMEM;
-	what = "create snapshot superblock";
-	if (!(snapshot_super = alloc_super()))
-		goto bad4;
-#endif
 	/* Jiaying: register /proc/driver/ddsnap */
 	ddsnap_proc_root = proc_mkdir("ddsnap", proc_root_driver);
 	if (!ddsnap_proc_root) {
 		printk("cannot create /proc/driver/ddsnap entry\n");
-#ifdef CACHE
-		goto bad4;
-#endif
 		goto bad3;
 	}
 	ddsnap_proc_root->owner = THIS_MODULE;
@@ -1618,11 +1532,6 @@ int __init dm_ddsnap_init(void)
 	sema_init(&ddsnap_proc_sem, 1);
 
 	return 0;
-
-#ifdef CACHE
-bad4:
-	dm_unregister_target(&ddsnap);
-#endif
 bad3:
 	kmem_cache_destroy(end_io_cache);
 bad2:
