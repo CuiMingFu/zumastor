@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <time.h>
 #include <signal.h>
+#include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -4245,6 +4246,12 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 			return 0;
 		}
 	}
+
+	/* To avoid writeout deadlock, we can't let ourselves be
+	 * swapped out, so lock everything into RAM.
+	 */
+	if (mlockall(MCL_CURRENT|MCL_FUTURE))
+		error("Unable to lock self into RAM: %s", strerror(errno));
 
 #ifdef DDSNAP_MEM_MONITOR
 	ddsnap_mem_monitor();
