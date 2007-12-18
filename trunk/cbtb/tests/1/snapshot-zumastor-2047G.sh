@@ -29,7 +29,7 @@ SLEEP=5
 echo "1..6"
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.ext3 /dev/mapper/testvol
+mkfs.ext3 -q /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
   # mkdir /var/lib/zumastor/volumes/testvol/filesystem
