@@ -45,7 +45,7 @@ if [ -f $fs_image ]; then
 	echo Using existing Debian uml root file system image.
 else
 	echo -n Getting Debian uml root file system image...
-	download http://uml.nagafix.co.uk/Debian-3.1/${fs_image}.bz2 c7bf74efc4a39ceb2ca1561e9f732853093777e5
+	download http://uml.nagafix.co.uk/Debian-4.0/${fs_image}.bz2 10518efb28fa5840e41228f1d6c8a5f8e1e2b1d5
 	echo -e "done.\n"
 fi
 
