@@ -1826,7 +1826,7 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 	if (!reply)
 		return 1;
 	int separate = !!reply->store.total;
-	char number1[16], number2[16];
+	char number1[27], number2[27];
 	unsigned snapshots = reply->snapshots;
 
 	commas(number1, sizeof(number1), reply->meta.total);
