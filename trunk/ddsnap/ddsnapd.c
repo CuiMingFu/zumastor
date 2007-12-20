@@ -1999,20 +1999,6 @@ static void gen_changelist_leaf(struct superblock *sb, struct eleaf *leaf, void 
 		}
 }
 
-static struct change_list *gen_changelist_tree(struct superblock *sb, struct snapshot const *snapshot1, struct snapshot const *snapshot2)
-{
-	struct gen_changelist gcl;
-
-	gcl.mask1 = 1ULL << snapshot1->bit;
-	gcl.mask2 = 1ULL << snapshot2->bit;
-	if ((gcl.cl = init_change_list(sb->snapdata.asi->allocsize_bits, snapshot1->tag, snapshot2->tag)) == NULL)
-		return NULL;
-
-	traverse_tree_range(sb, 0, -1, gen_changelist_leaf, &gcl);
-
-	return gcl.cl;
-}
-
 /*
  * High Level BTree Editing
  */
@@ -3666,53 +3652,56 @@ static int incoming(struct superblock *sb, struct client *client)
 		outerror(sock, USECOUNT_ERROR, err, err_msg);
 		break;
 	}
+	case STREAM_EXCEPTIONS:
 	case STREAM_CHANGELIST:
 	{
-		u32 tag1 = ((struct stream_changelist *)message.body)->snap1,
-			tag2 = ((struct stream_changelist *)message.body)->snap2;
-		char const *err_msg;
+		u32 tag1 = ((struct stream_changelist *)message.body)->snap1;
+		u32 tag2 = ((struct stream_changelist *)message.body)->snap2;
+		int against_origin = message.head.code == STREAM_EXCEPTIONS;
+		char *error = "unable to generate changelist";
+		err = EINVAL;
 
-#ifdef DEBUG_ERROR
-		err_msg = "Debug mode to test error messages";
-		goto stream_error;
-#endif
+		struct snapshot *snapshot1 = NULL;
+		struct snapshot *snapshot2 = find_snap(sb, tag2);
 
-		/* check that each snapshot is a valid tag */
-		struct snapshot *snapshot1, *snapshot2;
-		err_msg = "invalid snapshot tag";
+		if (!against_origin) {
+			snapshot1 = find_snap(sb, tag1);
+			error = "source snapshot does not exist";
+			if (!snapshot1)
+				goto eek;
+		}
+		if (!snapshot2) {
+			error = "destination snapshot does not exist";
+			goto eek;
+		}
 		/* Danger, Danger!!!  This is going to turn into a bug when tree walks go
 		   incremental because pointers to the snapshot list are short lived.  Need
 		   to pass the tags instead.  Next round of cleanups. */
-		if (!(snapshot1 = find_snap(sb, tag1)) || !(snapshot2 = find_snap(sb, tag2)))
-			goto stream_error;
-
-		struct change_list *cl;
 
 		trace_on(printf("generating changelist from snapshot tags %u and %u\n", tag1, tag2););
-		err_msg = "unable to generate changelist";
-		if ((cl = gen_changelist_tree(sb, snapshot1, snapshot2)) == NULL)
-			goto stream_error;
+		error = "unable to generate changelist";
+		struct gen_changelist gcl = {
+			.cl = init_change_list(sb->snapdata.asi->allocsize_bits, tag1, tag2),
+			.mask1 = against_origin ? 0 : 1ULL << snapshot1->bit,
+			.mask2 = 1ULL << snapshot2->bit };
 
-		trace_on(printf("sending stream header\n"););
-		if (outbead(sock, STREAM_CHANGELIST_OK, struct changelist_stream, cl->count, 
-					sb->snapdata.asi->allocsize_bits) < 0)
-			warn("unable to send reply to stream change list message");
-
-		trace_on(printf("streaming %llu chunk addresses\n", (unsigned long long) cl->count););
-		if (writepipe(sock, cl->chunks, cl->count * sizeof(cl->chunks[0])) < 0)
-			warn("unable to send chunks for streaming change list");
-
-		free_change_list(cl);
-
+		if (!gcl.cl)
+			goto eek;
+		if ((err = traverse_tree_range(sb, 0, -1, gen_changelist_leaf, &gcl)))
+			goto eek_free;
+		trace_on(printf("sending list of "U64FMT" changed chunks\n", gcl.cl->count););
+		error = "unable to send reply to stream change list message";
+		if (outbead(sock, STREAM_CHANGELIST_OK, struct changelist_stream, gcl.cl->count, sb->snapdata.asi->allocsize_bits) < 0)
+			goto eek_free;
+		if (writepipe(sock, gcl.cl->chunks, gcl.cl->count * sizeof(gcl.cl->chunks[0])) < 0)
+			goto eek_free;
+		free_change_list(gcl.cl);
 		break;
-
-	stream_error:
-		warn("%s", err_msg);
-
-		int err;
-		if ((err = outhead(sock, STREAM_CHANGELIST_ERROR, strlen(err_msg)+1)) < 0 ||
-				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
-			warn("unable to send error for streaming change list message: %s", strerror(-err));
+	eek_free:
+		free_change_list(gcl.cl);
+	eek:
+		warn("%s", error);
+		outerror(sock, CREATE_SNAPSHOT_ERROR, err, error);
 		break;
 	}
 	case STATUS:
