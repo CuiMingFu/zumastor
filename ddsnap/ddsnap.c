@@ -2413,7 +2413,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		unsigned cachesize_bytes = 0;
+		unsigned long long cachesize_bytes = 0;
 		if (cachesize_str != NULL) {
 			cachesize_bytes = strtobytes64(cachesize_str);
 			if (cachesize_bytes == INPUT_ERROR_64) {

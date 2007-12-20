@@ -4196,7 +4196,7 @@ int really_init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits
 	return 0;
 }
 
-int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned cachesize_bytes)
+int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned long long cachesize_bytes)
 {
 	struct superblock *sb = new_sb(metadev, orgdev, snapdev);
 
@@ -4228,7 +4228,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	 * Growth could cause deadlock, so pass a cachesize
 	 * to tell init_buffers to set the initial and max cache size the same.
 	 */
-	trace_on(warn("Setting cache size to %u bytes.\n", cachesize_bytes););
+	trace_on(warn("Setting cache size to %llu bytes.\n", cachesize_bytes););
 	init_buffers(bufsize, cachesize_bytes);
 	
 	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &agentfd) < 0)
