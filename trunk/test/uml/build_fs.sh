@@ -16,7 +16,28 @@ rm_exit() {
 	exit 1;
 }
 
+echo -n Packing ddsnap and zumastor source code...
+pushd $ZUMA_REPOSITORY
+tar czf ddsnap-src.tar.gz ddsnap
+tar czf zumastor-src.tar.gz zumastor
+popd
+echo -e "done.\n"
+
 pushd $WORKDIR
+
+mv $ZUMA_REPOSITORY/ddsnap-src.tar.gz $ZUMA_REPOSITORY/zumastor-src.tar.gz .
+chmod a+r ddsnap-src.tar.gz zumastor-src.tar.gz
+
+cp $ZUMA_REPOSITORY/Version Version
+if [ -f $ZUMA_REPOSITORY/SVNREV ] ; then
+	cp $ZUMA_REPOSITORY/SVNREV .
+else
+	pushd $ZUMA_REPOSITORY
+	svn info zumastor | grep ^Revision:  | cut -d\  -f2 > /tmp/SVNREV
+	popd
+	mv /tmp/SVNREV .
+fi
+chmod a+r Version SVNREV
 
 if [[ ! -e $uml_fs ]]; then
 	echo -n Unpacking root file system image...
@@ -32,42 +53,6 @@ mkdir -p ~/.ssh
 [[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f ~/.ssh/id_dsa -P ''
 cp ~/.ssh/id_dsa.pub $USER.pub
 chmod a+rw $USER.pub
-echo -e "done.\n"
-
-echo -n Building zumastor Debian package...
-VERSION=`awk '/^[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' $ZUMA_REPOSITORY/Version`
-if [ "x$VERSION" = "x" ] ; then
-	rm_exit 'Suspect Version file'
-fi
-
-if [ -f $ZUMA_REPOSITORY/SVNREV ] ; then
-	SVNREV=`awk '/^[0-9]+$/ { print $1; }' $ZUMA_REPOSITORY/SVNREV`
-else
-	pushd $ZUMA_REPOSITORY
-	SVNREV=`svn info zumastor | grep ^Revision:  | cut -d\  -f2`
-	popd
-fi
-
-pushd ${ZUMA_REPOSITORY}/zumastor || rm_exit "Couldn't cd to zumastor"
-[ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" \
-	|| rm_exit 'Failed to dch zumastor package'
-dpkg-buildpackage -uc -us -rfakeroot \
-	|| rm_exit 'Failed to build zumastor package'
-popd
-
-pushd ${ZUMA_REPOSITORY}/ddsnap \
-	|| rm_exit "Couldn't cd to ddsnap"
-[ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" \
-	|| rm_exit 'Failed to dch ddsnap package'
-dpkg-buildpackage -uc -us -rfakeroot \
-	|| rm_exit 'Failed to build ddsnap package'
-popd
-mv ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_*.deb .
-mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .
-rm ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_* ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*
-chmod a+rw *.deb
 echo -e "done.\n"
 
 popd
