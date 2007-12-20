@@ -8,7 +8,7 @@ ddsnap \- block device snapshot and replication
 [\-V|--version] [-?|--help] [--usage] \fIsubcommand\fP [option\.\.\.] [operand...]
 .br
 .B ddsnap initialize
-[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fImeta_device\fP]
+[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] [-k|--cachesize \fIcachesize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fImeta_device\fP]
 .br
 .B ddsnap agent 
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIagent_socket\fP
@@ -70,6 +70,10 @@ Specifies the journal size, i.e. 200k. Defaults to 400k.
 .IP \fB\-b\ \fIblocksize\fB|--blocksize=\fIblocksize
 .br
 Specifies the block size. Input has to be a power of two, i.e. 8k. Defaults to chunksize.
+.IP \fB\-b\ \fIcachesize\fB|--cachesize=\fIcachesize
+.br
+Specifies the amount of RAM to dedicate to the snapshot btree cache.  If not specified or
+if specified as 0 (zero), defaults to min(128MB, system ram size/4).
 .IP \fB-f|--foreground
 .br
 Sets the server to run in the foreground. The default is to run daemonized.

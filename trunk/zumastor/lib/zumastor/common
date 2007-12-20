@@ -161,6 +161,7 @@ function start_volume {
 	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r info=$VOLUMES/$vol
+	local -r cachesizefile=$info/cachesize
 	local -r sdev=$info/device/snapstore
 	local -r odev=$info/device/origin
 	local mdev=$info/device/meta
@@ -168,18 +169,23 @@ function start_volume {
 	local -r server=${SERVERS}/$vol
 	local -r agentlog=${LOGS}/${vol}/agent.log
 	local -r serverlog=${LOGS}/${vol}/server.log
+	local cachesize cacheopt
 
 	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
 	[[ -h $mdev ]] || mdev=""	
 
+	read cachesize 2>/dev/null <$cachesizefile
+	[[ -z $cachesize ]] || cacheopt=" --cachesize $cachesize"
+
 	ddsnap agent -l $agentlog $agent || return 1
-	ddsnap server -p ${RUNPATH}/${vol}-server.pid -l $serverlog $sdev $odev $mdev $agent $server || return 1
+	ddsnap server -p ${RUNPATH}/${vol}-server.pid -l $serverlog$cacheopt $sdev $odev $mdev $agent $server || return 1
 }
 
 function stop_volume {
 	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r info=$VOLUMES/$vol
+	local -r cachesizefile=$info/cachesize
 	local -r sdev=$info/device/snapstore
 	local -r odev=$info/device/origin
 	local mdev=$info/device/meta
@@ -188,6 +194,10 @@ function stop_volume {
 	local -r agentlog=${LOGS}/${vol}/agent.log
 	local -r serverlog=${LOGS}/${vol}/server.log
 	local -r pidfile=${RUNPATH}/${vol}-server.pid
+	local cachesize cacheopt
+
+	read cachesize 2>/dev/null <$cachesizefile
+	[[ -z $cachesize ]] || cacheopt=" --cachesize $cachesize"
 
 	for id in $(ddsnap status $server --list) $(get_managed_snapshots $vol); do
 		umount_remove_device $vol $id || return 1
@@ -197,7 +207,7 @@ function stop_volume {
 	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
 	[[ -h $mdev ]] && mdev="$mdev " || mdev=""
 
-	pkill -f "ddsnap server -p $pidfile -l $serverlog $sdev $odev ${mdev}$agent $server$"
+	pkill -f "ddsnap server -p $pidfile -l $serverlog$cacheopt $sdev $odev ${mdev}$agent $server$"
 	pkill -f "ddsnap agent -l $agentlog $agent$"
 	rm $agent $server $pidfile
 	return 0

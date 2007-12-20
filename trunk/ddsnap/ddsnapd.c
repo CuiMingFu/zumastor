@@ -4207,7 +4207,7 @@ int really_init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits
 	return 0;
 }
 
-int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg)
+int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned cachesize_bytes)
 {
 	struct superblock *sb = new_sb(metadev, orgdev, snapdev);
 
@@ -4219,16 +4219,28 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	if (!valid_sb(sb))
 		error("Invalid superblock\n");
 
-	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;	
-	unsigned prealloc_size = 1 << 27;
-	struct sysinfo info;
-	/* preallocate buffers as the minimum between 1/4 of physical RAM and 128MB */
-	if (!sysinfo(&info)) {
-		const u64 QUARTER_TOTAL_RAM = (u64)(info.totalram / 4) * (u64)info.mem_unit;
-		if (QUARTER_TOTAL_RAM < prealloc_size)
-			prealloc_size = QUARTER_TOTAL_RAM;
+	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;
+	if (cachesize_bytes == 0) {
+		/* default mem_pool_size is min(1/4 of physical RAM,  128MB)
+		 * because "128MB is enough for now" and "want to run on tiny UML instances"
+		 * It's probably wrong for anything but our smoke test, 
+		 * which is why we allow caller to override default.
+		 */
+		cachesize_bytes = 128 << 20;
+		struct sysinfo info;
+		if (!sysinfo(&info)) {
+			const u64 QUARTER_TOTAL_RAM = (u64)(info.totalram / 4) * (u64)info.mem_unit;
+			if (cachesize_bytes > QUARTER_TOTAL_RAM)
+				cachesize_bytes = QUARTER_TOTAL_RAM;
+		}
 	}
-	init_buffers(bufsize, prealloc_size);
+	/* The buffer system will grow if you don't preallocate buffers,
+	 * but if you preallocate, it won't allow growth.
+	 * Growth could cause deadlock, so pass a cachesize
+	 * to tell init_buffers to set the initial and max cache size the same.
+	 */
+	trace_on(warn("Setting cache size to %u bytes.\n", cachesize_bytes););
+	init_buffers(bufsize, cachesize_bytes);
 	
 	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &agentfd) < 0)
 		error("Could not setup snapshot server\n");
