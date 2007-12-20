@@ -62,11 +62,8 @@ lvcreate --size 16m -n test_snap sysvg
 
   sleep $SLEEP
   sync
-  xfs_freeze -f /var/run/zumastor/mount/testvol
-  sleep $SLEEP
   zumastor snapshot testvol hourly 
   sleep $SLEEP
-  xfs_freeze -u /var/run/zumastor/mount/testvol
 
   if [ -d /var/run/zumastor/mount/testvol/.snapshot/hourly.1/ ] ; then
     echo "ok 4 - second snapshot mounted"

@@ -240,13 +240,15 @@ function create_snapshot {
 	local -r vol=$1
 	local -r id=$2
 	local -r server=${SERVERS}/$vol
-	local status
+	local status filesystem=$(</proc/mounts awk "(\$1 == \"/dev/mapper/$vol\") { print \$3 }")
 
 	# only create snapshot for non-origin
 	[[ $id -eq -1 ]] && echo should not be creating device for origin && return 1
 
+	[[ $filesystem = "xfs" ]] && xfs_freeze -f $(mount_name $vol -1)
 	ddsnap create $server $id >/dev/null 2>/dev/null
 	status=$?
+	[[ $filesystem = "xfs" ]] && xfs_freeze -u $(mount_name $vol -1)
 	# flush origin device to prevent the race between origin writes and snapshot create
 	blockdev --flushbufs /dev/mapper/$vol
 	return $status

@@ -28,8 +28,10 @@ SLEEP=5
 
 echo "1..6"
 
+aptitude install xfsprogs
+
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-mkfs.ext3 -q /dev/mapper/testvol
+mkfs.xfs -f /dev/mapper/testvol
 
   # TODO: make this part of the zumastor define master or define volume
   # mkdir /var/lib/zumastor/volumes/testvol/filesystem
