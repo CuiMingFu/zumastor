@@ -10,6 +10,12 @@
 [[ $# -eq 1 ]] || { echo "Usage: build_fs.sh uml_fs"; exit 1; }
 uml_fs=$1
 
+rm_exit() {
+	echo $1
+	rm -f $uml_fs
+	exit 1;
+}
+
 pushd $WORKDIR
 
 if [[ ! -e $uml_fs ]]; then
@@ -31,9 +37,7 @@ echo -e "done.\n"
 echo -n Building zumastor Debian package...
 VERSION=`awk '/^[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' $ZUMA_REPOSITORY/Version`
 if [ "x$VERSION" = "x" ] ; then
-	echo "Suspect Version file"
-	rm -f $uml_fs
-	exit 1
+	rm_exit 'Suspect Version file'
 fi
 
 if [ -f $ZUMA_REPOSITORY/SVNREV ] ; then
@@ -44,16 +48,21 @@ else
 	popd
 fi
 
-pushd ${ZUMA_REPOSITORY}/zumastor || { rm -f $uml_fs; exit 1; }
+pushd ${ZUMA_REPOSITORY}/zumastor || rm_exit "Couldn't cd to zumastor"
 [ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || { rm -f $uml_fs; exit 1; }
-dpkg-buildpackage -uc -us -rfakeroot || { rm -f $uml_fs; exit 1; }
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" \
+	|| rm_exit 'Failed to dch zumastor package'
+dpkg-buildpackage -uc -us -rfakeroot \
+	|| rm_exit 'Failed to build zumastor package'
 popd
 
-pushd ${ZUMA_REPOSITORY}/ddsnap || { rm -f $uml_fs; exit 1; }
+pushd ${ZUMA_REPOSITORY}/ddsnap \
+	|| rm_exit "Couldn't cd to ddsnap"
 [ -f debian/changelog ] && rm debian/changelog
-VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || { rm -f $uml_fs; exit 1; }
-dpkg-buildpackage -uc -us -rfakeroot || { rm -f $uml_fs; exit 1; }
+VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" \
+	|| rm_exit 'Failed to dch ddsnap package'
+dpkg-buildpackage -uc -us -rfakeroot \
+	|| rm_exit 'Failed to build ddsnap package'
 popd
 mv ${ZUMA_REPOSITORY}/ddsnap_$VERSION-r$SVNREV_*.deb .
 mv ${ZUMA_REPOSITORY}/zumastor_$VERSION-r$SVNREV_*.deb .
@@ -62,3 +71,4 @@ chmod a+rw *.deb
 echo -e "done.\n"
 
 popd
+
