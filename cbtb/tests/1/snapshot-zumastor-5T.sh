@@ -55,13 +55,8 @@ time lvcreate --size 512G -n test_snap testvg
 
 echo "1..6"
 
-zumastor define volume testvol /dev/testvg/test /dev/testvg/test_snap --initialize
+zumastor define volume testvol /dev/testvg/test /dev/testvg/test_snap --initialize --mountopts nouuid
 mkfs.xfs /dev/mapper/testvol
-
-  # TODO: make this part of the zumastor define master or define volume
-  # mkdir /var/lib/zumastor/volumes/testvol/filesystem
-  echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
-
 zumastor define master testvol -h 24 -d 7
 
 echo ok 1 - testvol set up

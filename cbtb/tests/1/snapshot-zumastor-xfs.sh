@@ -25,14 +25,8 @@ lvcreate --size 16m -n test_snap sysvg
 
   echo "1..6"
 
-  zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
-
+  zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize --mountopts nouuid
   $mkfs /dev/mapper/testvol
-
-  # TODO: make this part of the zumastor define master
-  mkdir /var/lib/zumastor/volumes/testvol/filesystem
-  echo nouuid >/var/lib/zumastor/volumes/testvol/filesystem/options
-
   zumastor define master testvol -h 24 -d 7
 
   echo ok 1 - testvol set up
