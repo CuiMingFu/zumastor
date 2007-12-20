@@ -7,6 +7,7 @@
 umount_exit() {
 	echo $1
 	umount /mnt
+	rm -f $uml_fs
 	exit 1
 }
 
