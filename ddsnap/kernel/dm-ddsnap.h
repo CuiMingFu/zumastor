@@ -68,6 +68,7 @@ enum csnap_codes
 	SNAPSHOT_STATE,
 	REQUEST_ORIGIN_SECTORS, // !!! don't dedicate a whole message type to just this, return some other global stats here (and move me out of kernel)
 	ORIGIN_SECTORS,
+	STREAM_EXCEPTIONS, /* New in 0.5 */
 };
 
 enum csnap_error_codes
@@ -99,6 +100,7 @@ struct identify_error { uint32_t err; char msg[]; } PACKED; // !!! why not use r
 struct connect_server_error { uint32_t err; char msg[]; } PACKED; // !!! why not use reply_error and include msg
 struct create_snapshot { uint32_t snap; } PACKED;
 struct generate_changelist { uint32_t snap1; uint32_t snap2; } PACKED;
+struct generate_origindiff { uint32_t snap; } PACKED;
 struct snapinfo { uint32_t snap; int8_t prio; uint16_t usecnt; uint64_t ctime; } PACKED;
 struct snaplist { uint32_t count; struct snapinfo snapshots[]; } PACKED;
 struct stream_changelist { uint32_t snap1; uint32_t snap2; } PACKED;
