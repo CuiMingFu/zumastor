@@ -86,23 +86,27 @@ int is_same_device(char const *dev1,char const *dev2) {
 	return 1;
 }
 
-#define INPUT_ERROR 0 // really?
+#define INPUT_ERROR ULONG_MAX
+#define INPUT_ERROR_64 ULLONG_MAX
 
-u32 strtobytes(char const *string)
+u64 strtobytes64(char const *string)
 {
-	long bytes = 0;
+	unsigned long long bytes = 0;
 	char *letter = NULL;
 
-	bytes = strtol(string, &letter, 10);
+	bytes = strtoull(string, &letter, 10);
 
-	if (bytes <= 0)
-		return INPUT_ERROR;
+	if (bytes < 0)
+		return INPUT_ERROR_64;
+
+	if (bytes == ULLONG_MAX && errno == ERANGE)
+		return INPUT_ERROR_64;
 
 	if (letter[0] == '\0')
 		return bytes;
 
 	if (letter[1] != '\0')
-		return INPUT_ERROR;
+		return INPUT_ERROR_64;
 
 	switch (letter[0]) {
 	case 'k': case 'K':
@@ -112,8 +116,18 @@ u32 strtobytes(char const *string)
 	case 'g': case 'G':
 		return bytes * (1 << 30);
 	default:
-		return INPUT_ERROR;
+		return INPUT_ERROR_64;
 	}
+}
+
+u32 strtobytes(char const *string)
+{
+	unsigned long long bytes = 0;
+
+	bytes = strtobytes64(string);
+	if (bytes > ULONG_MAX || bytes == INPUT_ERROR_64)
+		return INPUT_ERROR;
+	return (u32)bytes;
 }
 
 u32 strtobits(char const *string)
@@ -2029,7 +2043,6 @@ int main(int argc, char *argv[])
 		{ "journalsize", 'j', POPT_ARG_STRING, &js_str, 0, "User specified journal size, i.e. 400k (default: 100 * chunk_size)", "size" },
 		{ "blocksize", 'b', POPT_ARG_STRING, &bs_str, 0, "Snapshot metadata block size (power of two, default = 4K)", "size" },
 		{ "chunksize", 'c', POPT_ARG_STRING, &cs_str, 0, "Snapshot store chunk size (power of two, default = 16K)", "size" },
-		{ "cache", 0, POPT_ARG_STRING, &cs_str, 0, "Preallocated buffer cache size (default = 128M)", "size" },
 		POPT_TABLEEND
 	};
 
@@ -2038,9 +2051,11 @@ int main(int argc, char *argv[])
 	char const *pidfile = NULL;
 	char const *progress_file = NULL;
 	char const *resume = NULL;
+	char const *cachesize_str = NULL;
 	struct poptOption serverOptions[] = {
 		{ "foreground", 'f', POPT_ARG_NONE, &nobg, 0, "run in foreground. daemonized by default.", NULL }, // !!! unusual semantics, we should be foreground by default, and optionally daemonize
 		{ "logfile", 'l', POPT_ARG_STRING, &logfile, 0, "use specified log file", NULL },
+		{ "cachesize", 'k', POPT_ARG_STRING, &cachesize_str, 0, "Buffer cache size (default = max(128M,1/4 sys RAM)", "size" },
 #ifdef DDSNAP_MEM_MONITOR
 		{ "mmonitor", 'm', POPT_ARG_INT, &mmon_interval, 0, "Memory monitor delay, seconds, zero to disable.", NULL },
 #endif
@@ -2307,7 +2322,6 @@ int main(int argc, char *argv[])
 				exit(1);
 			}
 		}
-
 		trace_off(printf("js_bytes is %u, bs_bits is %u, and cs_bits is %u\n", js_bytes, bs_bits, cs_bits););
 		return really_init_snapstore(orgdev_, snapdev_, metadev_, bs_bits, cs_bits, js_bytes);
 	}
@@ -2377,7 +2391,6 @@ int main(int argc, char *argv[])
 	if (strcmp(command, "server") == 0) {
 		char const *snapdev, *origdev, *metadev;
 		char const *agent_sockname, *server_sockname;
-
 		struct poptOption options[] = {
 			{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &serverOptions, 0, NULL, NULL },
 			POPT_AUTOHELP
@@ -2398,6 +2411,16 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "%s: %s: %s\n", command, poptBadOption(serverCon, POPT_BADOPTION_NOALIAS), poptStrerror(serverOpt));
 			poptFreeContext(serverCon);
 			return 1;
+		}
+
+		unsigned cachesize_bytes = 0;
+		if (cachesize_str != NULL) {
+			cachesize_bytes = strtobytes64(cachesize_str);
+			if (cachesize_bytes == INPUT_ERROR_64) {
+				fprintf(stderr, "Invalid cache size input. Omit option, or use 0 for the default\n");
+				poptPrintUsage(serverCon, stderr, 0);
+				return 1;
+			}
 		}
 
 		snapdev = poptGetArg(serverCon);
@@ -2459,7 +2482,7 @@ int main(int argc, char *argv[])
 
 		poptFreeContext(serverCon);
 
-		return start_server(orgdev_, snapdev_, metadev_, agent_sockname, server_sockname, logfile, pidfile, nobg);
+		return start_server(orgdev_, snapdev_, metadev_, agent_sockname, server_sockname, logfile, pidfile, nobg, cachesize_bytes);
 	}
 	if (strcmp(command, "create") == 0) {
 		if (argc != 4) {

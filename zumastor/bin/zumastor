@@ -473,13 +473,14 @@ function stop_target {
 }
 
 function define_volume {
-	[ $# -eq 5 ] || [ $# -eq 6 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 6 ]] || [[ $# -eq 7 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r odev=$2
 	local -r mountpoint=$3
 	local -r mountopts=$4
 	local -r sdev=$5
-	local -r mdev=$6
+	local -r cachesize=$6
+	local -r mdev=$7
 	local -r path=$VOLUMES/$vol
 	local -r sock=${SERVERS}/$vol
 
@@ -493,13 +494,14 @@ function define_volume {
 	mkdir $path/filesystem || return 1
 	echo $mountpoint >$path/filesystem/mountpoint
 	[[ $mountopts = "-" ]] || echo $mountopts >$path/filesystem/mountopts
+	[[ $cachesize -eq 0 ]] || echo $cachesize >$path/cachesize
 
 	start_volume $vol || { echo start failed; return 1; }
 	create_device $vol -1 || { echo create failed; return 1; }
 }
 
 function forget_volume {
-	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r path=$VOLUMES/$vol
 	local -r sock=${SERVERS}/$vol
@@ -520,6 +522,7 @@ function forget_volume {
 	rmdir $path/targets
 	rm -rf $path/device
 	rm -rf $path/filesystem
+	rm -f $path/cachesize
 
 	rmdir $path || return 1
 }
@@ -813,11 +816,12 @@ define)
 		declare args metadev init
 		declare blocksize=4k
 		declare chunksize=16k
+		declare cachesize=0
 		declare mountpoint
-		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-h|--help]"
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-h|--help]"
 
 		shift 2
-		args=`getopt -ob:c:m:hio:p: -l blocksize:,chunksize:,help,metadev:,initialize,mountpoint:,mountopts: -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -ob:c:m:hik:o:p: -l blocksize:,chunksize:,help,metadev:,initialize,cachesize:,mountpoint:,mountopts: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -830,6 +834,7 @@ define)
 				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
+				echo "  -k, --cachesize <size>  sets snapstore index size (default is system-dependent)"
 				echo "  -o, --mountopts <list>	sets mount options for the volume (no default)"
 				echo "  -p, --mountpoint <dir>  sets the volume mountpoint (default is $MOUNTS/<vol>)"
 				exit;;
@@ -838,6 +843,7 @@ define)
 			-m|--metadev) metadev=$2; shift 1;;
 			-b|--blocksize) blocksize=$2; shift 1;;
 			-c|--chunksize) chunksize=$2; shift 1;;
+			-k|--cachesize) cachesize=$2; shift 1;;
 			-o|--mountopts) mountopts=$2; shift 1;;
 			-p|--mountpoint) mountpoint=$2; shift 1;;
 			*) echo whoops; exit 9;;
@@ -845,7 +851,7 @@ define)
 			shift 1
 		done
 		shift # remove --
-		[[ $# = 3 ]] || { echo $usage; exit 2; }
+		[[ $# = 3 ]] || { echo "$usage"; exit 2; }
 		declare vol=$1
 		declare origin=$2
 		declare snapstore=$3
@@ -861,7 +867,7 @@ define)
 
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
-		define_volume $vol $origin $mountpoint $mountopts $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
+		define_volume $vol $origin $mountpoint $mountopts $snapstore $cachesize $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"

@@ -35,7 +35,7 @@ zumastor \- block device snapshot and replication management
 
 .SH COMMANDS
 .IP \fBdefine\ \fBvolume
-\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP]
+\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-k\fP|\fB--cachesize\fP \fIcachesize\fP] [\fB-o\fP|\fB--mountopts\fP \fImount options\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP]
 \fR
 
 Define a new zumastor volume named \fIvolume\fP based on the underlying volumes \fIorgdev\fP and \fIsnapdev\fP.  If specified, the \fImetadev\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the newly created volume data will be overwritten with zeros, overwriting all data on the origin device.
@@ -46,7 +46,9 @@ Note that these are are specified as powers of two.
 If the sizes given are not powers of two, in each case the next greater power
 of two will be used instead.
 
-A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Snapshot volumes will be mounted on directories below that point.
+The amount of RAM dedicated to the snapshot store cache defaults to min(128MB, system RAM/4), and can be tuned manually with the \fBcachesize\fP option.  For instance, to increase the cache size to 512MB, use --cachesize 512M.
+
+A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Mount options that apply to that mount point may be defined with the \fBmountopts\fP option.  Snapshot volumes will be mounted on directories below that point.
 .IP \fBdefine\ \fBmaster\fP
 .I volume \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-n\fP|\fB--no-snapmount\fP]
 
