@@ -20,6 +20,36 @@ cp /etc/resolv.conf /mnt/etc/resolv.conf \
 	|| umount_exit 'Failed to copy resolv.conf to UML'
 echo "deb ftp://ftp.us.debian.org/debian/ stable main contrib non-free" > /mnt/etc/apt/sources.list
 chroot /mnt apt-get -q update
+chroot /mnt dpkg -s build-essential liburi-perl libpopt-dev zlib1g-dev \
+	|| chroot /mnt apt-get -q -y install build-essential liburi-perl libpopt-dev zlib1g-dev
+chroot /mnt dpkg -s devscripts fakeroot debhelper \
+	|| chroot /mnt apt-get -q -y install devscripts fakeroot debhelper
+echo -e "done.\n"
+
+echo -n Building ddsnap and zumastor...
+tar zxf ddsnap-src.tar.gz -C /mnt/tmp
+tar zxf zumastor-src.tar.gz -C /mnt/tmp
+
+VERSION=`awk '/^[0-9]+\.[0-9]+(\.[0-9]+)?$/ { print $1; }' Version`
+[[ "x$VERSION" = "x" ]] && umount_exit 'Suspect Version file'
+SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV`
+[[ "x$SVNREV" = "x" ]] && umount_exit 'Suspect SVNREV file'
+
+[ -f /mnt/tmp/zumastor/debian/changelog ] && rm /mnt/tmp/zumastor/debian/changelog
+chroot /mnt /bin/bash -c "cd /tmp/zumastor; VISUAL=/bin/true EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV 'revision $SVNREV'" \
+	|| umount_exit 'Failed to dch zumastor package'
+chroot /mnt /bin/bash -c "cd /tmp/zumastor; dpkg-buildpackage -uc -us -rfakeroot" \
+	|| umount_exit 'Failed to build zumastor package'
+
+[ -f /mnt/tmp/ddsnap/debian/changelog ] && rm /mnt/tmp/ddsnap/debian/changelog
+chroot /mnt /bin/bash -c "cd /tmp/ddsnap; VISUAL=/bin/true EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV 'revision $SVNREV'" \
+	|| umount_exit 'Failed to dch ddsnap package'
+chroot /mnt /bin/bash -c "cd /tmp/ddsnap; dpkg-buildpackage -uc -us -rfakeroot" \
+	|| umount_exit 'Failed to build ddsnap package'
+chmod a+rw /mnt/tmp/*.deb
+
+rm -rf /mnt/tmp/zumastor
+rm -rf /mnt/tmp/ddnsap
 echo -e "done.\n"
 
 echo -n Installing ssh...
@@ -53,15 +83,15 @@ chroot /mnt dpkg -s tree >& /dev/null \
 echo -e "done.\n"
 
 echo -n Upgrading ddsnap and zumastor...
+pushd /mnt/tmp
 DDSNAP_DPKG=`ls ddsnap_*.deb`
 ZUMASTOR_DPKG=`ls zumastor_*.deb`
-cp *.deb /mnt
-chroot /mnt dpkg -i $DDSNAP_DPKG >& /dev/null \
+popd
+chroot /mnt dpkg -i /tmp/$DDSNAP_DPKG >& /dev/null \
 	|| umount_exit 'Failed to install ddsnap in UML'
-chroot /mnt dpkg -i $ZUMASTOR_DPKG >& /dev/null \
+chroot /mnt dpkg -i /tmp/$ZUMASTOR_DPKG >& /dev/null \
 	|| umount_exit 'Failed to install zumastor in UML'
-rm -f /mnt/*.deb
-rm -f ./*.deb
+rm -f /mnt/tmp/*.deb
 echo -e "done.\n"
 
 chroot /mnt apt-get clean >& /dev/null
