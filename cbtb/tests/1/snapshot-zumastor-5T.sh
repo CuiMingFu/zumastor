@@ -15,7 +15,6 @@
 set -e
 
 # Expect failure.  Delete this when the test is fully successful.
-# Since xfs is used, xfs_freeze will certainly be required instead of sync.
 # Read only by the test harness.
 EXPECT_FAIL=1
 
@@ -68,10 +67,8 @@ zumastor define master testvol -h 24 -d 7
 echo ok 1 - testvol set up
 
 sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
 zumastor snapshot testvol hourly 
 sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
 
 date >> /var/run/zumastor/mount/testvol/testfile
 sleep $SLEEP
@@ -96,10 +93,8 @@ else
 fi
 
 sync
-xfs_freeze -f /var/run/zumastor/mount/testvol
 zumastor snapshot testvol hourly 
 sleep $SLEEP
-xfs_freeze -u /var/run/zumastor/mount/testvol
 
 mountpoint2=$(snapmountpoint testvol 2)
 if [ -d "$mountpoint2" ] ; then
