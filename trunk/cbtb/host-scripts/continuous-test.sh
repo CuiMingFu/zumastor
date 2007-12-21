@@ -92,8 +92,8 @@ do
       echo FAIL $f >>$summary
     fi
 
-    if [ -f "${LOGDIR}/$LOGPREFIX}screen.png" ] ; then
-      files="${LOGDIR}/$LOGPREFIX}screen.png $files"
+    if [ -f "${LOGDIR}/${LOGPREFIX}screen.png" ] ; then
+      files="${LOGDIR}/${LOGPREFIX}screen.png $files"
     fi
 
   fi
