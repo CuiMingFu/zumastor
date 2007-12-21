@@ -177,10 +177,12 @@ done
 
   socat UNIX-CONNECT:${MONITOR} - <<EOF
 savevm running
-quit
+info snapshots
 EOF
 
-  time wait $qemu
+${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
+
+time wait $qemu
 
 
 echo "Instance shut down, removing ssh hostkey"
