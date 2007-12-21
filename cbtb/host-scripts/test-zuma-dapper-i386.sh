@@ -132,6 +132,11 @@ ${rqemu_i386} -m 512 \
   -net tap,ifname=${IFACE},script=no \
   -snapshot -hda ${diskimg} ${qemu_hd} \
   -boot c -no-reboot & qemu_pid=$!
+sleep 2
+socat - unix:${MONITOR} <<EOF
+  info network
+  info snapshots
+EOF
 
 if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
@@ -146,6 +151,12 @@ if [ "x$MACADDR2" != "x" ] ; then
     -net tap,ifname=${IFACE2},script=no \
     -snapshot -hda ${diskimg} ${qemu2_hd} \
     -boot c -no-reboot & qemu2_pid=$!
+  sleep 2
+  socat - unix:${MONITOR2} <<EOF
+info network
+info snapshots
+EOF
+
 fi
 
 
