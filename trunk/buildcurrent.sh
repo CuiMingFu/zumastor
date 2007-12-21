@@ -33,6 +33,11 @@ then
   exit 1
 fi
 
+builduml="false"
+if egrep '^CONFIG_UML=y$' "$kconfig"
+then
+  builduml="true"
+fi
 
 
 KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' KernelVersion`
@@ -121,8 +126,15 @@ then
   done
   echo -e "done.\n"
 
-  echo -n Building kernel package...
-  fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
+  if [ "$builduml" = "true" ]
+  then
+   echo -n Building UML kernel binary
+   make -j4 ARCH=um SUBARCH=i386 linux
+   mv linux ../linux-i386-r${SVNREV}
+  else
+    echo -n Building kernel package...
+    fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
+  fi
   popd >> $LOG
   echo -e "done.\n"
 fi
