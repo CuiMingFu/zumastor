@@ -91,6 +91,11 @@ do
       testret=$testrc
       echo FAIL $f >>$summary
     fi
+
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen.png $files"
+    fi
+
   fi
 done
 popd
@@ -113,6 +118,14 @@ do
       testret=$testrc
       echo FAIL $f >>$summary
     fi
+
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen.png $files"
+    fi
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen2.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen2.png $files"
+    fi
+
   fi
 done
 popd
