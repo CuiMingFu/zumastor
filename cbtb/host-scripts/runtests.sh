@@ -35,6 +35,7 @@ export LOGDIR="${top}/zumastor/build/r$installrev"
 [ -d $LOGDIR ] || mkdir $LOGDIR
 
 summary=${LOGDIR}/summary
+> $summary
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
