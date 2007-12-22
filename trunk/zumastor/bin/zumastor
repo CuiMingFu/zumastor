@@ -86,6 +86,7 @@ function new_snapshot {
 	local -a snapshots
 	local max next num oldest
 	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot
 
 	log "new '$kind' snapshot requested for volume '$vol'"
 
@@ -124,6 +125,7 @@ function new_snapshot {
 	# unmount/delete a snapshot may take a while. We do it after updating
 	# symlinks to reduce the window that a symlink points to nowhere
 	[[ -z $oldest ]] || umount_drop_snapshot $vol $oldest
+	[[ -f $dotsnapshot ]] && mount --rbind $snapmp ${mpoint}/.snapshot
 }
 
 # new_target_snapshot <volume> <hostname>
@@ -324,7 +326,7 @@ function run_master {
 		done
 		if [[ -f $dotsnapshot ]]; then
 			mkdir -p ${mpoint}/.snapshot
-			mount --rbind $snapmp ${mpoint}/.snapshot
+			mount --bind $snapmp ${mpoint}/.snapshot
 			if [[ -f $export ]]; then  # need to export .snapshot for it to be accessible over nfs
 				fsid=`echo "${mpoint}/.snapshot" | cksum | awk '{ printf "%d", ($1/2) }'`
 				exportfs -oro -ofsid=$fsid *:${mpoint}/.snapshot
