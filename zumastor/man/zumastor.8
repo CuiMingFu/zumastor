@@ -31,7 +31,36 @@ zumastor \- block device snapshot and replication management
 [\fIvolume\fP [\fIsnap\fP]] \fB[options]\fP
 
 .SH DESCRIPTION
-\fBZumastor\fP is a layer on top of the \fBddsnap(8)\fP block device snapshot facility that manages snapshot scheduling and remote replication topology. Zumastor implements a filesystem-based database at each node of a network of zumastor servers to specify how each managed block device ("volume") is replicated to zero or more remote zumastor servers.  Each volume on each zumastor server may be master volume at the root or a target volume at a non-root node of a replication tree.  Each zumastor master volume has a snapshot schedule specifying at which intervals snapshots are to be taken, and how many snapshots at a given interval are to be maintained.  Zumastor also provides for custom snapshot schedules and manual snapshot or replication initiation.
+
+\fBZumastor\fP controls snapshotting and remote replication of Linux
+block devices (volumes), and works with most common filesystems.
+
+A \fBsnapshot\fP is a view of the volume as it existed at a point in time.
+The administrator can trigger a snapshot manually, or ask Zumastor to
+take scheduled snapshots periodically (e.g. daily or hourly).  Up to 64
+snapshots are supported per volume.  All snapshots for a particular
+volume are stored in a second block device, called the snapshot store,
+and can be accessed via virtual devices provided by \fBddsnap(8)\fP.
+Zumastor mounts the snapshots for volume 'foo' at 
+/var/run/zumastor/volumes/foo-snapshots, and optionally
+also in the special directory .snapshot inside the root of the volume.
+Zumastor can also export the snapshots via NFS and/or Samba
+without manual edits of NFS or Samba configuration files.
+
+\fBReplication\fP means sending snapshots from a local
+(or upstream) machine to a remote (or downstream) machine.
+When a volume is first replicated, its entire contents are sent.
+When it is replicated a second time, only the changed blocks are sent.
+The snapshot data can also be compressed during transmission to save
+bandwidth.  Not all snapshots on a volume are replicated; you can do
+hourly snapshots, but only replicate once per day.
+On downstream machines, the downstream volume is always identical to
+the latest received snapshot.
+When a new snapshot arrives from upstream, the main volume is
+flipped transparantly to the new snapshot.
+If the main volume was being exported via NFS, clients who access
+that volume via NFS see the new snapshot contents as expected.
+
 
 .SH COMMANDS
 .IP \fBdefine\ \fBvolume
