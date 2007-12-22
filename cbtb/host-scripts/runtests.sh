@@ -91,9 +91,7 @@ for f in *.sh
 do
   export LOGPREFIX="$f."
   testlog="${LOGDIR}/${LOGPREFIX}log"
-  MACADDR=$MACADDR IPADDR=$IPADDR IFACE=$IFACE \
-    MACADDR2=$MACADDR2 IPADDR2=$IPADDR2 IFACE2=$IFACE2 \
-    timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
   if  [ $testrc -eq 0 ]
