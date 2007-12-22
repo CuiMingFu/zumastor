@@ -97,26 +97,26 @@ done
 qemu_hd=""
 qemu2_hd=""
 if [ $largest_hdbsize -gt 0 ] ; then
-  qemu-img create ${tmpdir}/hdb.img ${largest_hdbsize}G
+  qemu-img create ${tmpdir}/hdb.img ${largest_hdbsize}M
   qemu_hd="-hdb ${tmpdir}/hdb.img"
   if [ "x$MACADDR2" != "x" ] ; then
-    qemu-img create ${tmpdir}/hdb2.img ${largest_hdbsize}G
+    qemu-img create ${tmpdir}/hdb2.img ${largest_hdbsize}M
     qemu2_hd="-hdb ${tmpdir}/hdb2.img"
   fi
 fi
 if [ $largest_hdcsize -gt 0 ] ; then
-  qemu-img create ${tmpdir}/hdc.img ${largest_hdcsize}G
+  qemu-img create ${tmpdir}/hdc.img ${largest_hdcsize}M
   qemu_hd="${qemu_hd} -hdc ${tmpdir}/hdc.img"
   if [ "x$MACADDR2" != "x" ] ; then
-    qemu-img create ${tmpdir}/hdc2.img ${largest_hdcsize}G
+    qemu-img create ${tmpdir}/hdc2.img ${largest_hdcsize}M
     qemu2_hd="${qemu2_hd} -hdc ${tmpdir}/hdc2.img"
   fi
 fi
 if [ $largest_hddsize -gt 0 ] ; then
-  qemu-img create ${tmpdir}/hdd.img ${largest_hddsize}G
+  qemu-img create ${tmpdir}/hdd.img ${largest_hddsize}M
   qemu_hd="${qemu_hd} -hdd ${tmpdir}/hdd.img"
   if [ "x$MACADDR2" != "x" ] ; then
-    qemu-img create ${tmpdir}/hdd2.img ${largest_hddsize}G
+    qemu-img create ${tmpdir}/hdd2.img ${largest_hddsize}M
     qemu2_hd="${qemu2_hd} -hdd ${tmpdir}/hdd2.img"
   fi
 fi

@@ -2,8 +2,8 @@
 #
 # $Id$
 #
-# Set up sysvg with origin and snapshot store on master and secondary machine.
-# Begin replication cycle between machines
+# Set up origin and snapshot store on master and secondary machine on
+# raw disks.  Begin replication cycle between machines
 # and wait until it arrives and can be verified.
 # Modify the origin and verify that the modification also arrives at the
 # backup.
@@ -19,6 +19,8 @@ set -e
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
+HDBSIZE=4
+HDCSIZE=8
 
 slave=${IPADDR2}
 
@@ -34,9 +36,7 @@ echo "1..4"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-lvcreate --size 4m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
-zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 zumastor status --usage
@@ -48,9 +48,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
-${SSH} root@${slave} lvcreate --size 4m -n test sysvg
-${SSH} root@${slave} lvcreate --size 8m -n test_snap sysvg
-${SSH} root@${slave} zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+${SSH} root@${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  

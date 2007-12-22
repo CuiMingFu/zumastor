@@ -46,6 +46,27 @@ sudo mv $stagefile $rootdir/root/.ssh/authorized_keys
 sudo chown root:root $rootdir/root/.ssh/authorized_keys
 sudo chmod 600 $rootdir/root/.ssh/authorized_keys
 
+
+echo unassigned >$stagefile
+sudo mv $stagefile $rootdir/etc/hostname
+
+sudo ssh-keygen -q -P '' -N '' -t dsa -f $rootdir/root/.ssh/id_dsa
+sudo "cat $rootdir/root/.ssh/id_dsa.pub >> $rootdir/root/.ssh/authorized_keys"
+
+cat >$stagefile <<EOF
+# Used by ifup(8) and ifdown(8). See the interfaces(5) manpage or
+# /usr/share/doc/ifupdown/examples for more information.
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet dhcp
+EOF
+sudo mv $stagefile $rootdir/etc/network/interfaces
+
 # clean up the downloaded packages to conserve space
 sudo rm -f $rootdir/var/cache/apt/archives/*.deb
 
@@ -59,6 +80,19 @@ sudo mount -oloop,rw $ext3dev $ext3dir
 # tar it up the new filesystem onto the new ext3 device
 sudo tar cf - -C $rootdir . | \
   sudo tar xf - -C $ext3dir
+
+# create symlinks from sd* to the ubd* devices
+sudo ln -s ubda $ext3dir/dev/sda
+sudo ln -s ubdb $ext3dir/dev/sdb
+sudo ln -s ubdc $ext3dir/dev/sdc
+sudo ln -s ubdd $ext3dir/dev/sdd
+cat >$stagefile <<EOF
+KERNEL=="ubda",                 SYMLINK+="sda"
+KERNEL=="ubdb",                 SYMLINK+="sdb"
+KERNEL=="ubdc",                 SYMLINK+="sdc"
+KERNEL=="ubdd",                 SYMLINK+="sdd"
+EOF
+sudo mv $stagefile $ext3dir/etc/udev/rules.d/61-ubd-symlinks.rules
 
 sudo umount $ext3dir
 

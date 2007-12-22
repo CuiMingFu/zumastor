@@ -37,6 +37,7 @@ NameVirtualHost $VIRTHOST
   ProxyPreserveHost Off
 
   CacheRoot "/var/www/proxy"
+  CacheSize 1024000
   CacheMaxExpire 24
   CacheLastModifiedFactor 0.1
   CacheDefaultExpire 1

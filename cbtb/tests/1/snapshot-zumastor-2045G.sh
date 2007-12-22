@@ -15,10 +15,10 @@
 
 set -e
 
-# The required sizes of the sdb and sdc devices in G.
+# The required sizes of the sdb and sdc devices in M.  2045G
 # Read only by the test harness.
-HDBSIZE=2044
-HDCSIZE=2044
+HDBSIZE=2094080
+HDCSIZE=2094080
 
 # Terminate test in 40 minutes.  Read by test harness.
 TIMEOUT=2400
@@ -30,9 +30,11 @@ echo "1..6"
 
 aptitude install xfsprogs
 
+mount
+ls -l /dev/sdb /dev/sdc
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize --mountopts nouuid
 mkfs.xfs -f /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7 -s
+zumastor define master testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
