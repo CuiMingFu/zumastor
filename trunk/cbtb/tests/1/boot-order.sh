@@ -16,6 +16,7 @@ TIMEOUT=1200
 echo "1..2"
 rc=0
 
+apt-get update
 aptitude install -y insserv nfs-kernel-server
 echo "ok 1 - insserv installed"
 
