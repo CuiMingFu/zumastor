@@ -471,9 +471,11 @@ significantly.  Reducing the number of seeks is a high priority goal for
 future releases.
 Until that happens, Zumastor is best suited for read-mostly applications.</p></div>
 <h3 id="_ram">6.4. RAM</h3><div style="clear:left"></div>
-<div class="para"><p>Zumastor uses about 1MB of RAM per gigabyte of snapshot store to cache an internal index.
-Having less RAM probably means Zumastor will perform poorly, but we have not measured this yet.
-This may mean that adding a 10 terabyte volume to a system also requires adding several gigabytes of RAM for acceptable performance.</p></div>
+<div class="para"><p>Zumastor's snapshot exception index uses about 1MB of RAM per gigabyte of snapshot change blocks,
+but the index's size is fixed at ddsnapd startup time.  You can tune it with the &#8212;cachesize
+option to <em>zumastor define volume</em>; the default size of the cache is 128MB (or one
+quarter of physical RAM, whichever is smaller).
+You may need to tune it to get good performance with very large volumes.</p></div>
 <div class="para"><p>A future release may use a more compact index; see <a href="http://code.google.com/p/zumastor/issues/detail?id=5">bug 5</a>.</p></div>
 </div>
 <h2 id="_zumastor_user_interface">7. Zumastor User Interface</h2>
@@ -1227,7 +1229,7 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-17 15:31:25 PDT
+Last updated 2007-12-21 18:14:13 PDT
 </div>
 </div>
 </body>
