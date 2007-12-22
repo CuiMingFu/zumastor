@@ -124,7 +124,6 @@ fi
 # TODO(dld): add back  -loadvm running  when method to deal with changed
 # ethernet/IP allocations is developed.
 ${rqemu_i386} -m 512 \
-  -loadvm running \
   -serial file:${SERIAL} \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
@@ -143,7 +142,6 @@ if [ "x$MACADDR2" != "x" ] ; then
   VNC2=${tmpdir}/vnc2
   # TODO(dld): See above.  -loadvm running
   ${rqemu_i386} -m 512 \
-    -loadvm running \
     -serial file:${SERIAL2} \
     -monitor unix:${MONITOR2},server,nowait \
     -vnc unix:${VNC2} \
