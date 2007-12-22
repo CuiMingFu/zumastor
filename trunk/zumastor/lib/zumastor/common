@@ -389,7 +389,7 @@ function umount_device {
 		# nfs server hook: unexport the snapshot volume
 		exportfs -u *:$mount 2> /dev/null
 	else
-		mountpoint -q ${mount}/.snapshot && umount ${mount}/.snapshot
+		mountpoint -q ${mount}/.snapshot && umount -l ${mount}/.snapshot
 		exportfs -u *:${mount}/.snapshot 2> /dev/null
 	fi
 	umount $option /dev/mapper/$name 2> /dev/null

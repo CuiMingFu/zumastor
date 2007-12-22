@@ -324,7 +324,7 @@ function run_master {
 		done
 		if [[ -f $dotsnapshot ]]; then
 			mkdir -p ${mpoint}/.snapshot
-			mount --bind $snapmp ${mpoint}/.snapshot
+			mount --rbind $snapmp ${mpoint}/.snapshot
 			if [[ -f $export ]]; then  # need to export .snapshot for it to be accessible over nfs
 				fsid=`echo "${mpoint}/.snapshot" | cksum | awk '{ printf "%d", ($1/2) }'`
 				exportfs -oro -ofsid=$fsid *:${mpoint}/.snapshot
