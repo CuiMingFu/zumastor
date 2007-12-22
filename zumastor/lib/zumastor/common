@@ -16,6 +16,7 @@ declare -r CONFIG=/etc/zumastor
 declare -r AGENTS=$RUNPATH/agents
 declare -r SERVERS=$RUNPATH/servers
 declare -r MOUNTS=$RUNPATH/mount
+declare -r SNAPMOUNTS=$RUNPATH/snapshot
 declare -r CRONS=$RUNPATH/cron
 declare -r DEFAULT_PORT=$(cat $CONFIG/defaultport)
 declare -r SSH_COMMAND=$(cat $CONFIG/ssh_command)
@@ -103,9 +104,9 @@ function verify_valid_mountpoint {
 	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r mpoint=$1
 
+	mkdir -p $mpoint
 	# Has to be a directory.
 	[[ -d $mpoint ]] || return 1
-
 	return 0
 }
 
@@ -278,24 +279,28 @@ function mounted_vol_status {
 	return 0
 }
 
+function snap_path {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snappath=$VOLUMES/$vol/filesystem/snappath
+	local snapmount=${SNAPMOUNTS}/$vol
+	[[ -f $snappath ]] && read snapmount <$snappath
+	echo $snapmount
+}
+
 function mount_name {
 	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r id=$2
 	local -r server=$SERVERS/$vol
 	local -r mountpoint=$VOLUMES/$vol/filesystem/mountpoint
-	local -r oldmount=${MOUNTS}/$vol
-	local mpoint
+	local mpoint=${MOUNTS}/$vol
 
-	if [[ -f $mountpoint ]]; then
-		read mpoint <$mountpoint
-	else
-		mpoint=$oldmount
-	fi
+	[[ -f $mountpoint ]] && read mpoint <$mountpoint
 	if [[ $id != -1 ]]; then
 		ctime=`ddsnap status $server $id | tail -n 1 | cut -b 8-31`
 		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
-		mpoint=$mpoint/.snapshot/$stime
+		mpoint=$(snap_path $vol)/$stime
 	fi
 	echo $mpoint
 }
@@ -381,11 +386,15 @@ function umount_device {
 	if [[ $id -ne -1 ]]; then
 		local -r samba_mount=$(samba_name $vol $mount)
 		mountpoint -q $samba_mount && umount $samba_mount && rmdir $samba_mount
+		# nfs server hook: unexport the snapshot volume
+		exportfs -u *:$mount 2> /dev/null
+	else
+		mountpoint -q ${mount}/.snapshot && umount ${mount}/.snapshot
+		exportfs -u *:${mount}/.snapshot 2> /dev/null
 	fi
-	# nfs server hook: unexport the snapshot volume
-	[[ $id -eq -1 ]] || exportfs -u *:$mount 2> /dev/null
 	umount $option /dev/mapper/$name 2> /dev/null
 	[[ $id -ne -1 || $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
+	return 0
 }
 
 # remount_device <vol> <id> [rw]
@@ -519,7 +528,11 @@ function treeprint {
 	for file in *; do 
 		[[ ! -e $file ]] || [[ $file == "trigger" ]] && continue
 		[[ $full == "-f" ]] && echo -n "$string$PWD/$file" || echo -n "$string$file"
-		[[ -h $file ]] && echo " -> $(readlink $file)" && continue
+		if [[ -h $file ]]; then
+			echo " -> $(readlink $file)"
+			[[ $path = "snapshot" ]] && treeprint $full $(readlink $file) "$tree_indent$string"
+			continue
+		fi
 		[[ -f $file ]] && [[ -s $file ]] && echo ": $(cat $file)" && continue
 		[[ -d $file ]] && [[ $(stat -c %d $file) == $device ]] && echo && treeprint $full $file "$tree_indent$string" && continue
 		echo

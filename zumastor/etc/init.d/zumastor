@@ -33,12 +33,11 @@ function start_zumastor {
 	local log
 
 	# setup directory structure
-	if ! [ -d $RUNPATH ]; then
-		mkdir -p $AGENTS || return 1
-		mkdir -p $SERVERS || return 1
-		mkdir -p $CRONS || return 1
-		mkdir -p $MOUNTS || return 1
-	fi
+	mkdir -p $AGENTS || return 1
+	mkdir -p $SERVERS || return 1
+	mkdir -p $CRONS || return 1
+	mkdir -p $MOUNTS || return 1
+	mkdir -p $SNAPMOUNTS || return 1
 
 	touch_atomic $LOCKFILE || { echo "$LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
 	touch_atomic $RUNFILE || { echo "$RUNFILE exists, is zumastor already running?"; rm $LOCKFILE; exit 1; }

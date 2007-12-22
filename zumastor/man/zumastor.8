@@ -35,7 +35,7 @@ zumastor \- block device snapshot and replication management
 
 .SH COMMANDS
 .IP \fBdefine\ \fBvolume
-\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-k\fP|\fB--cachesize\fP \fIcachesize\fP] [\fB-o\fP|\fB--mountopts\fP \fImount options\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP]
+\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-k\fP|\fB--cachesize\fP \fIcachesize\fP] [\fB-o\fP|\fB--mountopts\fP \fImount options\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP] [\fB-s\fP|\fB--snappath\fP \fIsnapshout path\fP]
 \fR
 
 Define a new zumastor volume named \fIvolume\fP based on the underlying volumes \fIorgdev\fP and \fIsnapdev\fP.  If specified, the \fImetadev\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the newly created volume data will be overwritten with zeros, overwriting all data on the origin device.
@@ -48,13 +48,13 @@ of two will be used instead.
 
 The amount of RAM dedicated to the snapshot store cache defaults to min(128MB, system RAM/4), and can be tuned manually with the \fBcachesize\fP option.  For instance, to increase the cache size to 512MB, use --cachesize 512M.
 
-A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Mount options that apply to that mount point may be defined with the \fBmountopts\fP option.  Snapshot volumes will be mounted on directories below that point.
+A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Mount options that apply to that mount point may be defined with the \fBmountopts\fP option.  The snapshot mountpoint under which the volume snapshots are mounted can be defined with the \fBsnappath\fP option. 
 .IP \fBdefine\ \fBmaster\fP
-.I volume \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-n\fP|\fB--no-snapmount\fP]
+.I volume \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-s\fP|\fB--dotsnapshot\fP] [\fB-n\fP|\fB--no-snapmount\fP]
 
 Used after \fBdefine\fP \fBvolume\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If this volume was previously a replication target, removes the \fBsource\fP definition, since it is now a master. If \fIvolume\fP is already defined, just updates the rotation limits.
 
-By default, each newly created snapshot is mounted under .snapshot directory in the volume mount point, with each snapshot named for its creation time. But if the \fBno-snapmount\fP option is specified, the newly created snapshot will NOT be mounted. If the \fBexport\fP option is used, each mounted snapshot will be exported via NFS. If the \fBsamba\fP option is used, each mounted snapshot will be bind mounted to a directory following Samba's '@GMT-creation-time' naming convention under the volume mount point, and will be accessible via Samba's previous version interface. If the \fBno-snapmount\fP option is specified, the \fBexport\fP and \fBsamba\fP options will be ignored.
+By default, each newly created snapshot is mounted under the snapshot mountpoint specified by \fBdefine\fP \fBvolume\fP, with each snapshot named for its creation time. But if the \fBno-snapmount\fP option is specified, the newly created snapshot will NOT be mounted. If the \fBexport\fP option is used, each mounted snapshot will be exported via NFS. If the \fBsamba\fP option is used, each mounted snapshot will be bind mounted to a directory following Samba's '@GMT-creation-time' naming convention under the volume mount point, and will be accessible via Samba's previous version interface. If the \fBdotsnapshot\fP option is used, the snapshot mountpoint will be bind mounted to the .snapshot directory under the volume mount point. If the \fBno-snapmount\fP option is specified, the \fBexport\fP, \fBsamba\fP, and \fBdotsnapshot\fP options will be ignored.
 .IP \fBdefine\ source\fP
 .I volume
 \fIhost\fP[\fI:port\fP]] [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
