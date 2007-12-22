@@ -120,9 +120,11 @@ Until that happens, Zumastor is best suited for read-mostly applications.
 
 RAM
 ~~~
-Zumastor uses about 1MB of RAM per gigabyte of snapshot store to cache an internal index.  
-Having less RAM probably means Zumastor will perform poorly, but we have not measured this yet.
-This may mean that adding a 10 terabyte volume to a system also requires adding several gigabytes of RAM for acceptable performance.
+Zumastor's snapshot exception index uses about 1MB of RAM per gigabyte of snapshot change blocks,
+but the index's size is fixed at ddsnapd startup time.  You can tune it with the --cachesize
+option to 'zumastor define volume'; the default size of the cache is 128MB (or one
+quarter of physical RAM, whichever is smaller).
+You may need to tune it to get good performance with very large volumes.
 
 A future release may use a more compact index; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
 
