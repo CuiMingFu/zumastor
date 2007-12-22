@@ -30,7 +30,16 @@ if [ "x$buildrev" = "x$installrev" ] ; then
   exec $0
 fi
 
-
+if [ "x$FAILED_INSTALL_REV" = "x$buildrev" ] ; then
+  # if the last install failed, FAILED_INSTALL_REV was exported
+  # before this script was rerun, and if installrev still points to the
+  # same revision number, continue waiting rather than trying to restart.
+  # Intervention (such as a build-system reboot) is required to re-test
+  # the same version.
+  sleep 300
+  exec $0
+fi
+              
 mailto=/usr/bin/mailto
 sendmail=/usr/sbin/sendmail
 biabam=/usr/bin/biabam
@@ -85,6 +94,7 @@ else
   subject="zumastor b$branch r$buildrev install failure $installret"
   files="$installlog"
   email="${email_failure}"
+  export FAILED_INSTALL_REV=$buildrev
 fi
 
 
