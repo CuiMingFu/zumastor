@@ -89,7 +89,8 @@ if [ $installret -eq 0 ]; then
   # update the revision number that last successfully installed
   echo $buildrev >${repo}/build/installrev.new
   mv ${repo}/build/installrev.new ${repo}/build/installrev
-
+  export FAILED_INSTALL_REV=
+  
 else
   subject="zumastor b$branch r$buildrev install failure $installret"
   files="$installlog"

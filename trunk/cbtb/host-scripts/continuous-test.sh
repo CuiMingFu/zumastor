@@ -46,9 +46,9 @@ repo="${top}/zumastor-tests"
 
 if $TUNBR $TUNBR ./runtests.sh
 then
-  export EXPECT_FAIL_REV=
+  export FAILED_TEST_REV=
 else
-  export EXPECT_FAIL_REV=$installrev
+  export FAILED_TEST_REV=$installrev
 fi
 
 # Perhaps shorten this if a test ran successfully, as that caused
