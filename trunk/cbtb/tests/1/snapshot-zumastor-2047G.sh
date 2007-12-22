@@ -32,7 +32,7 @@ aptitude install xfsprogs
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize --mountopts nouuid
 mkfs.xfs -f /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol -h 24 -d 7 -s
 
 echo ok 1 - testvol set up
 

@@ -51,7 +51,7 @@ fi
 
 sync ; zumastor snapshot testvol hourly 
 sleep $SLEEP
-if [ -d /var/run/zumastor/mount/testvol\(0\)/ ] ; then
+if [ -e /dev/mapper/testvol\(0\) ] ; then
   echo ok 3 - testvol snapshotted
 else
   echo "not ok 3 - testvol snapshotted"

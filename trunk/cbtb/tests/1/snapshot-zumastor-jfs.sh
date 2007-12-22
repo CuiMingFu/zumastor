@@ -28,7 +28,7 @@ lvcreate --size 16m -n test_snap sysvg
   zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
 
   $mkfs /dev/mapper/testvol
-  zumastor define master testvol -h 24 -d 7
+  zumastor define master testvol -h 24 -d 7 -s
 
   echo ok 1 - testvol set up
 

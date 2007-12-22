@@ -66,7 +66,7 @@ function update_symlinks {
 	for snap in $(seq $((${#idlist[@]} - 1)) -1 0); do
 		id=${idlist[$snap]}
 		snapmount=$(mount_name $vol $id)
-		ln -sfn $(basename $snapmount) $mount/.snapshot/$kind.$count
+		ln -sfn $(basename $snapmount) $(snap_path $vol)/$kind.$count
 		let count++
 	done
 }
@@ -85,7 +85,7 @@ function new_snapshot {
 	local -r listfile=$master/snapshots/$kind
 	local -a snapshots
 	local max next num oldest
-	local -r snapmount=$VOLUMES/$vol/filesystem/snapmount
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap
 
 	log "new '$kind' snapshot requested for volume '$vol'"
 
@@ -111,7 +111,7 @@ function new_snapshot {
 	create_device $vol $next || { log "device creation failed for $next"; return 1; }
 
 	[[ $kind == "/manual" ]] && return 0
-	[[ -f $snapmount ]] && mount_device $vol $next
+	[[ -f $mountsnap ]] && mount_device $vol $next
 
 	if [[ $num -ge $max ]]; then
 		oldest=${snapshots[0]}
@@ -120,7 +120,7 @@ function new_snapshot {
 	fi
 	echo ${snapshots[@]} >$listfile
 	log "'$kind' snapshot list is now: ${snapshots[*]}"
-	[[ -f $snapmount ]] && update_symlinks $vol $kind
+	[[ -f $mountsnap ]] && update_symlinks $vol $kind
 	# unmount/delete a snapshot may take a while. We do it after updating
 	# symlinks to reduce the window that a symlink points to nowhere
 	[[ -z $oldest ]] || umount_drop_snapshot $vol $oldest
@@ -297,8 +297,10 @@ function run_master {
 	local -r fifo=$VOLUMES/$vol/master/trigger
 	local -r log=${LOGS}/$vol/master.log
 	local -r cron=${CRONS}/$vol
-	local kind mpoint
-	local -r snapmount=$VOLUMES/$vol/filesystem/snapmount
+	local kind mpoint snapmp
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap # if mount snapshot
+	local -r export=$VOLUMES/$vol/filesystem/export # if export snapshots over NFS
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot # if snapshots appear under .snapshot of origin volume
 
 	[ -r $fifo ] && [ -p $fifo ] || { echo "$0: master snapshot trigger '$fifo' is missing"; return 1; }
 	touch ${CRONS}/$vol || return 1
@@ -308,10 +310,10 @@ function run_master {
 
 	mount_device $vol -1 rw
 	mpoint=$(mount_name $vol -1)
+	snapmp=$(snap_path $vol)
 	# first clean up everything that might be left
-	rm -f $mpoint/.snapshot/hourly.* $mpoint/.snapshot/daily.* $mpoint/.snapshot/weekly.* >& /dev/null
-	if [[ -f $snapmount ]]; then
-		mkdir -p $mpoint/.snapshot
+	mkdir -p $snapmp
+	if [[ -f $mountsnap ]]; then
 		list=$(cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null)
 		for id in $list; do
 			log "Mounting snapshot '$vol($id)'" $log
@@ -320,6 +322,14 @@ function run_master {
 		for kind in $(ls $VOLUMES/$vol/master/snapshots/ 2>/dev/null); do
 			update_symlinks $vol $kind
 		done
+		if [[ -f $dotsnapshot ]]; then
+			mkdir -p ${mpoint}/.snapshot
+			mount --bind $snapmp ${mpoint}/.snapshot
+			if [[ -f $export ]]; then  # need to export .snapshot for it to be accessible over nfs
+				fsid=`echo "${mpoint}/.snapshot" | cksum | awk '{ printf "%d", ($1/2) }'`
+				exportfs -oro -ofsid=$fsid *:${mpoint}/.snapshot
+			fi
+		fi
 	fi
 
 	# we reopen the log for each write so rotation works
@@ -441,9 +451,17 @@ function stop_master {
 	local -r vol=$1
 	local -r cron=${CRONS}/$vol
 	local -r log=${LOGS}/$vol/master.log
+	local id snapmp
 
 	log "stop master called, umounting volume" $log
 	umount_device $vol -1 2>/dev/null
+
+	for id in `cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null`; do
+		umount_device $vol $id
+	done
+	snapmp=$(snap_path $vol)
+	rm -f $snapmp/hourly.* $snapmp/daily.* $snapmp/weekly.* $snapmp/monthly.* >& /dev/null
+	[[ $snapmp = ${SNAPMOUNTS}/$vol ]] && rmdir $snapmp 2> /dev/null
 
 	rm -f $cron
 	log "killing master daemon" $log
@@ -473,28 +491,16 @@ function stop_target {
 }
 
 function define_volume {
-	[[ $# -eq 6 ]] || [[ $# -eq 7 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
+	local -r device=$VOLUMES/$vol/device
 	local -r odev=$2
-	local -r mountpoint=$3
-	local -r mountopts=$4
-	local -r sdev=$5
-	local -r cachesize=$6
-	local -r mdev=$7
-	local -r path=$VOLUMES/$vol
-	local -r sock=${SERVERS}/$vol
+	local -r sdev=$3
+	local -r mdev=$4
 
-	[[ -d $LOGS/$vol ]] || mkdir $LOGS/$vol || return
-	mkdir $path || return 1
-	mkdir $path/device || return 1
-	ln -sf $odev $path/device/origin  || return 1
-	ln -sf $sdev $path/device/snapstore || return 1
-	[ -z $mdev ] || ln -sf $mdev $path/device/meta || return 1
-	mkdir $path/targets || return 1
-	mkdir $path/filesystem || return 1
-	echo $mountpoint >$path/filesystem/mountpoint
-	[[ $mountopts = "-" ]] || echo $mountopts >$path/filesystem/mountopts
-	[[ $cachesize -eq 0 ]] || echo $cachesize >$path/cachesize
+	ln -sf $odev $device/origin  || return 1
+	ln -sf $sdev $device/snapstore || return 1
+	[ -z $mdev ] || ln -sf $mdev $device/meta || return 1
 
 	start_volume $vol || { echo start failed; return 1; }
 	create_device $vol -1 || { echo create failed; return 1; }
@@ -519,6 +525,7 @@ function forget_volume {
 
 	stop_volume $vol || return 1
 
+	rm -f ${MOUNTS}/$vol ${SNAPMOUNTS}/$vol
 	rmdir $path/targets
 	rm -rf $path/device
 	rm -rf $path/filesystem
@@ -816,12 +823,12 @@ define)
 		declare args metadev init
 		declare blocksize=4k
 		declare chunksize=16k
-		declare cachesize=0
-		declare mountpoint
-		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-h|--help]"
+		declare cachesize
+		declare mountpoint snappath
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [-h|--help]"
 
 		shift 2
-		args=`getopt -ob:c:m:hik:o:p: -l blocksize:,chunksize:,help,metadev:,initialize,cachesize:,mountpoint:,mountopts: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
+		args=`getopt -ob:c:m:hik:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -837,6 +844,7 @@ define)
 				echo "  -k, --cachesize <size>  sets snapstore index size (default is system-dependent)"
 				echo "  -o, --mountopts <list>	sets mount options for the volume (no default)"
 				echo "  -p, --mountpoint <dir>  sets the volume mountpoint (default is $MOUNTS/<vol>)"
+				echo "  -s, --snappath <dir>  	sets the volume snapshot mountpoint (default is $SNAPMOUNTS/<vol>)"
 				exit;;
 
 			-i|--initialize) init="yes";;
@@ -846,6 +854,7 @@ define)
 			-k|--cachesize) cachesize=$2; shift 1;;
 			-o|--mountopts) mountopts=$2; shift 1;;
 			-p|--mountpoint) mountpoint=$2; shift 1;;
+			-s|--snappath) snappath=$2; shift 1;;
 			*) echo whoops; exit 9;;
 			esac
 			shift 1
@@ -861,13 +870,27 @@ define)
 		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
 		verify_valid_device $snapstore || { echo "$0: invalid device '$snapstore'"; exit 1; }
 
-		[[ -z $mountpoint ]] || verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
-		[[ -z $mountpoint ]] && mountpoint=$(mount_name $vol -1)
-		[[ -z $mountopts ]] && mountopts="-"
+		declare -r path=$VOLUMES/$vol
+		mkdir -p $LOGS/$vol
+		mkdir $path || { echo "$0: volume '$vol' is already configured"; exit 1; }
+		mkdir $path/device $path/targets $path/filesystem || { echo "$0: volume '$vol' configure error"; exit 1; }
+		if [[ ! -z $mountpoint ]]; then
+			verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
+			echo $mountpoint >$path/filesystem/mountpoint
+			ln -sf $mountpoint $MOUNTS/$vol
+		fi
+		[[ -z $mountopts ]] || echo $mountopts >$path/filesystem/mountopts
+		if [[ ! -z $snappath ]]; then
+			verify_valid_mountpoint $snappath || { echo "$0: invalid snapshot mountpoint '$snappath'"; exit 1; }
+			[[ -z $snappath ]] || echo $snappath >$path/filesystem/snappath
+			ln -sf $snappath $SNAPMOUNTS/$vol
+		fi
 
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
-		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || exit
-		define_volume $vol $origin $mountpoint $mountopts $snapstore $cachesize $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
+		[[ -z $cachesize ]] || echo $cachesize >$path/cachesize
+		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || { echo "$0: initialize volume '$vol' failed"; exit 1; }
+
+		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"
@@ -918,13 +941,13 @@ define)
 		exit $? ;;
 	master)
 		declare args arg kind count delta=0
-		declare snapmount="yes" export samba
+		declare mountsnap="yes" export samba dotsnapshot
 		declare -a token value
-		declare usage="Usage: $name [-h|--hourly <n>] [-d|--daily <n>] [-w|--weekly <n>] [-m|--monthly <n>] [-c|--custom <name> <n>] [-e|--export] [-n|--no-snapmount] [-p|--samba] [-h|--help]"
+		declare usage="Usage: $name [-h|--hourly <n>] [-d|--daily <n>] [-w|--weekly <n>] [-m|--monthly <n>] [-c|--custom <name> <n>] [-e|--export] [-s|--dotsnapshot] [-n|--no-snapmount] [-p|--samba] [-h|--help]"
 
 		declare name="$0 $1 $2"
 		shift 2
-		args=`getopt -oh:d:w:m:c::ynep -l help,hourly:,daily:,weekly:,monthly:,custom:,no-snapmount,export,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -oh:d:w:m:c::ynesp -l help,hourly:,daily:,weekly:,monthly:,custom:,no-snapmount,export,dotsnapshot,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -942,6 +965,7 @@ define)
 				echo "  -c, --custom <name>,<n>  set snapshot limit for custom rotation named <name>"
 				echo "  -n, --no-snapmount       don't mount snapshots"
 				echo "  -e, --export             export snapshot directories over nfs"
+				echo "  -s, --dotsnapshot        display snapshots under the .snapshot directory of the origin volume"
 				echo "  -p, --samba              support previous version feature of samba"
 				echo "  -y, --yes                answer yes to all prompts"
 				exit;;
@@ -953,8 +977,9 @@ define)
 				find_in $kind hourly daily weekly monthly /manual && { echo "illegal custom snapshot rotation '$kind'"; exit 1; }
 				verify_valid_volname $kind || { echo "$0: invalid custom rotation name '$kind'"; exit 1; }
 				count=${count/*,/};;
-			-n|--no-snapmount) snapmount="no"; shift 1; continue;;
+			-n|--no-snapmount) mountsnap="no"; shift 1; continue;;
 			-e|--export) export="yes"; shift 1; continue;;
+			-s|--dotsnapshot) dotsnapshot="yes"; shift 1; continue;;
 			-p|--samba) samba="yes"; shift 1; continue;;
 			-y|--yes) yes_to_all=1; shift 1; continue;;
 			*) echo whoops; exit 9;;
@@ -984,10 +1009,14 @@ define)
 		fi
 
 		declare -r fpath=$VOLUMES/$vol/filesystem
-		rm -f $fpath/snapmount $fpath/export $fpath/samba  # reset the configuration
+		rm -f $fpath/mountsnap $fpath/export $fpath/dotsnapshot $fpath/samba  # reset the configuration
 		[[ $export = "yes" ]] && echo $export > $fpath/export
 		[[ $samba = "yes" ]] && echo $samba > $fpath/samba
-		[[ $snapmount = "yes" ]] && echo $snapmount > $fpath/snapmount
+		[[ $mountsnap = "yes" ]] && echo $mountsnap > $fpath/mountsnap
+		[[ $dotsnapshot = "yes" ]] && echo $dotsnapshot > $fpath/dotsnapshot
+		if [[ ! $mountsnap = "yes" ]] && [[ $export = "yes" || $samba = "yes" || $dotsnapshot = "yes" ]]; then
+			echo "WARNING: --no-snapmount option specified, --export, --samba, and --dotsnapshot options will be ignored!"
+		fi
 
 		if [ ! -e $VOLUMES/$vol/master ]; then
 			define_master $vol || exit $?
