@@ -364,14 +364,20 @@ function export_snap {
 	local -r vol=$1
 	local -r snap=$2
 	local -r mount=$(mount_name $vol $snap)
-	local vfsid fsid
+	local vfsid fsid dmount dfsid
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot
 
 	# FIXME: we should only export snapshots whose origin volume is exported.
 	# The problem is we can't learn this from exports because users may export a 
 	# dir linked to the origin volume and export_snap may be run before nfs starts
 	# FIXME: cksum has high collision rate. Should use $volid$snapid once they are implemented
 	fsid=`echo "$vol$snap" | cksum | awk '{ printf "%d", ($1/2) }'`
-	exportfs -oro -ofsid=$fsid *:$mount
+	exportfs -o"ro,fsid=$fsid,crossmnt,nohide" *:$mount
+	if [[ -f $dotsnapshot ]]; then
+		dmount=$(mount_name $vol -1)/.snapshot/$(basename $mount)
+		dfsid=`echo "$dmount" | cksum | awk '{ printf "%d", ($1/2) }'`
+		exportfs -o"ro,fsid=$dfsid,crossmnt,nohide" *:$dmount
+	fi
 }
 
 function umount_device {
@@ -381,6 +387,7 @@ function umount_device {
 	local -r option=$3
 	local -r name=$(volume_name $vol $id)
 	local -r mount=$(mount_name $vol $id)
+	local -r dmount=$(mount_name $vol -1)/.snapshot/$(basename $mount)
 
 	# samba hook: umount the bind mount
 	if [[ $id -ne -1 ]]; then
@@ -388,6 +395,7 @@ function umount_device {
 		mountpoint -q $samba_mount && umount $samba_mount && rmdir $samba_mount
 		# nfs server hook: unexport the snapshot volume
 		exportfs -u *:$mount 2> /dev/null
+		exportfs -u *:$dmount 2> /dev/null
 	else
 		mountpoint -q ${mount}/.snapshot && umount -l ${mount}/.snapshot
 		exportfs -u *:${mount}/.snapshot 2> /dev/null
