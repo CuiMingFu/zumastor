@@ -28,6 +28,7 @@ SLEEP=5
 
 echo "1..6"
 
+apt-get update
 aptitude install xfsprogs
 
 mount
