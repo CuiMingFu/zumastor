@@ -58,4 +58,6 @@ then
     rm -rf $tmpdir/host-setup
   fi
 fi
-  
+
+# Install and configure debootstrap
+../host-setup/debootstrap.sh
