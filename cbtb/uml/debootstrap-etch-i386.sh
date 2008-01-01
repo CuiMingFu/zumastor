@@ -89,7 +89,11 @@ $SUDO mount -oloop,rw $ext3dev $ext3dir
 $SUDO tar cf - -C $rootdir . | \
   $SUDO tar xf - -C $ext3dir
 
-# create symlinks from sd* to the ubd* devices
+# make sure the ubd* devices are in the base image
+$SUDO chroot $ext3dir MAKEDEV ubd
+
+# create symlinks from sd* to the ubd* devices so the tests have the
+# disk names they expect
 $SUDO ln -s ubda $ext3dir/dev/sda
 $SUDO ln -s ubdb $ext3dir/dev/sdb
 $SUDO ln -s ubdc $ext3dir/dev/sdc
