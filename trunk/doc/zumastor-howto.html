@@ -524,24 +524,29 @@ use ddsnap directly, but if you're curious, see <a href="http://zumastor.org/man
 and <em>snapshot</em> volumes.  Simply put, origin volumes are what you
 take snapshots of.
 Zumastor mounts these volumes for you in appropriately named
-subdirectories of /var/mount/zumastor.
+subdirectories of /var/run/zumastor/mount.
 In other words, you do not need to add any of these to /etc/fstab.
 The zumastor init script will mount the volume and all its snapshots
 automatically at boot time.</p></div>
 <div class="para"><p>Now do some IO on the filesystem, then look at df again:</p></div>
-<div class="para"><p>Snapshot volumes are mounted under the special <em>.snapshot</em> directory of
-their origin volumes. Each snapshot mount point is named for the creation time of that snapshot,
+<div class="para"><p>Zumastor mounts all of snapshot volumes in appropriately named
+subdirectories of /var/run/zumastor/snapshot.
+Each snapshot mount point is named for the creation time of that snapshot,
 in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
-under the .snapshot directory for each specified snapshot rotation
-(e.g., hourly.0, hourly.1, daily.0, etc).</p></div>
+for each specified snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).</p></div>
+<div class="para"><p>Snapshot volumes are mounted under the special <em>.snapshot</em> directory of
+their origin volumes.</p></div>
 <div class="para"><p>Zumastor skips one number each snapshot for housekeeping reasons, so
 home(1000) would be roughly the 500th snapshot of home.
 The snapshot number never decreases (though perhaps it would
 wrap if you did billions of snapshots&#8230;)</p></div>
-<div class="para"><p>By default, Zumastor mounts all its volumes under /var/mount/zumastor.
+<div class="para"><p>By default, Zumastor mounts all its volumes under /var/run/zumastor/mount,
+and mounts all its volume snapshots under /var/run/zumastor/snapshot.
 You can change the mount point of a volume with the <tt>&#8212;mountpoint</tt> option
 of the command <tt>zumastor define volume</tt> or with the <tt>zumastor remount</tt>
-command, as described in Zumastor man page.</p></div>
+command, as described in Zumastor man page.
+Similarly, you can change the mount points of a volume snapshot with the
+<tt>&#8212;snappath</tt> option of the command <tt>zumastor define volume</tt>.</p></div>
 </div>
 <h2 id="_installing_zumastor">8. Installing Zumastor</h2>
 <div class="sectionbody">
@@ -998,7 +1003,7 @@ script.  We can accelerate this by manually telling zumastor to take an
 <pre><tt># zumastor snapshot zumatest hourly
 # df | grep zumatest
 /dev/mapper/zumatest  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest
-/dev/mapper/zumatest(0)  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest(0)</tt></pre>
+/dev/mapper/zumatest(0)  5160576    131228   4767204   3% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48</tt></pre>
 </div></div>
 <div class="para"><p>If you do some IO on the filesystem you should notice only the origin device, mounted on <tt>/var/run/zumastor/mount/zumatest</tt> changes:</p></div>
 <div class="literalblock">
@@ -1006,7 +1011,7 @@ script.  We can accelerate this by manually telling zumastor to take an
 <pre><tt># echo "This is the first file!" &gt; /var/run/zumastor/zumatest/foo.txt
 # df | grep zumatest
 /dev/mapper/zumatest  99150       4128   89902   5% /var/run/zumastor/mount/zumatest
-/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/mount/zumatest(0)</tt></pre>
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48</tt></pre>
 </div></div>
 <div class="para"><p>As expected, the origin's "Used" block count goes up by one,
 but the snapshot's doesn't change.</p></div>
@@ -1016,8 +1021,8 @@ but the snapshot's doesn't change.</p></div>
 <pre><tt># zumastor snapshot zumatest hourly
 # df | grep zumatest
 /dev/mapper/zumatest  99150    4128   89902   5% /var/run/zumastor/mount/zumatest
-/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/mount/zumatest(0)
-/dev/mapper/zumatest(2)  99150    4128   89902   5% /var/run/zumastor/mount/zumatest(0)</tt></pre>
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48
+/dev/mapper/zumatest(2)  99150    4128   89902   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.31.15</tt></pre>
 </div></div>
 <div class="para"><p>Notice that the first snapshot was named
 <tt>zumatest(0)</tt>, but the new one is named <tt>zumatest(2)</tt>.
@@ -1078,7 +1083,8 @@ Add the following lines to the NFS exports file <tt>/etc/exports</tt>
 </p>
 <div class="listingblock">
 <div class="content">
-<pre><tt>/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)</tt></pre>
+<pre><tt>/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/snapshot/testvol *(ro,fsid=1,nohide,no_subtree_check,crossmnt)</tt></pre>
 </div></div>
 <div class="para"><p>The &#8220;fsid=xxx&#8221; option is required to ensure that the NFS server uses the same
 file handle after a restart or remount of an exported volume.  If it is not
@@ -1110,17 +1116,9 @@ does this for you:</p></div>
 </div></div>
 </li>
 </ol></div>
-<div class="para"><p>To export zumastor volumes from a different path, symlink the zumastor volumes
-to that path and add it to <tt>/etc/exports</tt>.</p></div>
-<div class="admonitionblock">
-<table><tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">A future revision of Zumastor may allow you to specify an arbitrary mount
-point, eliminating the need for this symlink.</td>
-</tr></table>
-</div>
+<div class="para"><p>To export zumastor volumes from a different path, you can either symlink the zumastor volumes
+to that path or use the <tt>&#8212;mountpoint</tt> and <tt>&#8212;snappath</tt> options
+with the command <tt>zumastor define volume</tt> described in section "Origin and Snapshot mount points" above.</p></div>
 <h3 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">10.11. Recovering files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>&#8212;export</tt> option with the <tt>zumastor define master</tt>
 command and modified your NFS server's startup script
@@ -1128,12 +1126,13 @@ as described in the section "Exporting a Zumastor volume via NFS" above.</p></di
 <div class="para"><p>Then mount the Zumastor volume as normal on an NFS client, for instance:</p></div>
 <div class="listingblock">
 <div class="content">
-<pre><tt>mount -tnfs nfs-server:/var/run/zumastor/mount/testvol /mnt
-ls /mnt/.snapshot</tt></pre>
+<pre><tt>mount -tnfs nfs-server:/var/run/zumastor/snapshot/testvol /mnt
+ls /mnt</tt></pre>
 </div></div>
-<div class="para"><p>There will be a number of snapshot directories under /mnt/.snapshot.
+<div class="para"><p>There will be a number of snapshot directories under /mnt.
 Each of these directories is named for the time at which that snapshot was
-taken.  To recover a file, find it in the appropriate snapshot directory and
+taken and symlinked to the corresponding snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).
+To recover a file, find it in the appropriate snapshot directory and
 copy it to the desired location.</p></div>
 <div class="admonitionblock">
 <table><tr>
@@ -1142,7 +1141,7 @@ copy it to the desired location.</p></div>
 </td>
 <td class="content">A future revision of Zumastor may add options to make the snapshots
 visible inside each directory, which would let you access them from any
-place under the mount point.</td>
+place under the volume mount point.</td>
 </tr></table>
 </div>
 <h3 id="_exporting_a_zumastor_volume_via_samba">10.12. Exporting a Zumastor volume via Samba</h3><div style="clear:left"></div>
@@ -1229,7 +1228,7 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2007-12-21 18:14:13 PDT
+Last updated 2008-01-02 14:27:33 PDT
 </div>
 </div>
 </body>
