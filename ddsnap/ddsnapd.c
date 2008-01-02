@@ -1380,7 +1380,7 @@ static void show_leaf_range(struct eleaf *leaf, chunk_t start, chunk_t finish)
 	for (int i = 0; i < leaf->count; i++) {
 		chunk_t addr = leaf->map[i].rchunk;
 		if (addr >= start && addr <= finish) {
-			printf("Addr %Lu: ", addr);
+			printf("Addr %Lu: ", (unsigned long long) addr);
 			for (struct exception *p = emap(leaf, i); p < emap(leaf, i+1); p++)
 				printf("%Lx/%08llx, ", p->chunk, p->share);
 			printf("\n");
