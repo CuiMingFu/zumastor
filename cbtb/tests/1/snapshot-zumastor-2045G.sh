@@ -58,7 +58,7 @@ sync
 zumastor snapshot testvol hourly 
 sleep $SLEEP
 
-if [ -e /var/run/zumastor/snapshot/testvol/.snapshot/hourly.1/ ] ; then
+if [ -e /var/run/zumastor/snapshot/testvol/hourly.1/ ] ; then
   echo "ok 4 - second snapshot mounted"
 else
   ls -laR /var/run/zumastor/
