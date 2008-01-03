@@ -88,10 +88,10 @@ $SUDO tar cf - -C $rootdir . | \
   $SUDO tar xf - -C $ext3dir
 
 # create symlinks from sd* to the ubd* devices
-$SUDO ln -s ubda $ext3dir/dev/sda
-$SUDO ln -s ubdb $ext3dir/dev/sdb
-$SUDO ln -s ubdc $ext3dir/dev/sdc
-$SUDO ln -s ubdd $ext3dir/dev/sdd
+$SUDO ln -s /dev/ubda $ext3dir/dev/sda
+$SUDO ln -s /dev/ubdb $ext3dir/dev/sdb
+$SUDO ln -s /dev/ubdc $ext3dir/dev/sdc
+$SUDO ln -s /dev/ubdd $ext3dir/dev/sdd
 cat >$stagefile <<EOF
 KERNEL=="ubda",                 SYMLINK+="sda"
 KERNEL=="ubdb",                 SYMLINK+="sdb"

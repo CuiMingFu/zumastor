@@ -125,13 +125,8 @@ $build/linux-${ARCH}-r${SVNREV} \
   con=null & uml_pid=$!
 
 if [ "x$MACADDR2" != "x" ] ; then
-echo  $build/linux-${ARCH}-r${SVNREV} \
-    ubd0=${tmpdir}/hda2.img,$templateimg $hd fake_ide \
-    mem=512M \
-    eth0=tuntap,$IFACE2,$MACADDR2,$VIRTHOST \
-    con=null & uml2_pid=$!
   $build/linux-${ARCH}-r${SVNREV} \
-    ubd0=${tmpdir}/hda2.img,$templateimg $hd fake_ide \
+    ubd0=${tmpdir}/hda2.img,$templateimg $hd2 fake_ide \
     mem=512M \
     eth0=tuntap,$IFACE2,$MACADDR2,$VIRTHOST \
     con=null & uml2_pid=$!

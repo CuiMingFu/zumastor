@@ -110,6 +110,20 @@ if [ "$rhash" = "$hash" ] ; then
   echo ok 8 - origin and slave testfiles are in sync
 else
   echo not ok 8 - origin and slave testfiles are in sync
+    mount
+    df
+    ls -lR /var/run/zumastor/
+    tail -200 /var/log/syslog
+  ${SSH} root@${slave} <<EOF
+    mount
+    df
+    ls -lR /var/run/zumastor/
+    tail -200 /var/log/syslog
+    sleep 300
+    mount
+    df
+    ls -lR /var/run/zumastor/mount/
+EOF
   exit 8
 fi
 
