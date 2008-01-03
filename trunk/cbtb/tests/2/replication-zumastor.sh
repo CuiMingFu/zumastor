@@ -90,19 +90,14 @@ zumastor replicate testvol slave
 
 
 # give it a minute to replicate (on a 30 second cycle), and verify
-# that it is there.  If not, look at the target volume, wait 5 minutes,
-# and look again
+# that it is there.  If not, look at the target volume
 sleep 60
 rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
   ${SSH} root@${slave} <<EOF
     mount
     df
-    ls -lR /var/run/zumastor/mount/
+    ls -lR /var/run/zumastor/
     tail -200 /var/log/syslog
-    sleep 300
-    mount
-    df
-    ls -lR /var/run/zumastor/mount/
 EOF
 
 
@@ -119,10 +114,6 @@ else
     df
     ls -lR /var/run/zumastor/
     tail -200 /var/log/syslog
-    sleep 300
-    mount
-    df
-    ls -lR /var/run/zumastor/mount/
 EOF
   exit 8
 fi
