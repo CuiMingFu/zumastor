@@ -156,6 +156,11 @@ time wait $qemu || retval=$?
 kill -0 $qemu && kill -9 $qemu
 
 
+# don't try to run the first boot that saves the image.  KVM/tunbr
+# are having an issue allocating the same IPADDR again
+if false ; then
+
+
 # restart qemu on the new image and boot until ssh is working
 # and then savevm running to create a snapshot named "running"
 
@@ -184,6 +189,9 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
 time wait $qemu
 
+
+# endif false
+fi
 
 echo "Instance shut down, removing ssh hostkey"
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
