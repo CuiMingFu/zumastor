@@ -149,6 +149,12 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /boot/grub/menu.lst' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /etc/fstab' || retval=$?
 
+# qemu still doesn't do apic's well with linux.  Take it off the menu.
+${CMDTIMEOUT} ${SSH} root@${IPADDR} sed --in-place '/^#.*kopt=/s/$/ noapic/' /boot/grub/menu.lst || retval=$?
+
+# update grub
+${CMDTIMEOUT} ${SSH} root@${IPADDR} 'update-grub' || retval=$?
+
 # halt the new image, and wait for qemu to exit
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
