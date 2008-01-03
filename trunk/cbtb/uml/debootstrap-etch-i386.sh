@@ -90,14 +90,20 @@ $SUDO tar cf - -C $rootdir . | \
   $SUDO tar xf - -C $ext3dir
 
 # make sure the ubd* devices are in the base image
-$SUDO chroot $ext3dir MAKEDEV ubd
+mkdir -p $ext3dir/proc
+$SUDO mount -t proc proc $ext3dir/proc
+$SUDO chroot $ext3dir <<EOF
+cd /dev
+/dev/MAKEDEV ubd
+EOF
+$SUDO umount $ext3dir/proc
 
 # create symlinks from sd* to the ubd* devices so the tests have the
 # disk names they expect
-$SUDO ln -s ubda $ext3dir/dev/sda
-$SUDO ln -s ubdb $ext3dir/dev/sdb
-$SUDO ln -s ubdc $ext3dir/dev/sdc
-$SUDO ln -s ubdd $ext3dir/dev/sdd
+$SUDO ln -s /dev/ubda $ext3dir/dev/sda
+$SUDO ln -s /dev/ubdb $ext3dir/dev/sdb
+$SUDO ln -s /dev/ubdc $ext3dir/dev/sdc
+$SUDO ln -s /dev/ubdd $ext3dir/dev/sdd
 
 
 $SUDO umount $ext3dir
