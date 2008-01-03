@@ -86,8 +86,9 @@ int is_same_device(char const *dev1,char const *dev2) {
 	return 1;
 }
 
-#define INPUT_ERROR ULONG_MAX
-#define INPUT_ERROR_64 ULLONG_MAX
+// FIXME: Overloading *_MAX is bad
+#define INPUT_ERROR UINT32_MAX
+#define INPUT_ERROR_64 UINT64_MAX
 
 u64 strtobytes64(char const *string)
 {
