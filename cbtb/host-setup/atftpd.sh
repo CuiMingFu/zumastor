@@ -60,6 +60,7 @@ UBUNTUARCHIVE="http://archive.ubuntu.com/ubuntu"
 DEBIANARCHIVE="http://ftp.us.debian.org/debian"
 cd /tftpboot
 wget -O - ${UBUNTUARCHIVE}/dists/dapper/main/installer-i386/current/images/netboot/netboot.tar.gz | tar zxvf -
+wget -O - ${UBUNTUARCHIVE}/dists/dapper/main/installer-amd64/current/images/netboot/netboot.tar.gz | tar zxvf -
 wget -O - ${DEBIANARCHIVE}/dists/etch/main/installer-amd64/current/images/netboot/netboot.tar.gz | tar zxvf -
 wget -O - ${DEBIANARCHIVE}/dists/etch/main/installer-i386/current/images/netboot/netboot.tar.gz | tar zxvf -
 chmod -R o+rX .
