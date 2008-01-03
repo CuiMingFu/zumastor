@@ -23,8 +23,21 @@ HDCSIZE=2094080
 # Terminate test in 40 minutes.  Read by test harness.
 TIMEOUT=2400
 
-# necessary at the moment, looks like a zumastor bug
-SLEEP=5
+# wait for file.  The first argument is the timeout, the second the file.
+timeout_file_wait() {
+  local max=$1
+  local file=$2
+  local count=0
+  while [ ! -e $file ] && [ $count -lt $max ]
+  do 
+    let "count = count + 1"
+    sleep 1
+  done
+  [ -e $file ]
+  return $?
+}
+
+
 
 echo "1..6"
 
@@ -41,37 +54,44 @@ echo ok 1 - testvol set up
 
 sync
 zumastor snapshot testvol hourly 
-sleep $SLEEP
 
-date >> /var/run/zumastor/mount/testvol/testfile
-sleep $SLEEP
-
-if [ ! -f /var/run/zumastor/snapshot/testvol/hourly.0/testfile ] ; then
-  echo "ok 3 - testfile not present in first snapshot"
+if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
+  echo "ok 3 - first snapshot mounted"
 else
   ls -lR /var/run/zumastor/
-  echo "not ok 3 - testfile not present in first snapshot"
+  echo "not ok 3 - first snapshot mounted"
   exit 3
+fi
+
+date >> /var/run/zumastor/mount/testvol/testfile
+
+if [ ! -f /var/run/zumastor/snapshot/testvol/hourly.0/testfile ] ; then
+  echo "ok 4 - testfile not present in first snapshot"
+else
+  ls -lR /var/run/zumastor/
+  echo "not ok 4 - testfile not present in first snapshot"
+  exit 4
 fi
 
 sync
 zumastor snapshot testvol hourly 
-sleep $SLEEP
 
-if [ -e /var/run/zumastor/snapshot/testvol/hourly.1/ ] ; then
-  echo "ok 4 - second snapshot mounted"
-else
-  ls -laR /var/run/zumastor/
-  echo "not ok 4 - second snapshot mounted"
-  exit 4
-fi
 
-if diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
-  echo "ok 5 - identical testfile immediately after second snapshot"
+if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.1 ; then
+  echo "ok 5 - second snapshot mounted"
 else
   ls -lR /var/run/zumastor/
-  echo "not ok 5 - identical testfile immediately after second snapshot"
+  echo "not ok 5 - second snapshot mounted"
+  exit 5
+fi
+
+  
+if diff -q /var/run/zumastor/mount/testvol/testfile \
+    /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
+  echo "ok 6 - identical testfile immediately after second snapshot"
+else
+  ls -lR /var/run/zumastor/
+  echo "not ok 6 - identical testfile immediately after second snapshot"
   exit 5
 fi
 
