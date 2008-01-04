@@ -173,7 +173,7 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /boot/grub/menu.lst' || r
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /etc/fstab' || retval=$?
 
 # qemu still doesn't do apic's well with linux.  Take it off the menu.
-${CMDTIMEOUT} ${SSH} root@${IPADDR} sed --in-place '/^# kopt=root/# kopt=noapic root/' /boot/grub/menu.lst || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} sed --in-place 's/^# kopt=root=/# kopt=noapic root=/' /boot/grub/menu.lst || retval=$?
 
 # update grub
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'update-grub' || retval=$?
