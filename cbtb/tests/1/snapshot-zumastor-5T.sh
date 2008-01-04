@@ -33,7 +33,8 @@ SLEEP=5
 
 
 # additional software requirements of this test
-aptitude install xfsprogs
+apt-get update
+aptitude install -y xfsprogs
 modprobe xfs
 
 # create LVM VG testvg

@@ -42,7 +42,7 @@ timeout_file_wait() {
 echo "1..6"
 
 apt-get update
-aptitude install xfsprogs
+aptitude install -y xfsprogs
 
 mount
 ls -l /dev/sdb /dev/sdc

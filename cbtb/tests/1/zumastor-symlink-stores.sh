@@ -25,7 +25,7 @@ SLEEP=5
 echo "1..3"
 
 apt-get update
-aptitude install e2fsprogs
+aptitude install -y e2fsprogs
 
 mount
 ls -l /dev/sdb /dev/sdc

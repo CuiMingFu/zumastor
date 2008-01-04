@@ -18,7 +18,9 @@ TIMEOUT=600
 SLEEP=5
 
 mkfs='mkfs.xfs -f'
-aptitude install xfsprogs
+
+apt-get update
+aptitude install -y xfsprogs
 
 lvcreate --size 16m -n test sysvg
 lvcreate --size 16m -n test_snap sysvg
