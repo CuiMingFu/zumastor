@@ -54,7 +54,9 @@ else
   exit 3
 fi
     
+apt-get update
 aptitude install -y nfs-kernel-server
+
 echo "/var/run/zumastor/mount/testvol slave(rw,sync,no_root_squash)" >>/etc/exports
 /etc/init.d/nfs-common restart
 /etc/init.d/nfs-kernel-server restart
@@ -70,6 +72,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
+${SSH} root@${slave} apt-get update
 ${SSH} root@${slave} aptitude install -y nfs-common
 ${SSH} root@${slave} mount master:/var/run/zumastor/mount/testvol /mnt
 ${SSH} root@${slave} mount

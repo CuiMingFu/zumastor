@@ -18,7 +18,9 @@ TIMEOUT=600
 SLEEP=5
 
 mkfs='mkfs.jfs -q'
-aptitude install jfsutils 
+
+apt-get update
+aptitude install -y jfsutils 
 
 lvcreate --size 16m -n test sysvg
 lvcreate --size 16m -n test_snap sysvg

@@ -18,7 +18,9 @@ TIMEOUT=600
 SLEEP=30
 
 mkfs='mkfs.reiserfs -f'
-aptitude install reiserfsprogs 
+
+apt-get update
+aptitude install -y reiserfsprogs 
 
 modprobe reiserfs
 
