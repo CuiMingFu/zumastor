@@ -141,7 +141,7 @@ EOF
 # replace bash with dash in the build environment, to see where it fails
 # and prevent future undeclared bashisms
 ${SETUPTIMEOUT} ${SSH} root@${IPADDR} \
-'aptitude install dash && update-alternatives --install /bin/sh sh /bin/dash 1'
+'apt-get update && aptitude install -y dash && update-alternatives --install /bin/sh sh /bin/dash 1'
 
 # Specific kernel configurations take priority over general configurations
 # kernel/config/${KERNEL_VERSION}-${ARCH} is not in the archive and may
