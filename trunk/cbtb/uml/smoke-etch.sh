@@ -16,4 +16,4 @@ ARCH=`dpkg --print-architecture`
 DIST=etch
 time ./setup.sh
 time ./build-${DIST}-${ARCH}.sh
-time DIST=${DIST} ARCH=${ARCH} ./runtests.sh
+time DIST=${DIST} ARCH=${ARCH} ./runtests.sh $*
