@@ -494,12 +494,12 @@ A commandline tool, /bin/zumastor
 </li>
 <li>
 <p>
-Origin mount points, e.g. /var/mount/zumastor/myvolumename
+Origin mount points, e.g. /var/run/zumastor/mount/myvolumename
 </p>
 </li>
 <li>
 <p>
-Snapshot mount points, e.g. /var/mount/zumastor/myvolumename(10)
+Snapshot mount points, e.g. /var/run/zumastor/snapshot/myvolumename/yyyy.mm.dd-hh.mm.ss
 </p>
 </li>
 </ul></div>
@@ -528,14 +528,11 @@ subdirectories of /var/run/zumastor/mount.
 In other words, you do not need to add any of these to /etc/fstab.
 The zumastor init script will mount the volume and all its snapshots
 automatically at boot time.</p></div>
-<div class="para"><p>Now do some IO on the filesystem, then look at df again:</p></div>
 <div class="para"><p>Zumastor mounts all of snapshot volumes in appropriately named
 subdirectories of /var/run/zumastor/snapshot.
 Each snapshot mount point is named for the creation time of that snapshot,
 in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
 for each specified snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).</p></div>
-<div class="para"><p>Snapshot volumes are mounted under the special <em>.snapshot</em> directory of
-their origin volumes.</p></div>
 <div class="para"><p>Zumastor skips one number each snapshot for housekeeping reasons, so
 home(1000) would be roughly the 500th snapshot of home.
 The snapshot number never decreases (though perhaps it would
@@ -1228,7 +1225,7 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 <div id="footer">
 <div id="footer-text">
 Version 0.0<br />
-Last updated 2008-01-02 14:27:33 PDT
+Last updated 2008-01-03 16:11:47 PDT
 </div>
 </div>
 </body>
