@@ -813,12 +813,26 @@ function nag_daemon {
 	done &
 }
 
+<<<<<<< .mine
+# dereference any symlinks in argumant
+function dereference_symlinks {
+	local entry
+	entry=$1
+	while [[ -L $entry ]] ; do
+		entry=`readlink $entry`
+	done
+	echo $entry
+}
+
+
+=======
 function usage {
     echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]"
 }
 
 [[ $1 == "--help" ]] || [[ $1 == "-h" ]] && { usage; exit 0; }
 
+>>>>>>> .r1215
 [[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
 [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
 [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ $1 == "replicate" ]] || [[ ! -e $LOCKFILE ]] || { echo "$0: $LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
@@ -870,9 +884,9 @@ define)
 		shift # remove --
 		[[ $# = 3 ]] || { echo "$usage"; exit 2; }
 		declare vol=$1
-		declare origin=$2
-		declare snapstore=$3
-		
+		declare origin=$(dereference_symlinks $2)
+		declare snapstore=$(dereference_symlinks $3)
+
 		verify_valid_volname $vol || { echo "$0: invalid volume name '$vol'"; exit 1; }
 		verify_managed_vol $vol && { echo "$0: volume '$vol' is already configured"; exit 1; }
 		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
