@@ -134,8 +134,8 @@ Zumastor exposes itself to users in several ways:
 
 * An admin script, /etc/init.d/zumastor
 * A commandline tool, /bin/zumastor
-* Origin mount points, e.g. /var/mount/zumastor/myvolumename
-* Snapshot mount points, e.g. /var/mount/zumastor/myvolumename(10)
+* Origin mount points, e.g. /var/run/zumastor/mount/myvolumename
+* Snapshot mount points, e.g. /var/run/zumastor/snapshot/myvolumename/yyyy.mm.dd-hh.mm.ss
 
 Zumastor admin script
 ~~~~~~~~~~~~~~~~~~~~~
@@ -170,16 +170,11 @@ In other words, you do not need to add any of these to /etc/fstab.
 The zumastor init script will mount the volume and all its snapshots 
 automatically at boot time.
 
-Now do some IO on the filesystem, then look at df again:
-
 Zumastor mounts all of snapshot volumes in appropriately named
 subdirectories of /var/run/zumastor/snapshot.
 Each snapshot mount point is named for the creation time of that snapshot,
 in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
 for each specified snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).
-
-Snapshot volumes are mounted under the special '.snapshot' directory of
-their origin volumes. 
 
 Zumastor skips one number each snapshot for housekeeping reasons, so
 home(1000) would be roughly the 500th snapshot of home.  
