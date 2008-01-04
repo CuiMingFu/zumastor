@@ -11,6 +11,22 @@
 
 set -e
 
+# wait for ssh to work. Parameter 1 is the number of iterations to
+# attempt, parameter 2 is the account@host to try to log in to
+wait_for_ssh() {
+  local max=$1
+  local account=$2
+  local count=0
+  while [ $count -lt $max ] && ! ${SSH} $account hostname 2>/dev/null
+  do
+    let "count = count + 1"
+    sleep 10
+  done
+  ${SSH} $account hostname 2>/dev/null
+  return $?
+}
+
+
 KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' ../KernelVersion`
 if [ "x$KERNEL_VERSION" = "x" ] ; then
   echo "Suspect KernelVersion file"
@@ -107,15 +123,22 @@ ${qemu_i386} -m 512 \
   -vnc unix:${VNC} \
   -net nic,macaddr=${MACADDR},model=ne2k_pci \
   -net tap,ifname=${IFACE},script=no \
-  -boot c -hda "${DISKIMG}" -no-reboot & qemu=$!
+  -boot c -hda "${DISKIMG}" -no-reboot & qemu_pid=$!
   
 
-# wait for ssh to work
-while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
-do
-  echo -n .
-  sleep 10
-done
+if ! wait_for_ssh 30 root@${IPADDR}
+then
+  if [ "x$LOGDIR" != "x" ] ; then
+    socat - unix:${MONITOR} <<EOF
+      screendump $LOGDIR/install.ppm
+EOF
+    convert $LOGDIR/install.ppm $LOGDIR/install.png
+    rm $LOGDIR/install.ppm
+  fi
+  kill -9 $qemu_pid
+  retval=64
+  unset qemu_pid
+fi
 
 date
 
@@ -158,8 +181,8 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'update-grub' || retval=$?
 # halt the new image, and wait for qemu to exit
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 
-time wait $qemu || retval=$?
-kill -0 $qemu && kill -9 $qemu
+time wait $qemu_pid || retval=$?
+kill -0 $qemu_pid && kill -9 $qemu_pid
 
 
 # don't try to run the first boot that saves the image.  KVM/tunbr

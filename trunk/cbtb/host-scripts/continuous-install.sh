@@ -68,8 +68,9 @@ if [ -L "${TEMPLATEIMG}" ] ; then
   TEMPLATEIMG=`readlink "${TEMPLATEIMG}"`
 fi
 
+export LOGDIR="${BUILDDIR}/r${buildrev}"
 # build and test the current working directory packages
-installlog=${BUILDDIR}/r${buildrev}/install-r${buildrev}.log
+installlog=$LOGDIR/install-r${buildrev}.log
 installret=-1
 
 rm -f ${diskimg}
