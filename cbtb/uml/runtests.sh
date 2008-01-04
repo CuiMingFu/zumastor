@@ -11,21 +11,51 @@
 
 set -e
 
+smoketests1="snapshot-zumastor-2045G.sh"
+smoketests2="replication-zumastor.sh"
+  
 if [ "x$ARCH" = "x" ] ; then
-  ARCH=i386
+  ARCH=`dpkg --print-arch || echo i386`
 fi
 
 if [ "x$DIST" = "x" ] ; then
-  DIST=dapper
+  DIST=etch
 fi
 
-smoketests1="snapshot-zumastor-2045G.sh"
-smoketests2="replication-zumastor.sh"
+usage() {
+  cat <<EOF
+$0 [--all]
+
+--all   Run all tests in cbtb/tests/1/ and cbtb/tests/2/, rather than just
+        the smoketests: $smoketests1 $smoketests2.
+
+Environment variables:
+ARCH - the CPU/ABI architecture to test.     currently: $ARCH
+DIST - the distribution release to test on.  currently: $DIST
+EOF
+}
+
 testparent=../tests
 
+tests1=$smoketests1
+tests2=$smoketests2
+
+case $1 in
+--all)
+  tests1=`cd $testparent/1 && echo *.sh`
+  tests2=`cd $testparent/2 && echo *.sh`
+  shift
+  ;;
+
+*)
+  usage
+  exit 1
+  ;;
+esac
+  
 summary=`mktemp`
 
-for test in $smoketests1
+for test in $tests1
 do
   if DIST=$DIST ARCH=$ARCH time tunbr ./test-zuma-uml.sh $testparent/1/$test
   then
@@ -35,7 +65,7 @@ do
   fi
 done
 
-for test in $smoketests2
+for test in $tests2
 do
   if  DIST=$DIST ARCH=$ARCH time tunbr tunbr ./test-zuma-uml.sh $testparent/2/$test
   then
