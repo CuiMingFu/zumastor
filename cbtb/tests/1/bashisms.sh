@@ -17,7 +17,8 @@ set -e
 EXPECT_FAIL=1
 
 # install dash and replace /bin/sh
-aptitude install dash && update-alternatives --install /bin/sh sh /bin/dash 1
+apt-get update
+aptitude install -y dash && update-alternatives --install /bin/sh sh /bin/dash 1
 
 # The installed zumastor scripts
 for f in /bin/zumastor /etc/cron.hourly/zumastor /etc/init.d/zumastor \
