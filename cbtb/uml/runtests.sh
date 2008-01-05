@@ -47,7 +47,7 @@ case $1 in
   shift
   ;;
 
-*)
+--help|-h)
   usage
   exit 1
   ;;
