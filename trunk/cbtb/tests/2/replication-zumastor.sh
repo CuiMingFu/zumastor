@@ -31,7 +31,7 @@ SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-echo "1..4"
+echo "1..8"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -69,12 +69,12 @@ zumastor status --usage
 echo ok 6 - replication manually kicked off from master
 
 # reasonable wait for these small volumes to finish the initial replication
-${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol || true
+sleep 60
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
 zumastor snapshot testvol hourly 
-sleep 2
+sleep 60
 zumastor status --usage
 ${SSH} root@${slave} ls -l /var/run/zumastor/mount/testvol || true
 ${SSH} root@${slave} zumastor status --usage
