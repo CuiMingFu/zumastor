@@ -64,7 +64,8 @@ if [ ! -f ${diskimg} ] ; then
   exit 1
 fi
 
-echo IPADDR=${IPADDR}
+env
+cat /var/lib/misc/dnsmasq.leases
 echo control/tmp dir=${tmpdir}
 
 
