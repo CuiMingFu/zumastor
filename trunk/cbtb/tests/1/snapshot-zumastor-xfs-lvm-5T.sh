@@ -14,10 +14,6 @@
 
 set -e
 
-# Expect failure.  Delete this when the test is fully successful.
-# Read only by the test harness.
-EXPECT_FAIL=1
-
 # The required sizes of the sd[bcd] devices in M.
 # Read only by the test harness.
 HDBSIZE=2094080
