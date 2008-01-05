@@ -11,6 +11,12 @@
 
 set -e
 
+# The required sizes of the sdb and sdc devices in M.  2045G
+# Read only by the test harness.
+# 8M for the snapsho storeand 4M for the origin.
+HDBSIZE=8
+HDCSIZE=4
+
 rc=0
 
 
@@ -22,30 +28,24 @@ SLEEP=10
 
 echo "1..11"
 
-lvcreate --size 4m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
-dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
-dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
-echo ok 1 - lvm set up
-
-ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
+ddsnap initialize /dev/sdb  /dev/sdc
 echo ok 2 - ddsnap initialize
 
 ddsnap agent /tmp/control
 echo ok 3 - ddsnap agent
 
-ddsnap server /dev/sysvg/test_snap /dev/sysvg/test /tmp/control /tmp/server
+ddsnap server /dev/sdb /dev/sdc /tmp/control /tmp/server
 echo ok 4 - ddsnap server
 
 size=`ddsnap status /tmp/server --size` 
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test /tmp/control -1 | dmsetup create testvol
+echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/control -1 | dmsetup create testvol
 echo ok 5 - create testvol
 
 ddsnap create /tmp/server 0
 echo ok 6 - ddsnap create [snapshot]
 
 sleep $SLEEP
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test /tmp/control 0 | dmsetup create testvol\(0\)
+echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/control 0 | dmsetup create testvol\(0\)
 echo ok 7 - create testvol\(0\)
 
 hash=`md5sum </dev/mapper/testvol`
@@ -70,7 +70,7 @@ ddsnap create /tmp/server 2
 echo ok 10 - ddsnap create [snapshot 2]
 
 sleep $SLEEP
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test /tmp/control 2 | dmsetup create testvol\(2\)
+echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/control 2 | dmsetup create testvol\(2\)
 echo ok 11 - create testvol\(2\)
 
 
