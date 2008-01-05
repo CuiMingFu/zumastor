@@ -102,7 +102,7 @@ fi
 
 
 if diff -q /var/run/zumastor/mount/testvol/testfile \
-    /var/run/zumastor/snapshot/testvol/hourly.1/testfile 2>&1 >/dev/null ; then
+    /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
   echo "ok 5 - identical testfile immediately after second snapshot"
 else
   ls -lR /var/run/zumastor
