@@ -11,7 +11,7 @@
 
 set -e
 
-smoketests1="snapshot-zumastor-2045G.sh"
+smoketests1="snapshot-zumastor-xfs-2045G.sh"
 smoketests2="replication-zumastor.sh"
   
 if [ "x$ARCH" = "x" ] ; then
