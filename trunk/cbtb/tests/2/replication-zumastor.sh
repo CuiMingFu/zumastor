@@ -96,6 +96,7 @@ zumastor status --usage
 
 # reasonable wait for these small volumes to finish the initial replication
 if ! timeout_remote_file_wait 120 root@${slave} /var/run/zumastor/mount/testvol
+then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
@@ -113,6 +114,7 @@ sync
 zumastor snapshot testvol hourly 
 
 if ! timeout_file_wait 30 /var/run/zumastor/mount/testvol
+then
   ls -alR /var/run/zumastor
   zumastor status --usage
   tail -200 /var/log/syslog
@@ -133,6 +135,7 @@ zumastor replicate testvol slave
 # give it two minutes to replicate (on a 30 second cycle), and verify
 # that it is there.  If not, look at the target volume
 if ! timeout_remote_file_wait 120 root@${slave} /var/run/zumastor/mount/testvol
+then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
