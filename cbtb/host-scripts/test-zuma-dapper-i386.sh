@@ -138,6 +138,8 @@ socat - unix:${MONITOR} <<EOF
   info snapshots
 EOF
 
+cat /var/lib/misc/dnsmasq.leases
+
 if [ "x$MACADDR2" != "x" ] ; then
   MONITOR2=${tmpdir}/monitor2
   VNC2=${tmpdir}/vnc2
@@ -155,6 +157,8 @@ if [ "x$MACADDR2" != "x" ] ; then
 info network
 info snapshots
 EOF
+
+cat /var/lib/misc/dnsmasq.leases
 
 fi
 
@@ -207,6 +211,8 @@ EOF
   fi
 fi
 
+cat /var/lib/misc/dnsmasq.leases
+
 params="IPADDR=${IPADDR}"
 if [ "x$IPADDR2" != "x" ] ; then
   params="${params} IPADDR2=${IPADDR2}"
@@ -255,6 +261,7 @@ if [ "x$qemu2_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR2} poweroff
 fi
 
+cat /var/lib/misc/dnsmasq.leases
 
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
 if [ "x$IPADDR2" != "x" ] ; then
@@ -281,5 +288,7 @@ if [ "x$killer2" != "x" ] ; then
 fi
 
 rm -rf ${tmpdir}
+
+cat /var/lib/misc/dnsmasq.leases
 
 exit ${retval}
