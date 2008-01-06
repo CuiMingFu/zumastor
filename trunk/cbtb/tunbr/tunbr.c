@@ -142,6 +142,12 @@ void del_from_leases(const char *leases, const char *newleases,
 	if (iip[0]==ip[0] && iip[1]==ip[1] && iip[2]==ip[2] && iip[3]==ip[3] &&
 	    imac[0]==mac[0] && imac[1]==mac[1] && imac[2]==mac[2] &&
 	    imac[3]==mac[3] && imac[4]==mac[4] && imac[5]==mac[5]) {
+	    time_t t=time(NULL);
+	    fprintf(stderr,
+	       "%s: tunbr deleting %x:%x:%x:%x:%x:%x %d.%d.%d.%d\n",
+	       ctime(&t),
+	       imac[0], imac[1], imac[2], imac[3], imac[4], imac[5],
+	       iip[0], iip[1], iip[2], iip[3]);
 	  continue;
 	}
       }
@@ -285,7 +291,16 @@ void add_to_leases(const char *leases, const char *newleases,
 	       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
 	       ip[0], ip[1], ip[2], ip[3]);
   if (n>0 && n<sizeof(outbuf)) {
+    time_t t;
     s = write(ofd, outbuf, n);
+
+    t=time(NULL);
+    fprintf(stderr,
+       "%s: tunbr adding %x:%x:%x:%x:%x:%x %d.%d.%d.%d\n",
+       ctime(&t),
+       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+       ip[0], ip[1], ip[2], ip[3]);
+
     if (s != n) {
       perror(newleases);
       exit(6);
@@ -529,7 +544,11 @@ int main(int argc, char **argv) {
 
   child = fork();
   if (child>0) {
-    waitpid(child, &status, 0);
+    pid_t p;
+    time_t t=time(NULL);
+    p = waitpid(child, &status, 0);
+    fprintf(stderr, "%s: tunbr waitpid(%d)=%d, status=%d\n",
+      ctime(&t), child, p, status);
   } else if (child==0) {
     setuid(uid);
     execvp(argv[1], argv+1);
