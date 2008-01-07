@@ -45,7 +45,7 @@ timeout_file_wait() {
 # wait for file on remote site with timeout.
 timeout_remote_file_wait() {
   local max=$1
-  local remote=$1
+  local remote=$2
   local file=$3
   local count=0
   while $SSH $remote [ ! -e $file ] && [ $count -lt $max ]
