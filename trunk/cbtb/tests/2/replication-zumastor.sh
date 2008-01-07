@@ -58,7 +58,7 @@ timeout_remote_file_wait() {
 }
 
 
-echo "1..9"
+echo "1..10"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -140,10 +140,23 @@ then
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
   
-  echo not ok 8 - testfile has migrated to slave
+  echo not ok 8 - testvol has migrated to slave
   exit 8
 else
-  echo ok 8 - testfile has migrated to slave
+  echo ok 8 - testvol has migrated to slave
+fi
+
+# check separately for the testfile
+if ! timeout_remote_file_wait 120 root@${slave} /var/run/zumastor/mount/testfile
+then
+  $SSH root@${slave} ls -alR /var/run/zumastor
+  $SSH root@${slave} zumastor status --usage
+  $SSH root@${slave} tail -200 /var/log/syslog
+  
+  echo not ok 9 - testfile has migrated to slave
+  exit 9
+else
+  echo ok 9 - testfile has migrated to slave
 fi
 
 rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
@@ -156,9 +169,9 @@ EOF
 
 
 if [ "$rhash" = "$hash" ] ; then
-  echo ok 9 - origin and slave testfiles are in sync
+  echo ok 10 - origin and slave testfiles are in sync
 else
-  echo not ok 9 - origin and slave testfiles are in sync
+  echo not ok 10 - origin and slave testfiles are in sync
     mount
     df
     ls -lR /var/run/zumastor/
@@ -170,7 +183,7 @@ else
     ls -lR /var/run/zumastor/
     tail -200 /var/log/syslog
 EOF
-  exit 9
+  exit 10
 fi
 
 exit 0
