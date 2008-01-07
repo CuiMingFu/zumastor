@@ -34,11 +34,22 @@ aptitude install dnsmasq
 if [ ! -f /etc/dnsmasq.conf.distrib ] ; then
   dpkg-divert --local --rename --add /etc/dnsmasq.conf
 
+  # where tunbr will put anything it wants
+  # dnsmasq to serve.  Truncate this on reboot.
+  touch /var/lib/misc/tunbr.dnsmasq
+  cat >/etc/init.d/tunbr-dnsmasq <<EOF
+#!/bin/sh
+
+> /var/lib/misc/tunbr.dnsmasq
+EOF
+  chmod 755 /etc/init.d/tunbr-dnsmasq
+  ln -sf /etc/init.d/tunbr-dnsmasq /etc/rcS.d/S80tunbr-dnsmasq
+
   # Write a new configuration file to /etc/dnsmasq.conf
   cat >/etc/dnsmasq.conf <<EOF
 #
 # dnsmasq configuration file for use hosting a zumastor test environment.
-# dhcp-range must include at least the range that tunbr is compiled to use.
+# dhcp-range should not use the range that tunbr is compiled to use.
 # dhcp-leasefile must match the lease file that tunbr will also manage.
 #
 # The default configuration file for dnsmasq (/etc/dnsmasq.conf) as
@@ -52,12 +63,14 @@ if [ ! -f /etc/dnsmasq.conf.distrib ] ; then
 interface=$VIRTBR
 interface=lo
 bind-interfaces
-dhcp-range=$NETWORK.50,$NETWORK.253,12h
+dhcp-range=$NETWORK.50,$NETWORK.149,12h
 dhcp-leasefile=/var/lib/misc/dnsmasq.leases
+conf-file=/var/lib/misc/tunbr.dnsmasq
 log-queries
 dhcp-boot=/pxelinux.0,boothost,$VIRTHOST
 domain-needed
 bogus-priv
 EOF
   /etc/init.d/dnsmasq restart
+
 fi
