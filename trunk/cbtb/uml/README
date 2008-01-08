@@ -45,7 +45,8 @@ sys     0m14.317s
 echo $?
 
 
-Runnning a dual-node test:
+Runnning a dual-node test, and waiting at test completion for a
+[Return] so the developer may debug interactively.
 
-time ARCH=i386 DIST=etch tunbr tunbr ./test-zuma-uml.sh ../tests/2/replication-zumastor.sh
-
+time ARCH=i386 DIST=etch tunbr tunbr ./test-zuma-uml.sh \
+  ../tests/2/replication-zumastor.sh ../tests/wait.sh
