@@ -655,6 +655,7 @@ static int generate_progress_file(const char *progress_file, char **tmpfilename)
 		return -ENOMEM;
 	}
 	strncpy(progress_tmpfile, progress_file, progress_len);
+	strncpy(progress_tmpfile + progress_len, ".tmp", 5);
 	*tmpfilename = progress_tmpfile;
 	return 0;
 }
