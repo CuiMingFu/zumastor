@@ -71,9 +71,7 @@ Define a new zumastor volume named \fIvolume\fP based on the underlying volumes 
 
 The snapshot block and chunk sizes can be specified with the \fBblocksize\fP and \fBchunksize\fP options, respectively.
 They may only differ if separate metadata and snapshot devices are specified.
-Note that these are are specified as powers of two.
-If the sizes given are not powers of two, in each case the next greater power
-of two will be used instead.
+Note that these values must be specified as powers of two and must be larger than 512 bytes.
 
 The amount of RAM dedicated to the snapshot store cache defaults to min(128MB, system RAM/4), and can be tuned manually with the \fBcachesize\fP option.  For instance, to increase the cache size to 512MB, use --cachesize 512M.
 
