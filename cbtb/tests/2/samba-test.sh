@@ -16,32 +16,46 @@ rc=0
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=2400
+HDBSIZE=4
+HDCSIZE=8
 
-# Remove this when the test is expected to succeed.  Test harness greps for it.
+# See test 7 below.  Found race condition in samba/smbfs deleting files.
 EXPECT_FAIL=1
 
-# necessary at the moment, looks like a zumastor bug
-SLEEP=5
 
 slave=${IPADDR2}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 
+# wait for file.  The first argument is the timeout, the second the file.
+timeout_file_wait() {
+  local max=$1
+  local file=$2
+  local count=0
+  while [ ! -e $file ] && [ $count -lt $max ]
+   do
+   let "count = count + 1"
+   sleep 1
+  done
+  [ -e $file ]
+  return $?
+}
+                        
+
+
+
 echo "1..8"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-lvcreate --size 4m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
-zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
 echo ok 1 - testvol set up
 
-sleep $SLEEP
 if [ -d /var/run/zumastor/mount/testvol/ ] ; then
   echo ok 2 - testvol mounted
 else
@@ -49,19 +63,20 @@ else
   exit 2
 fi
 
-sync ; zumastor snapshot testvol hourly 
-sleep $SLEEP
-if [ -e /dev/mapper/testvol\(0\) ] ; then
-  echo ok 3 - testvol snapshotted
+sync
+zumastor snapshot testvol hourly 
+
+if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
+  echo "ok 3 - first snapshot mounted"
 else
-  echo "not ok 3 - testvol snapshotted"
+  ls -lR /var/run/zumastor/
+  echo "not ok 3 - first snapshot mounted"
   exit 3
 fi
 
-# update-inetd tries to do tricky things to /dev/tty
-rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd    
-apt-get update
-DEBIAN_FRONTEND=noninteractive aptitude install -y samba
+
+# preconfigure so not asked for samba workgroup
+mkdir /etc/samba
 cat > /etc/samba/smb.conf << EOF
 [global]
   workgroup = ZUMABUILD
@@ -73,6 +88,11 @@ cat > /etc/samba/smb.conf << EOF
   path=/var/run/zumastor/mount/testvol
   writable = yes
 EOF
+
+# update-inetd tries to do tricky things to /dev/tty
+rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd    
+apt-get update
+DEBIAN_FRONTEND=noninteractive aptitude install -y samba
 
 if /etc/init.d/samba restart ; then
   echo ok 4 - testvol exported
@@ -89,8 +109,8 @@ echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} apt-get update
-${SSH} root@${slave} aptitude install -y smbfs
-${SSH} root@${slave} modprobe cifs
+${SSH} root@${slave} DEBIAN_FRONTEND=noninteractive aptitude install -y smbfs
+${SSH} root@${slave} modprobe cifs || true
 ${SSH} root@${slave} mount //master/testvol /mnt -t cifs -o user=root,pass=password
 ${SSH} root@${slave} mount
 echo ok 5 - slave set up
@@ -116,7 +136,11 @@ else
   echo not ok 6 - file written on CIFS client visible on master
 fi
 
-  
+#
+# This is the test that's known to fail occaisionally, depending
+# on speed.  Putting something (like the SSH commented out here)
+# tends to make it work.
+#
 rm /var/run/zumastor/mount/testvol/masterfile
 #$SSH root@${slave} ls -l /mnt/ || true
 if $SSH root@${slave} test -f /mnt/masterfile ; then
