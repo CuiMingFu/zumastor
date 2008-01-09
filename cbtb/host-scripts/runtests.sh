@@ -12,8 +12,6 @@
 top="${PWD}"
 branch=`cat $top/zumastor/Version`
 
-cat /var/lib/misc/dnsmasq.leases
-
 installrev=''
 if [ -f ${top}/zumastor/build/installrev ] ; then
   installrev=`cat ${top}/zumastor/build/installrev`
@@ -85,8 +83,6 @@ do
       files="${LOGDIR}/${LOGPREFIX}screen.png $files"
     fi
 
-    cat /var/lib/misc/dnsmasq.leases
-
   fi
 done
 popd
@@ -116,8 +112,6 @@ do
     if [ -f "${LOGDIR}/$LOGPREFIX}screen2.png" ] ; then
       files="${LOGDIR}/$LOGPREFIX}screen2.png $files"
     fi
-
-    cat /var/lib/misc/dnsmasq.leases
 
   fi
 done
@@ -173,7 +167,5 @@ elif [ -x ${sendmail} ] ; then
     done
   ) | ${sendmail} ${email}
 fi
-
-cat /var/lib/misc/dnsmasq.leases
 
 exit $testret

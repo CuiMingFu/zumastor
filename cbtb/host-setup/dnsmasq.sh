@@ -65,7 +65,7 @@ interface=lo
 bind-interfaces
 conf-file=/var/lib/misc/tunbr.dnsmasq
 dhcp-range=$NETWORK.50,static,infinite
-dhcp-leasefile=/var/lib/misc/dnsmasq.leases
+dhcp-leasefile=/dev/null
 log-queries
 dhcp-boot=/pxelinux.0,boothost,$VIRTHOST
 domain-needed
