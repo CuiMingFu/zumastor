@@ -63,9 +63,9 @@ EOF
 interface=$VIRTBR
 interface=lo
 bind-interfaces
-dhcp-range=$NETWORK.50,$NETWORK.149,12h
-dhcp-leasefile=/var/lib/misc/dnsmasq.leases
 conf-file=/var/lib/misc/tunbr.dnsmasq
+dhcp-range=$NETWORK.50,static,infinite
+dhcp-leasefile=/var/lib/misc/dnsmasq.leases
 log-queries
 dhcp-boot=/pxelinux.0,boothost,$VIRTHOST
 domain-needed
