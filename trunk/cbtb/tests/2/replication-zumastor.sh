@@ -130,7 +130,7 @@ hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 #
 # schedule an immediate replication cycle
 #
-zumastor replicate testvol slave
+zumastor replicate --wait testvol slave
 
 
 # give it two minutes to replicate (on a 30 second cycle), and verify
@@ -148,7 +148,7 @@ else
 fi
 
 # check separately for the testfile
-if ! timeout_remote_file_wait 120 root@${slave} /var/run/zumastor/mount/testfile
+if ! timeout_remote_file_wait 120 root@${slave} /var/run/zumastor/mount/testvol/testfile
 then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage

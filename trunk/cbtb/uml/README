@@ -15,6 +15,10 @@ host environment, so the host must be a Debian-derived system, and probably
 no newer than Debian/etch and have the zumastor/ddsnap/kernel build
 dependencies installed.  See builddepends.sh. 
 
+For fast compiles install ccache using local disk and symlink gcc to it:
+   apt-get install ccache
+   [if on NFS] ln -s /somelocalfilesystem ~/.ccache
+   ln -sf /usr/bin/ccache /usr/local/bin/gcc
 
 
 cd cbtb/uml
