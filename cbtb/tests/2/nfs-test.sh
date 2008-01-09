@@ -14,30 +14,43 @@ set -e
 rc=0
 
 # Terminate test in 20 minutes.  Read by test harness.
-TIMEOUT=2400
-
-# necessary at the moment, looks like a zumastor bug
-SLEEP=5
+TIMEOUT=1200
+HDBSIZE=4
+HDCSIZE=8
 
 slave=${IPADDR2}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 
+# wait for file.  The first argument is the timeout, the second the file.
+timeout_file_wait() {
+  local max=$1
+  local file=$2
+  local count=0
+  while [ ! -e $file ] && [ $count -lt $max ]
+   do
+   let "count = count + 1"
+   sleep 1
+  done
+  [ -e $file ]
+  return $?
+}
+                        
+
+
+
 echo "1..8"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-lvcreate --size 4m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
-zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol -h 24 -d 7
 ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
 echo ok 1 - testvol set up
 
-sleep $SLEEP
 if [ -d /var/run/zumastor/mount/testvol/ ] ; then
   echo ok 2 - testvol mounted
 else
@@ -45,14 +58,18 @@ else
   exit 2
 fi
 
-sync ; zumastor snapshot testvol hourly 
-sleep $SLEEP
-if [ -e /dev/mapper/testvol\(0\) ] ; then
-  echo ok 3 - testvol snapshotted
+sync
+zumastor snapshot testvol hourly 
+
+if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
+  echo "ok 3 - first snapshot mounted"
 else
-  echo "not ok 3 - testvol snapshotted"
+  ls -lR /var/run/zumastor/
+  echo "not ok 3 - first snapshot mounted"
   exit 3
 fi
+
+
     
 apt-get update
 aptitude install -y nfs-kernel-server
