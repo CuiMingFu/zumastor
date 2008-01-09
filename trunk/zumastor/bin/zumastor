@@ -827,8 +827,8 @@ function usage {
     echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]"
 }
 
+[[ $1 == "--version" ]] && { cat $CONFIG/version ; exit; }
 [[ $1 == "--help" ]] || [[ $1 == "-h" ]] && { usage; exit 0; }
-
 [[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
 [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
 [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ $1 == "replicate" ]] || [[ ! -e $LOCKFILE ]] || { echo "$0: $LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
