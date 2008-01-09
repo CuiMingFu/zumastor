@@ -17,6 +17,10 @@ rc=0
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
+# Extra disk sizes required
+HDBSIZE=4
+HDCSIZE=8
+
 slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
@@ -40,19 +44,8 @@ ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 echo ok 2 - slave network set up
 
-lvcreate --size 4m -n test sysvg
-lvcreate --size 8m -n test_snap sysvg
-dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
-dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
-echo ok 3 - master lvm set up
 
-${SSH} root@${slave} lvcreate --size 4m -n test sysvg
-${SSH} root@${slave} lvcreate --size 8m -n test_snap sysvg
-${SSH} root@${slave} dd if=/dev/zero bs=32k count=128 of=/dev/sysvg/test
-${SSH} root@${slave} dd if=/dev/zero bs=32k count=256 of=/dev/sysvg/test_snap
-echo ok 4 - slave lvm set up
-
-ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
+ddsnap initialize /dev/sdc /dev/sdb
 echo ok 5 - master ddsnap initialize
 
 controlsocket="/tmp/control"
@@ -65,11 +58,11 @@ mkdir /tmp/server
 # TODO: when b/892805 is fixed, last element of socket may be something
 # other than $volname
 serversocket="/tmp/server/$volname"
-ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
+ddsnap server /dev/sdc /dev/sdb $controlsocket $serversocket
 echo ok 7 - master ddsnap server
 sleep $SLEEP
 
-${SSH} root@${slave} ddsnap initialize /dev/sysvg/test_snap /dev/sysvg/test
+${SSH} root@${slave} ddsnap initialize /dev/sdc /dev/sdb
 echo ok 8 - slave ddsnap initialize
 sleep $SLEEP
 
@@ -79,16 +72,16 @@ sleep $SLEEP
 
 ${SSH} root@${slave} mkdir /tmp/server
 ${SSH} root@${slave} \
-  ddsnap server /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $serversocket
+  ddsnap server /dev/sdc /dev/sdb $controlsocket $serversocket
 echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
 size=`ddsnap status $serversocket --size` 
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname
+echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket -1 | dmsetup create $volname
 echo ok 11 - master create $volname
 sleep $SLEEP
 
-$SSH root@${slave} "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket -1 | dmsetup create $volname"
+$SSH root@${slave} "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket -1 | dmsetup create $volname"
 echo ok 12 - slave create $volname
 sleep $SLEEP
 
@@ -104,7 +97,7 @@ ddsnap create $serversocket $tosnap
 echo ok 14 - ddsnap create $tosnap
 sleep $SLEEP
 
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
+echo 0 $size ddsnap /dev/sdc /dev/sdb \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
 echo ok 15 - create $volname\($tosnap\) block device on master
@@ -129,7 +122,7 @@ echo ok 18 - create snapshot $tosnap on slave
 sleep $SLEEP
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+  "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
 echo ok 19 - create $volname\($tosnap\) block device on slave
 
 hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
@@ -149,7 +142,7 @@ ddsnap create $serversocket $tosnap
 echo ok 22 - ddsnap create $tosnap
 sleep $SLEEP
 
-echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test \
+echo 0 $size ddsnap /dev/sdc /dev/sdb \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
 echo ok 23 - create $volname\($tosnap\) block device on master
@@ -172,7 +165,7 @@ $SSH root@$slave \
 echo ok 26 - create snapshot $tosnap on slave
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sysvg/test_snap /dev/sysvg/test $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+  "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
 echo ok 27 - create $volname\($tosnap\) block device on slave
 
 hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
