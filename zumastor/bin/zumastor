@@ -827,7 +827,7 @@ function usage {
     echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]"
 }
 
-[[ $1 == "--version" ]] && { cat $CONFIG/version ; exit; }
+[[ $1 == "--version" ]] || [[ $1 == "-v" ]] && { cat $CONFIG/version ; exit; }
 [[ $1 == "--help" ]] || [[ $1 == "-h" ]] && { usage; exit 0; }
 [[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
 [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
