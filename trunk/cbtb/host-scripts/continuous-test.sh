@@ -43,8 +43,6 @@ repo="${top}/zumastor-tests"
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-cat /var/lib/misc/dnsmasq.leases
-
 if $TUNBR $TUNBR ./runtests.sh
 then
   export FAILED_TEST_REV=
@@ -52,13 +50,8 @@ else
   export FAILED_TEST_REV=$installrev
 fi
 
-cat /var/lib/misc/dnsmasq.leases
-
 # Perhaps shorten this if a test ran successfully, as that caused
 # a delay already on it's own.  
 sleep 300
-
-cat /var/lib/misc/dnsmasq.leases
-
 
 exec $0
