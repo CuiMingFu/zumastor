@@ -42,7 +42,6 @@ timeout_file_wait() {
 # additional software requirements of this test
 apt-get update
 aptitude install -y xfsprogs
-modprobe xfs
 
 # create LVM VG testvg
 time pvcreate -ff /dev/sdb
