@@ -4,7 +4,7 @@ clean:
 	rm -rf ./usr nblock_write
 
 etc/zumastor/version:
-	@echo zumastor revision `svnversion .||cat SVNREV` built on `date` by `whoami`@`hostname` > $@
+	@echo zumastor revision `cat SVNREV || svnversion .` built on `date` by `whoami`@`hostname` > $@
 
 zumastor.8.gz: ./man/zumastor.8
 	gzip -c ./man/zumastor.8 > zumastor.8.gz
