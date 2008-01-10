@@ -2,7 +2,7 @@
 <layman>
 <overlay
     type = "svn"
-    src  = "http://zumastor.googlecode.com/svn/branches/gentoo/overlay"
+    src  = "http://zumastor.googlecode.com/svn/trunk/gentoo/overlay"
     contact = "zumastor@googlegroups.com"
     name = "zumastor"
     status = "unofficial">
