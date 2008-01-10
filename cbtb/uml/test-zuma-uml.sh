@@ -25,11 +25,7 @@ fi
 pushd ../..
   repo=${PWD}
   build=${PWD}/build
-  if [ -f SVNREV ] ; then
-    SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV`
-  else
-    SVNREV=`svn info zumastor | grep ^Revision:  | cut -d\  -f2`
-  fi
+  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 popd
 
 templateimg=$build/${DIST}-${ARCH}-zumastor-r${SVNREV}.ext3
@@ -137,10 +133,10 @@ fi
 trap "kill -9 ${uml_pid} ${uml2_pid} ; exit 1" 1 2 3 6 14 15
 
 count=0
-while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR} hostname 2>/dev/null
+while kill -0 ${uml_pid} && [ $count -lt 30 ] && \
+  ! ${SSH} root@${IPADDR} hostname 2>/dev/null
 do
   count=$(( count + 1 ))
-  echo -n .
   sleep 10
 done
 if [ $count -ge 30 ]
@@ -152,10 +148,10 @@ fi
   
 if [ "x$MACADDR2" != "x" ] ; then
   count=0
-  while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
+  while kill -0 ${uml2_pid} && [ $count -lt 30 ] && \
+    ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
   do
     count=$(( count + 1 ))
-    echo -n .
     sleep 10
   done
 

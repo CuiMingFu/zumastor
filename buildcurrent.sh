@@ -138,4 +138,3 @@ then
 fi
 
 popd >> $LOG
-echo zumastor packages successfully built in $BUILD_DIR/*.deb
