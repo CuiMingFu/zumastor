@@ -40,11 +40,8 @@ if [ "x$VERSION" = "x" ] ; then
   exit 1
 fi
     
-if [ -f SVNREV ] ; then
-  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV`
-else
-  SVNREV=`svn info | grep ^Revision:  | cut -d\  -f2`
-fi
+SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+
 
 # Build the userspace debs and the UML kernel
 ./buildcurrent.sh kernel/config/$KERNEL_VERSION-um-uml
