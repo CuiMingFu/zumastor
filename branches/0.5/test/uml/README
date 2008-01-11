@@ -1,0 +1,105 @@
+For quick start, have a look at demo.sh or just run it. The script will set up
+everything for you.
+
+Content
+  * config_uml is the configuration file for setting up uml.
+  * config_single is the configuration file for setting up a single zumastor host.
+  * config_replication is the configuration file for setting up replication.
+  * build_uml.sh builds uml linux executable with the $KERNEL_VERSION specified 
+    in config_uml.
+  * build_fs.sh builds a root file system image based on the image downloaded from 
+    uml website.
+  * build_fs_root.sh requires root privilege. It installs all the required libraries
+    and utilities on the root file system image.
+  * setup_network_root.sh requires root privilege. It configures host and uml network.
+  * start_uml.sh loads up a uml.
+  * start_replication.sh loads up source and target umls, sets up ssh keys for source 
+    and target umls to access each other, and sets up source and target volumes 
+    according to the configurations specified in config_replication.
+  * update_zuma_root.sh requires root privilege. It takes the root file system image 
+    as input and installs ddnsap and zumastor from the $ZUMA_REPOSITORY repository
+    specified in config_uml. The ddsnap and zumastor code need to be compiled first
+    before running this script. ddsnap and zumastor directories need to be readable
+    by root.
+  * test_XXX.sh is a test script that tests zumastor correctness under a particular 
+    condition.
+  * run_all.sh runs all test scripts included in the current directory one by one. 
+    The generated results are "test_name PASS/FAIL/UNRESOLVED" and a log file of 
+    output for each test.
+
+Usage
+  * The host machine needs to run a 32 bit kernel and a libc compatible with Debian 
+    Etch (such as Ubuntu Dapper) to compile uml linux kernel.
+  * The host machine needs 3.5G free space to set up uml replication test.
+  * The default configuration files assume the tests to be run from the test/uml
+    directory under a zumastor source repository. If you want to run the uml tests
+    from a different place, please copy all the files in this directory to your
+    working directory and change $ZUMA_REPOSITORY in config_uml to the path where 
+    zumastor repository locates.
+  * For security reason, we recommend you to run uml tests as a normal user. Have a 
+    look at demo.sh for the steps of setting up a uml environment for zumastor tests.
+    Here is how to try it:
+        sh demo.sh 
+    In demo.sh, uml_fs1 is the file name of the source uml file system image, uml_fs2 is 
+    the file name of the target uml file system image, 192.168.100.1 is the virtual 
+    IP assigned to source uml, 192.168.100.2 is the virtual IP assigned to target uml, 
+    uml_1 is the host name assigned to source uml, uml_2 is the host name assigned 
+    to target uml, and 192.168.100.111 is the assigned tap IP on host. You can replace 
+    these values with your own configuration. When you change a configuration, have a 
+    look at config_uml and config_replication (or config_single for single uml test) 
+    and modify them accordingly.
+  * After the initial setup, any test will re-use the existing kernel and file system 
+    images. You can start a test by running ./test_xxx.sh. The only exception is that
+    you need to re-configure iptable every time the host machine reboots:
+         sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    To set up iptable automatically, you can put the above command into a script under 
+    /etc/init.d and link it to the proper rc scripts.
+  * If you want to run large volume replication tests, you can create four logical 
+    volumes on the host with 'lvcreate', and replace $source_ubdb_dev, $source_ubdc_dev,
+    $target_ubdb_dev, and $target_ubdc_dev with these lvms in config_replication.
+  * We use environment variable $ITERATIONS to control how many cycles a test executes.
+    demo.sh set $ITERATIONS to 1 to check if the uml environment is successfully build.
+    You may want to run a test for many cycles, say 10000, for retrieving subtle bugs.
+  * The built root file system image contains basic packages required to run a 
+    zumastor test. For developers, you can run update_zuma_root.sh to install your own 
+    ddsnap and zumastor code from a local zumastor source repository. Before doing
+    this, have a look at config_uml and change $ZUMA_REPOSITORY to the path of your
+    local zumastor source repository. You can also install the following packages 
+    and checkout the current zumastor code on uml if you want to debug zumastor
+    and ddsnap on uml directly:
+         apt-get install subversion
+         apt-get install make
+         apt-get install gcc
+         apt-get install zlib1g-dev
+         apt-get install libpopt-dev
+         svn co http://zumastor.googlecode.com/svn/trunk/ zumastor
+
+Troubleshooting
+  uml kernel build)
+    * Watch out for oldconfig ARCH=um gratuitously changing your config to 64bit 
+      if you are building under a 64 bit host.
+    * Please check the gcc version if you got any error during compiling.
+      (gcc-4.0 may cause some problems).
+  host iptable setup)
+    * The kernel config options Networking -> Network Options -> 
+      Network packet filtering framework -> Core Netfilter Configuration -> 
+      Netfilter connection tracking support and Networking -> Network Options -> 
+      Network packet filtering framework -> IP: Netfilter Configuration -> 
+      IPv4 connection tracking support && Full NAT && MASQUERADE target support 
+      need to be set on host machine for iptable to work.
+  access from another host)
+    * Add route on a host that wants to access the uml: 
+        route add -host $uml_ip gw $hostname dev eth0
+    * Add hostname matching on a host that wants to access the uml: 
+        echo "$uml_ip $uml_host" >> /etc/hosts
+  running)
+    * The default memory that the test scripts assign to uml is 64M. You can change 
+      this by changing the value of mem option that linux takes in the corresponding 
+      test script.
+    * If syslogd or ssh are extremely slow, check if your DNS server responds to 
+      queries from the assigned uml names. Append your domain name to those uml
+      names to see if that solves the problem.
+    * If you want to check the status of a running uml, you can ssh to it with
+      'ssh -l root uml_1' where uml_1 is the assigned uml hostname. In case ssh does
+      not work, you can attach to the running uml with 'screen -r pid-of-uml-screen'
+      where pid-of-uml-screen is the pid of process "SCREEN -d -m ./linux ...".

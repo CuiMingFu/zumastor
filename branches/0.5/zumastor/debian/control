@@ -1,0 +1,12 @@
+Source: zumastor
+Section: unknown
+Priority: optional
+Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
+Build-Depends: debhelper (>= 4.0.0)
+Standards-Version: 3.6.2
+
+Package: zumastor
+Architecture: any
+Depends: ddsnap (>= 0.4), cron, dmsetup, util-linux, ${shlibs:Depends}, ${misc:Depends}
+Description: Zumastor interface for ddsnap
+	Provides snapshot and replication management for the ddsnap package

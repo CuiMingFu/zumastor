@@ -1,0 +1,73 @@
+--- 2.6.22.10.clean/drivers/md/Kconfig	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/drivers/md/Kconfig	2007-11-21 13:02:54.000000000 -0800
+@@ -271,6 +271,14 @@ config DM_DELAY
+ 
+ 	If unsure, say N.
+ 
++config DM_DDSNAP
++	tristate "Distributed Data Snapshot target (EXPERIMENTAL)"
++	depends on BLK_DEV_DM && EXPERIMENTAL
++	---help---
++	  This device-mapper target allows you to take multiple simultaneous
++	  read/write snapshots of a clustered or non-clustered block devices.
++	  If unsure, say N.
++
+ endmenu
+ 
+ endif
+--- 2.6.22.10.clean/drivers/md/Makefile	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/drivers/md/Makefile	2007-11-21 13:02:27.000000000 -0800
+@@ -37,6 +37,7 @@ obj-$(CONFIG_DM_MULTIPATH_EMC)	+= dm-emc
+ obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
+ obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
+ obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
++obj-$(CONFIG_DM_DDSNAP)		+= dm-ddsnap.o
+ 
+ quiet_cmd_unroll = UNROLL  $@
+       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
+--- 2.6.22.10.clean/include/linux/prctl.h	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/include/linux/prctl.h	2007-11-21 10:46:25.000000000 -0800
+@@ -59,4 +59,8 @@
+ # define PR_ENDIAN_LITTLE	1	/* True little endian mode */
+ # define PR_ENDIAN_PPC_LITTLE	2	/* "PowerPC" pseudo little endian */
+ 
++/* set process less throttleL: see PF_LESS_THROTTLE */
++#define PR_SET_LESS_THROTTLE           21
++#define PR_SET_MEMALLOC			22
++
+ #endif /* _LINUX_PRCTL_H */
+--- 2.6.22.10.clean/kernel/sys.c	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/kernel/sys.c	2007-11-21 10:46:25.000000000 -0800
+@@ -2241,7 +2241,16 @@ asmlinkage long sys_prctl(int option, un
+ 		case PR_SET_ENDIAN:
+ 			error = SET_ENDIAN(current, arg2);
+ 			break;
+-
++		case PR_SET_LESS_THROTTLE: {
++			current->flags |= PF_LESS_THROTTLE;
++			return 0;
++		}
++			
++		case PR_SET_MEMALLOC: {
++			current->flags |= PF_MEMALLOC;
++			printk("set PF_MEMALLOC for process %s[%i]\n", current->comm, current->pid);
++			return 0;
++		}
+ 		default:
+ 			error = -EINVAL;
+ 			break;
+--- 2.6.22.10.clean/net/socket.c	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/net/socket.c	2007-11-21 10:46:25.000000000 -0800
+@@ -2316,6 +2316,12 @@ int kernel_sock_ioctl(struct socket *soc
+ 	return err;
+ }
+ 
++/* Cluster devices need these, or better: kernel interfaces */
++
++EXPORT_SYMBOL_GPL(sys_connect);
++EXPORT_SYMBOL_GPL(sys_recvmsg);
++EXPORT_SYMBOL_GPL(sys_socket);
++
+ /* ABI emulation layers need these two */
+ EXPORT_SYMBOL(move_addr_to_kernel);
+ EXPORT_SYMBOL(move_addr_to_user);
