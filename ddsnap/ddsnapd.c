@@ -1021,6 +1021,45 @@ static u64 calc_bitmap_blocks(struct superblock *sb, u64 chunks)
 	return (chunks + (1 << (chunkshift + 3)) - 1) >> (chunkshift + 3);
 }
 
+/*
+ * Initialize the allocation bitmap.  Mark all chunks free except
+ * those we reserve for the superblock and the allocation bitmap
+ * itself.  Note that the bitmap will likely take a fractional block
+ * and indeed may also take a fractional byte.  In the latter case,
+ * we cheat by using the whole byte but marking the last few chunks
+ * (those past the end of the volume) as used.  They'll never be freed
+ * so we don't have to worry about dealing with the partial byte in
+ * alloc_chunk_from_range().
+ */
+static void init_bitmap_blocks(struct superblock *sb, unsigned bitmap_base, unsigned bitmaps, u64 chunks, u64 reserved_chunks)
+{
+	int i;
+	unsigned sector = bitmap_base;
+	u64 reserved = reserved_chunks;
+	unsigned chunks_per_bitmap_block = sb->metadata.allocsize << 3;
+
+	warn("Initializing %u bitmap block(s)", bitmaps);
+	for (i = 0; i < bitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
+		struct buffer *buffer = getblk(sb->metadev, sector, sb->metadata.allocsize);
+		if (reserved > chunks_per_bitmap_block) {
+			memset(buffer->data, 0xff, sb->metadata.allocsize);
+			reserved -= chunks_per_bitmap_block;
+		} else {
+			memset(buffer->data, 0, sb->metadata.allocsize);
+			/* Suppress overrun allocation in partial last byte */
+			if (reserved > 0) {
+				for (int j = 0; j < reserved; j++)
+					set_bitmap_bit(buffer->data, j);
+				reserved = 0;
+			}
+		}
+		if (i == bitmaps - 1 && (chunks & 7))
+			buffer->data[(chunks >> 3) & (sb->metadata.allocsize - 1)] |= 0xff << (chunks & 7);
+		write_buffer(buffer);
+		brelse(buffer);
+	}
+}
+
 /* 
  * Disk layout for combined snapshot store:
  *    4k unused
@@ -1061,40 +1100,16 @@ static int init_allocation(struct superblock *sb)
 		    (!combined(sb) ? sb->snapdata.asi->bitmap_blocks : 0)) 
 		   << sb->metadata.chunk_sectors_bits);
 	
-	u64 chunks  = sb->metadata.asi->chunks  + (!combined(sb) ? sb->snapdata.asi->chunks  : 0);
-	unsigned bitmaps = sb->metadata.asi->bitmap_blocks + (combined(sb) ? 0 : sb->snapdata.asi->bitmap_blocks);
 	if (!combined(sb))
 		warn("metadata store size: %Li chunks (%Li sectors)", 
 		     sb->metadata.asi->chunks, sb->metadata.asi->chunks << sb->metadata.chunk_sectors_bits);
+	u64 chunks  = !combined(sb) ? sb->snapdata.asi->chunks  : sb->metadata.asi->chunks;
 	warn("snapshot store size: %Li chunks (%Li sectors)", 
 	     chunks, chunks << sb->snapdata.chunk_sectors_bits);
 
-	warn("Initializing %u bitmap block(s)", bitmaps);
-	/*
-	 * Initialize the allocation bitmap.  Mark all chunks free except
-	 * those we reserve for the superblock and the allocation bitmap
-	 * itself.  Note that the bitmap will likely take a fractional block
-	 * and indeed may also take a fractional byte.  In the latter case,
-	 * we cheat by using the whole byte but marking the last few chunks
-	 * (those past the end of the volume) as used.  They'll never be freed
-	 * so we don't have to worry about dealing with the partial byte in
-	 * alloc_chunk_from_range().
-	 */
-	unsigned sector = sb->metadata.asi->bitmap_base;
-	for (int i = 0; i < bitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
-		struct buffer *buffer = getblk(sb->metadev, sector, sb->metadata.allocsize);
-		memset(buffer->data, 0, sb->metadata.allocsize);
-		/* Reserve bitmaps and superblock */
-		if (i == 0) { // FIXME: this does not handle large enough bitmap and/or journal chunks
-			for (int j = 0; j < reserved; j++)
-				set_bitmap_bit(buffer->data, j);
-		}
-		/* Suppress overrun allocation in partial last byte */
-		if (i == bitmaps - 1 && (chunks & 7))
-			buffer->data[(chunks >> 3) & (sb->metadata.allocsize - 1)] |= 0xff << (chunks & 7);
-		write_buffer(buffer);
-		brelse(buffer);
-	}
+	init_bitmap_blocks(sb, sb->metadata.asi->bitmap_base, sb->metadata.asi->bitmap_blocks, sb->metadata.asi->chunks, reserved);
+	if (!combined(sb))
+		init_bitmap_blocks(sb, sb->snapdata.asi->bitmap_base, sb->snapdata.asi->bitmap_blocks, sb->snapdata.asi->chunks, 0);
 	selfcheck_freespace(sb);
 	return 0;
 }
