@@ -130,18 +130,18 @@ fi
 
 
 # kill the emulator if any abort-like signal is received
-trap "kill -9 ${uml_pid} ${uml2_pid} ; exit 1" 1 2 3 6 14 15
+trap "kill ${uml_pid} ${uml2_pid} ; exit 1" 1 2 3 6 14 15
 
 count=0
 while kill -0 ${uml_pid} && [ $count -lt 30 ] && \
   ! ${SSH} root@${IPADDR} hostname 2>/dev/null
 do
   count=$(( count + 1 ))
-  sleep 10
+  sleep 1
 done
 if [ $count -ge 30 ]
 then
-  kill -9 $uml_pid
+  kill $uml_pid
   retval=64
   unset uml_pid
 fi
@@ -152,12 +152,12 @@ if [ "x$MACADDR2" != "x" ] ; then
     ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
   do
     count=$(( count + 1 ))
-    sleep 10
+    sleep 1
   done
 
   if [ $count -ge 30 ] 
   then
-    kill -9 $uml2_pid
+    kill $uml2_pid
     retval=65
     unset uml2_pid
   fi
@@ -198,10 +198,10 @@ fi
 # Kill emulators if more than 10 minutes pass during shutdown
 # They haven't been dying properly
 if [ "x$uml_pid" != "x" ] ; then
-  ( sleep 600 ; kill -9 $uml_pid ) & killer=$!
+  ( sleep 600 ; kill $uml_pid ) & killer=$!
 fi
 if [ "x$uml2_pid" != "x" ] ; then
-  ( sleep 600 ; kill -9 $uml2_pid ) & killer2=$!
+  ( sleep 600 ; kill $uml2_pid ) & killer2=$!
 fi
 
 if [ "x$uml_pid" != "x" ] ; then
@@ -220,21 +220,21 @@ fi
 
 if [ "x$uml_pid" != "x" ] ; then
   time wait ${uml_pid} || retval=$?
-  kill -0 ${uml_pid} && kill -9 ${uml_pid}
+  kill -0 ${uml_pid} && kill ${uml_pid}
 fi
 
 if [ "x$uml2_pid" != "x" ] ; then
   time wait ${uml2_pid} || retval=$?
-  kill -0 ${uml2_pid} && kill -9 ${uml2_pid}
+  kill -0 ${uml2_pid} && kill ${uml2_pid}
 fi
 
 
 # clean up the 10 minute shutdown killers
 if [ "x$killer2" != "x" ] ; then
-  kill -0 $killer && kill -9 $killer
+  kill -0 $killer && kill $killer
 fi
 if [ "x$killer2" != "x" ] ; then
-  kill -0 $killer2 && kill -9 $killer2
+  kill -0 $killer2 && kill $killer2
 fi
 
 rm -rf ${tmpdir}
