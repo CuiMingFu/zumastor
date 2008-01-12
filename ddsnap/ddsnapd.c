@@ -2894,6 +2894,196 @@ static void setup_sb(struct superblock *sb)
 	sb->snapdata.asi = combined(sb) ? &(sb)->image.metadata : &(sb)->image.snapdata;
 }
 
+/* 
+ * flag = 0: check if bits for chunks from start_chunk to end_chunk are all zero
+ * flag = 1: set bits for chunks from start_chunk to end_chunk
+ * flag = 2: clear bits for chunks from start_chunk to end_chunk
+ */
+static int change_bits(struct superblock *sb, u64 start_chunk, u64 end_chunk, u64 base, int flag)
+{
+	u64 chunk;
+	unsigned bitmap_shift = sb->metadata.asi->allocsize_bits + 3;
+	u64 bitmap_mask = (1 << bitmap_shift ) - 1;
+	sector_t sector = (base >> SECTOR_BITS) + ((start_chunk >> bitmap_shift) << sb->metadata.chunk_sectors_bits);
+	warn("start_chunk %Lu, end_chunk %Lu, base %Lu, flag %d, sector %Lu", start_chunk, end_chunk, base, flag, sector);
+	for (chunk = start_chunk; chunk <= end_chunk; sector += chunk_sectors(&sb->metadata)) {
+		struct buffer *buffer = bread(sb->metadev, sector, sb->metadata.allocsize);
+		do {
+			if (!flag && get_bitmap_bit(buffer->data, chunk & bitmap_mask)) {
+				warn("chunk %Lu is in use", chunk);
+				return -1;
+			}
+			if (flag == 1)
+				set_bitmap_bit(buffer->data, chunk & bitmap_mask);
+			if (flag == 2)
+				clear_bitmap_bit(buffer->data, chunk & bitmap_mask);
+			chunk ++;
+		} while ((chunk & bitmap_mask) && (chunk <= end_chunk));
+		if (flag)
+			brelse_dirty(buffer);
+	}
+	return 0;
+}
+
+/* 
+ * Shrink snapshot store: clear bits for shrinked space and free unused bitmap chunks
+ * Expand snapshot store:
+ *   If we don't need more bitmap chunks, just update last bytes.
+ *   Otherwise:
+ *     Copy old bitmap blocks to the beginning of the added space
+ *     Zero additional new bitmap blocks
+ *     Set new bitmap base and bitmap blocks
+ *     Clear bits for old bitmap chunks in new bitmap
+ *     Reserve new bitmap chunks in new bitmap
+ */
+
+static void update_bitmap(struct superblock *sb, struct allocspace *as, u64 newchunks, u64 new_basechunk, u64 new_metachunks)
+{
+	u64 oldchunks = as->asi->chunks;
+	unsigned oldbitmaps = as->asi->bitmap_blocks;
+	unsigned newbitmaps = calc_bitmap_blocks(sb, newchunks);
+	u64 oldbase = as->asi->bitmap_base << SECTOR_BITS;
+	u64 newbase = new_basechunk << sb->metadata.asi->allocsize_bits;
+	unsigned blockshift = sb->metadata.asi->allocsize_bits;
+	unsigned blocksize = sb->metadata.allocsize;
+	u64 oldchunks_meta = oldbase >> sb->metadata.asi->allocsize_bits;
+	sector_t sector;
+	int i;
+
+	warn("oldchunks %Lu newchunks %Lu, oldbitmaps %u, newbitmaps %u", oldchunks, newchunks, oldbitmaps, newbitmaps);
+	/* snapshot shrinking */
+	if (newchunks <= oldchunks) {
+		/* check if any chunk to be freed is currently in use */
+		if (change_bits(sb, newchunks, oldchunks - 1, oldbase, 0))
+			error("some chunks to be freed are still in use!!!");
+		/* clear bits for unused bitmap chunks */
+		if (newbitmaps < oldbitmaps) {
+			change_bits(sb, oldchunks_meta + newbitmaps, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
+			as->asi->bitmap_blocks = newbitmaps;
+		}
+		return;
+	}
+
+	/* no need to relocate bitmap if we don't need more bitmap chunks */
+	if (oldbitmaps == newbitmaps) {
+		if ((oldchunks & 7) || (newchunks & 7)) {
+			/* clear the last byte of the old/new bitmap block */
+			sector_t sector = (oldbase >> SECTOR_BITS) + ((oldbitmaps - 1) << sb->metadata.chunk_sectors_bits);
+			struct buffer *buffer = bread(sb->metadev, sector, blocksize);
+			if ((oldchunks & 7))
+				buffer->data[(oldchunks >> 3) & (blocksize - 1)] &= ~(0xff << (oldchunks & 7));
+			if ((newchunks & 7))
+				buffer->data[(newchunks >> 3) & (blocksize - 1)] |= 0xff << (newchunks & 7);
+			brelse_dirty(buffer);
+		}
+		return;
+	}
+
+	warn("expand bitmap: oldbase %Lu, newbase %Lu, new_metachunks %Lu", oldbase, newbase, new_metachunks);
+	/* need to add enough metadata space when expanding metadata/snapshot store */
+	if (new_metachunks < newbitmaps)
+		error("Not enough space for bitmap relocation, please add more metadata space!!!");
+
+	/* copy old bitmap chunks to the newbase */
+	for (i = 0; i < oldbitmaps; i++) {
+		trace_off(warn("copy oldbitmap %d to sector %Lu", i, (newbase + (i << blockshift)) >> SECTOR_BITS););
+		diskread(sb->metadev, sb->copybuf, blocksize, oldbase + (i << blockshift));
+		diskwrite(sb->metadev, sb->copybuf, blocksize, newbase + (i << blockshift));
+	}
+
+	/* clear the partial bits for the last old bitmap byte */
+	if ((oldchunks & 7)) {
+		sector_t sector = (newbase >> SECTOR_BITS) + ((oldbitmaps - 1) << sb->metadata.chunk_sectors_bits);
+		struct buffer *buffer = bread(sb->metadev, sector, blocksize);
+		buffer->data[(oldchunks >> 3) & (blocksize - 1)] &= ~(0xff << (oldchunks & 7));
+		brelse_dirty(buffer);
+	}
+
+	/* clear new bitmap chunks */
+	sector = (newbase >> SECTOR_BITS) + (oldbitmaps << sb->metadata.chunk_sectors_bits);
+	for (i = oldbitmaps; i < newbitmaps; i++, sector += chunk_sectors(&sb->metadata)) {
+		struct buffer *buffer = getblk(sb->metadev, sector, blocksize);
+		memset(buffer->data, 0, blocksize);
+		trace_off(warn("clear newbitmap %d, sector %Lu", i, sector););
+		/* Suppress overrun allocation in partial last byte */
+		if (i == newbitmaps - 1 && (newchunks & 7))
+			buffer->data[(newchunks >> 3) & (blocksize - 1)] |= 0xff << (newchunks & 7);
+		brelse_dirty(buffer);
+	}
+
+	as->asi->bitmap_base = newbase >> SECTOR_BITS;
+	as->asi->bitmap_blocks = newbitmaps;
+
+	/* clear bits for old bitmap chunks and reserve new bitmap chunks at new bitmap base */
+	change_bits(sb, oldchunks_meta, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
+	change_bits(sb, new_basechunk, new_basechunk + newbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 1);
+}
+
+int fd_size(int fd, u64 *bytes); // bogus, do the size checks in ddsnap.c
+
+static int sb_get_device_sizes(struct superblock *sb)
+{
+	u64 size, newsize;
+	int error;
+	u64 new_bitmap_basechunk = 0;
+	u64 new_metachunks = 0;
+
+	if ((error = fd_size(sb->metadev, &size)) < 0) {
+		warn("Error %i: %s determining metadata store size", error, strerror(-error));
+		return error;
+	}
+	newsize = size >> sb->image.metadata.allocsize_bits;
+	warn("sb->image.metadata.chunks %Lu newsize %Lu", sb->image.metadata.chunks, newsize);
+	if (sb->image.metadata.chunks != newsize) {
+		u64 oldbitmaps = sb->image.metadata.bitmap_blocks;
+		warn("metadev size changes from %Lu to %Lu", sb->image.metadata.chunks, newsize);
+		/* no need to do bitmap update during initialization (i.e., metadata.chunks ==0) */
+		if (sb->image.metadata.chunks) {
+			new_bitmap_basechunk = sb->image.metadata.chunks;
+			new_metachunks = newsize - sb->image.metadata.chunks;
+			update_bitmap(sb, &sb->metadata, newsize, new_bitmap_basechunk, new_metachunks);
+			new_bitmap_basechunk += sb->metadata.asi->bitmap_blocks;
+			new_metachunks -= sb->metadata.asi->bitmap_blocks;
+		}
+		sb->image.metadata.freechunks += newsize - sb->image.metadata.chunks + oldbitmaps - sb->image.metadata.bitmap_blocks;
+		sb->image.metadata.chunks = newsize;
+	}
+
+	if (sb->metadev != sb->snapdev) {
+		if ((error = fd_size(sb->snapdev, &size)) < 0) {
+			warn("Error %i: %s determining snapshot store size", error, strerror(-error));
+			return error;
+		}
+		newsize = size >> sb->image.snapdata.allocsize_bits;
+		if (sb->image.snapdata.chunks != newsize) {
+			warn("snapdev size changes from %Lu to %Lu", sb->image.snapdata.chunks, newsize);
+			/* 
+			 * For bitmap relocation purpose, we allow snapdev expanding only if metadev 
+			 * is also expanded. In that case, new_bitmap_basechunk and new_metachunks
+			 * have been properly updated above.
+			 */
+			if (sb->image.snapdata.chunks) {
+				u64 oldbitmaps = sb->image.snapdata.bitmap_blocks;
+				update_bitmap(sb, &sb->snapdata, newsize, new_bitmap_basechunk, new_metachunks);
+				sb->image.metadata.freechunks += oldbitmaps - sb->image.snapdata.bitmap_blocks;
+			}
+			sb->image.snapdata.freechunks += newsize - sb->image.snapdata.chunks;
+			sb->image.snapdata.chunks = newsize;
+		}
+	}
+
+	if ((error = fd_size(sb->orgdev, &size)) < 0) {
+		warn("Error %i: %s determining origin volume size", errno, strerror(-errno));
+		return error;
+	}
+	newsize = size >> SECTOR_BITS;
+	if (sb->image.orgsectors != newsize) {
+		warn("orgdev size changes from %Lu to %Lu", sb->image.orgsectors, newsize);
+		sb->image.orgsectors = newsize;
+	}
+	return 0;
+}
+
 static void load_sb(struct superblock *sb)
 {
 	if (diskread(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
@@ -2902,6 +3092,8 @@ static void load_sb(struct superblock *sb)
 	setup_sb(sb);
 	sb->snapmask = calc_snapmask(sb);
 	trace(printf("Active snapshot mask: %016llx\n", sb->snapmask););
+	if (sb_get_device_sizes(sb))
+		error("Unable to get device sizes");
 #if 0
 	// make this a startup option !!!
 	sb->metadata.chunks_used = sb->metadata.asi->chunks - count_free(sb, &sb->metadata);
@@ -2917,8 +3109,6 @@ static void save_state(struct superblock *sb)
 	save_sb(sb);
 }
 
-int fd_size(int fd, u64 *bytes); // bogus, do the size checks in ddsnap.c
-
 /*
  * I'll leave all the testing hooks lying around in the main routine for now,
  * since the low level components still tend to break every now and then and
@@ -2932,26 +3122,10 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	sb->image.metadata.allocsize_bits = bs_bits;
 	sb->image.snapdata.allocsize_bits = cs_bits;
 
-	u64 size;
-	if ((error = fd_size(sb->metadev, &size)) < 0) {
-		warn("Error %i: %s determining metadata store size", error, strerror(-error));
+	if ((error = sb_get_device_sizes(sb)) != 0) {
+		warn("Error %i: %s get device sizes", error, strerror(-error));
 		return error;
 	}
-	sb->image.metadata.chunks = size >> sb->image.metadata.allocsize_bits;
-
-	if (sb->metadev != sb->snapdev) {
-		if ((error = fd_size(sb->snapdev, &size)) < 0) {
-			warn("Error %i: %s determining snapshot store size", error, strerror(-error));
-			return error;
-		}
-		sb->image.snapdata.chunks = size >> sb->image.snapdata.allocsize_bits;
-	}
-
-	if ((error = fd_size(sb->orgdev, &size)) < 0) {
-		warn("Error %i: %s determining origin volume size", errno, strerror(-errno));
-		return error;
-	}
-	sb->image.orgsectors = size >> SECTOR_BITS;
 
 	setup_sb(sb);
 	sb->image.etree_levels = 1;
@@ -3077,63 +3251,6 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 #endif
 	return 0;
 }
-
-// Expand snapshot store:
-//   Calculate num bitmap blocks for new size
-//   Copy bitmap blocks to current top
-//   Clear new bitmap blocks
-//   Reserve new bitmap blocks
-//   Clear remainder bits in old last bitmap byte
-//   Set remainder bits in new last bitmap byte
-//   Set new bitmap base and chunks count
-
-
-/* need to fix and test expand_snapstore */
-
-#if 0
-static void expand_snapstore(struct superblock *sb, u64 newchunks)
-{
-	u64 oldchunks = sb->image.chunks;
-	unsigned oldbitmaps = sb->image.bitmap_blocks;
-	unsigned newbitmaps = calc_bitmap_blocks(sb, newchunks);
-	unsigned blocksize = sb->blocksize;
-	unsigned blockshift = sb->image.blocksize_bits;
-	u64 oldbase = sb->image.bitmap_base << SECTOR_BITS;
-	u64 newbase = sb->image.bitmap_base << SECTOR_BITS;
-
-	int i;
-	for (i = 0; i < oldbitmaps; i++) {
-		// do it one block at a time for now !!! sucks
-		// maybe should do copy with bread/write?
-		diskread(sb->snapdev, sb->copybuf, blocksize, oldbase + (i << blockshift));  // 64 bit!!!
-		diskwrite(sb->snapdev, sb->copybuf, blocksize, newbase + (i << blockshift));  // 64 bit!!!
-	}
-
-	if ((oldchunks & 7)) {
-		sector_t sector = (oldbase >> SECTOR_BITS) + ((oldbitmaps - 1) << sb->sectors_per_block_bits);
-		struct buffer *buffer = getblk(sb->snapdev, sector, blocksize);
-		buffer->data[(oldchunks >> 3) & (blocksize - 1)] &= ~(0xff << (oldchunks & 7));
-		brelse_dirty(buffer);
-	}
-
-	for (i = oldbitmaps; i < newbitmaps; i++) {
-		struct buffer *buffer = getblk(sb->snapdev, newbase >> SECTOR_BITS, blocksize);
-		memset(buffer->data, 0, sb->blocksize);
-		/* Suppress overrun allocation in partial last byte */
-		if (i == newbitmaps - 1 && (newchunks & 7))
-			buffer->data[(newchunks >> 3) & (blocksize - 1)] |= 0xff << (newchunks & 7);
-		brelse_dirty(buffer);
-	}
-
-	for (i = 0; i < newbitmaps; i++) {
-		grab_chunk(sb, (newbase >> blockshift) + i); // !!! assume blocksize = chunksize
-	}
-
-	sb->image.bitmap_base = newbase >> SECTOR_BITS;
-	sb->image.chunks = newchunks;
-	save_state(sb);
-}
-#endif
 
 static int client_locks(struct superblock *sb, struct client *client, int check)
 {
