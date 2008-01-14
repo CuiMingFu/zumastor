@@ -11,6 +11,20 @@
 
 set -e
 
+# wait for file.  The first argument is the timeout, the second the file.
+timeout_file_wait() {
+  local max=$1
+  local file=$2
+  local count=0
+  while [ ! -e $file ] && [ $count -lt $max ]
+  do 
+    let "count = count + 1"
+    sleep 1
+  done
+  [ -e $file ]
+  return $?
+}
+
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='scp -o StrictHostKeyChecking=no'
 # CMDTIMEOUT='timeout -14 120'
@@ -131,7 +145,17 @@ ${rqemu_i386} -m 512 \
   -net tap,ifname=${IFACE},script=no \
   -snapshot -hda ${diskimg} ${qemu_hd} \
   -boot c -no-reboot & qemu_pid=$!
-while [ ! -e ${MONITOR} ] ; do sleep 1 ; done
+if ! timeout_file_wait 30 ${MONITOR}
+then
+  echo First qemu instance never started, test harness problem.  Aborting.
+  kill -0 $qemu_pid && kill $qemu_pid
+  if [ "x$MACADDR2" != "x" ] ; then
+    kill -0 $qemu2_pid && kill $qemu2_pid
+  fi
+  exit 2
+fi
+
+
 socat - unix:${MONITOR} <<EOF
   info network
   info snapshots
@@ -149,7 +173,14 @@ if [ "x$MACADDR2" != "x" ] ; then
     -net tap,ifname=${IFACE2},script=no \
     -snapshot -hda ${diskimg} ${qemu2_hd} \
     -boot c -no-reboot & qemu2_pid=$!
-  while [ ! -e ${MONITOR2} ] ; do sleep 1 ; done
+if ! timeout_file_wait 30 ${MONITOR2}
+then
+  echo Second qemu instance never started, test harness problem.  Aborting.
+  kill -0 $qemu_pid && kill $qemu_pid
+  kill -0 $qemu2_pid && kill $qemu2_pid
+  exit 2
+fi
+
   socat - unix:${MONITOR2} <<EOF
 info network
 info snapshots
