@@ -43,7 +43,7 @@ if [ "x$VERSION" = "x" ] ; then
   echo "Suspect Version file"
   exit 65
 fi
-SVNREV=`svnversion || svn info | awk '/Revision:/ { print $2; }'`
+SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 ARCH=i386
 
 
