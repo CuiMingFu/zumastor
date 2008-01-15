@@ -184,45 +184,4 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
 time wait $qemu_pid || retval=$?
 kill -0 $qemu_pid && kill -9 $qemu_pid
 
-
-# don't try to run the first boot that saves the image.  KVM/tunbr
-# are having an issue allocating the same IPADDR again
-if false ; then
-
-
-# restart qemu on the new image and boot until ssh is working
-# and then savevm running to create a snapshot named "running"
-
-${rqemu_i386} -m 512 \
-  -serial unix:${SERIAL},server,nowait \
-  -monitor unix:${MONITOR},server,nowait \
-  -vnc unix:${VNC} \
-  -net nic,macaddr=${MACADDR},model=ne2k_pci \
-  -net tap,ifname=${IFACE},script=no \
-  -boot c -hda "${DISKIMG}" -no-reboot & qemu=$!
-  
-
-# wait for ssh to work
-while ! ${SSH} root@${IPADDR} hostname 2>/dev/null
-do
-  echo -n .
-  sleep 10
-done
-
-  socat UNIX-CONNECT:${MONITOR} - <<EOF
-savevm running
-info snapshots
-EOF
-
-${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
-
-time wait $qemu
-
-
-# endif false
-fi
-
-# Rather than cleanup known_hosts, symlink it to /dev/null for the host
-# zbuild user.
-
 exit $retval
