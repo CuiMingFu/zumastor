@@ -15,7 +15,7 @@ set -e
 pushd ../..
   SRC=$PWD
   BUILD_DIR="$SRC/build"
-  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 popd
 
 ARCH=i386

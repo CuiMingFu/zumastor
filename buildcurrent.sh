@@ -54,7 +54,7 @@ fi
 
 # Get the svn revision number from the file SVNREV, svnversion, or by scraping
 # the output of svn log, in order until one is successful
-SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 
 SRC=${PWD}
 BUILD_DIR=${SRC}/build
