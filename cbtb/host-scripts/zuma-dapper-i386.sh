@@ -39,7 +39,7 @@ if [ "x$VERSION" = "x" ] ; then
 fi
 if [ "x$SVNREV" = "x" ] ; then
   pushd ..
-  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`  
+  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
   popd
 fi
 ARCH=i386
@@ -222,9 +222,7 @@ time wait $qemu
 # endif false
 fi
 
-echo "Instance shut down, removing ssh hostkey"
-sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
+# Rather than cleanup known_hosts, symlink it to /dev/null for the host
+# zbuild user.
 
 exit $retval
-
-
