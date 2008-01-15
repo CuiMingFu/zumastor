@@ -37,6 +37,9 @@ if [ ! -f /etc/dnsmasq.conf.distrib ] ; then
   # where tunbr will put anything it wants
   # dnsmasq to serve.  Truncate this on reboot.
   touch /var/lib/misc/tunbr.dnsmasq
+fi
+
+
   cat >/etc/init.d/tunbr-dnsmasq <<EOF
 #!/bin/sh
 
@@ -73,4 +76,3 @@ bogus-priv
 EOF
   /etc/init.d/dnsmasq restart
 
-fi
