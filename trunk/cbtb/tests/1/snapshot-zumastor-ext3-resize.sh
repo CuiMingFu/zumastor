@@ -58,7 +58,7 @@ function size_check {
 }
 
 apt-get update
-aptitude install e2fsprogs
+aptitude install -y e2fsprogs
 
 # create LVM VG testvg
 time pvcreate -ff /dev/sdb
