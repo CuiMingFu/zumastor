@@ -98,7 +98,7 @@ file_check 3 "identical testfile after snapshot"
 lvresize /dev/testvg/test -L 16m
 /etc/init.d/zumastor restart
 zumastor stop master testvol
-e2fsck -f /dev/mapper/testvol
+e2fsck -f -y /dev/mapper/testvol
 resize2fs /dev/mapper/testvol 16m
 zumastor start master testvol
 size_check "origin" "16,777,216" 4 "size check after origin volume enlarge"
@@ -127,7 +127,7 @@ sync
 
 # test origin volume shrink: currently not fully supported
 zumastor stop master testvol
-e2fsck -f /dev/mapper/testvol
+e2fsck -f -y /dev/mapper/testvol
 resize2fs /dev/mapper/testvol 4m
 # force any data left on the freed space to be copied out to the snapstore
 dd if=/dev/zero of=/dev/mapper/testvol bs=1k seek=4k count=12k
