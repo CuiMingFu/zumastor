@@ -103,8 +103,8 @@ $SUDO ln -s /dev/ubdd $ext3dir/dev/sdd
 
 # Some logic in the installer is hosed under debootstrap
 # Just make sure this directory exists or DHCP will fail
-rm -f $ext3dir/etc/network/run
-mkdir $ext3dir/etc/network/run
+$SUDO rm -f $ext3dir/etc/network/run
+$SUDO mkdir $ext3dir/etc/network/run
 
 $SUDO umount $ext3dir
 
