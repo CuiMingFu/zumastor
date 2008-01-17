@@ -70,6 +70,8 @@ auto eth0
 iface eth0 inet dhcp
 EOF
 $SUDO mv $stagefile $rootdir/etc/network/interfaces
+$SUDO chown root:root $rootdir/etc/network/interfaces
+$SUDO chmod 644 $rootdir/etc/network/interfaces
 
 # clean up the downloaded packages to conserve space
 $SUDO rm -f $rootdir/var/cache/apt/archives/*.deb
@@ -102,9 +104,9 @@ $SUDO ln -s /dev/ubdc $ext3dir/dev/sdc
 $SUDO ln -s /dev/ubdd $ext3dir/dev/sdd
 
 # Some logic in the installer is hosed under debootstrap
-# Just make sure this directory exists or DHCP will fail
-$SUDO rm -f $ext3dir/etc/network/run
-$SUDO mkdir $ext3dir/etc/network/run
+# Just make sure this exists or DHCP will fail
+# $SUDO rm -rf $ext3dir/etc/network/run
+# $SUDO mkdir $ext3dir/etc/network/run
 
 $SUDO umount $ext3dir
 
