@@ -63,8 +63,6 @@ largest_hdcsize=0
 largest_hddsize=0
 for f in ${execfiles}
 do
-  if [ "x$console1" = "x" ] ; then console1="$logdir/`basename ${f}`.console1" ; fi
-  if [ "x$console2" = "x" ] ; then console2="$logdir/`basename ${f}`.console2" ; fi
   hdbsize=`awk -F = '/^HDBSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hdbsize" != "x" ] ; then
     if [ "$hdbsize" -ge "$largest_hdbsize" ] ; then
@@ -84,9 +82,6 @@ do
     fi
   fi
 done
-
-if [ "x$console1" = "x" ] ; then console1="$logdir/console1" ; fi
-if [ "x$console2" = "x" ] ; then console2="$logdir/console2" ; fi
 
 
 hd=""
@@ -120,16 +115,16 @@ $build/linux-${ARCH}-r${SVNREV} \
   ubd0=${tmpdir}/hda.img,$templateimg $hd fake_ide \
   mem=512M \
   eth0=tuntap,$IFACE,$MACADDR,$VIRTHOST \
+  con=null \
   & uml_pid=$!
-#  con0=fd:0,fd:1 con1=fd:0,fd:1 con=null </dev/null >$console1 \
 
 if [ "x$MACADDR2" != "x" ] ; then
   $build/linux-${ARCH}-r${SVNREV} \
     ubd0=${tmpdir}/hda2.img,$templateimg $hd2 fake_ide \
     mem=512M \
     eth0=tuntap,$IFACE2,$MACADDR2,$VIRTHOST \
+    con=null \
     & uml2_pid=$!
-#    con0=fd:0,fd:1 con1=fd:0,fd:1 con=null </dev/null >$console2 
 fi
 
 

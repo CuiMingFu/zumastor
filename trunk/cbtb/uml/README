@@ -36,7 +36,7 @@ sys     1m14.491s
 
 Running just a single test:
 
-time ARCH=i386 DIST=etch tunbr ./test-zuma-uml.sh ../tests/1/snapshot-zumastor-2045G.sh
+time ARCH=i386 DIST=etch tunbr ./test-zuma-uml.sh ../tests/1/snapshot-zumastor-xfs-2045G.sh
  ...
 + exit 0
 Set 'tap3' nonpersistent
