@@ -15,8 +15,10 @@
 
 set -e
 
-# Terminate test in 20 minutes.  Read by test harness.
-TIMEOUT=1200
+# Terminate test in 5 minutes.  Read by test harness.  The test usually
+# times out due to the zumastor define source in step 4, so a very tight
+# limit has been given to this test to speed up runs of the entire suite.
+TIMEOUT=300
 HDBSIZE=4
 HDCSIZE=8
 
