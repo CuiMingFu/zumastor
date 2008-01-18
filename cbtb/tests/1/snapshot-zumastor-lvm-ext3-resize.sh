@@ -18,9 +18,6 @@ HDBSIZE=1024
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
 
-# feature not yet implemented
-EXPECT_FAIL=1
-
 # wait for file.  The first argument is the timeout, the second the file.
 timeout_file_wait() {
   local max=$1
