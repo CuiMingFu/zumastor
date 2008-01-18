@@ -64,6 +64,7 @@ TIME=`date +%s`
 
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
+[ -d $BUILD_DIR/r${SVNREV} ] || mkdir $BUILD_DIR/r${SVNREV}
 cp $kconfig $BUILD_DIR/$KERNEL_VERSION.config
 pushd $BUILD_DIR >> $LOG || exit 1
 
