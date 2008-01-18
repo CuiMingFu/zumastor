@@ -31,15 +31,12 @@ declare -r MAX_SNAPSHOTS=64
 declare -r SNAPSHOTS_PER_TARGET=2 # hold and send
 declare -r SNAPSHOTS_FOR_SOURCE=4 # only three are necessary if do things in the right order
 
+# TODO: hunt down and clear all code surrounding calls to this function
+# before deleting it
 declare yes_to_all
 function prompt_continue {
-	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
-	local text=$1 input
-
 	[[ $yes_to_all ]] && return 0
-	read -p "$text [n] " input
-	[[ $input = "y" ]] || [[ $input = "yes" ]] || exit 1
-	return 0
+	return 1
 }
 
 # log <filename> <message>
