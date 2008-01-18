@@ -53,8 +53,8 @@ cp --sparse=always $ext3 $uda
 sudo mount -oloop,rw $uda $rootdir
 
 # install the new zumastor userspace programs
-cp $BUILD_DIR/zumastor_$VERSION-r${SVNREV}_$ARCH.deb \
-  $BUILD_DIR/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
+cp $BUILD_DIR/r${SVNREV}/zumastor_$VERSION-r${SVNREV}_$ARCH.deb \
+  $BUILD_DIR/r${SVNREV}/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
   $rootdir/tmp
 
 sudo chroot $rootdir dpkg -i /tmp/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \

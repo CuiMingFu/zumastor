@@ -78,7 +78,7 @@ echo ${SVNREV} >SVNREV
 EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
-mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}
+mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
 echo -e "done.\n"
 
 echo -n Building ddsnap Debian package...
@@ -89,7 +89,7 @@ EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$S
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 make genpatches
 popd >> $LOG
-mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}
+mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
 echo -e "done.\n"
 
 if [ -e linux-${KERNEL_VERSION} ] ; then
@@ -132,6 +132,12 @@ then
   else
     echo -n Building kernel package...
     fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
+    for kfile in \
+      kernel-image-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb \
+      kernel-headers-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb
+    do
+      [ -f $kfile ] && mv $kfile r${SVNREV}/
+    done
   fi
   popd >> $LOG
   echo -e "done.\n"
