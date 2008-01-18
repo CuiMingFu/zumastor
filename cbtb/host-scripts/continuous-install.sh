@@ -54,7 +54,7 @@ diskimgdir=${HOME}/testenv
 export BUILDDIR="${top}/zumastor/build"
 export SVNREV=$buildrev
 export TEMPLATEIMG="${BUILDDIR}/dapper-i386.img"
-export DISKIMG="${BUILDDIR}/dapper-i386-zumastor-r${SVNREV}.img"
+export DISKIMG="${BUILDDIR}/r${SVNREV}/dapper-i386-zumastor-r${SVNREV}.img"
 
 
 pushd ${BUILDDIR}

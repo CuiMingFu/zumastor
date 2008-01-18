@@ -82,9 +82,8 @@ SERIAL=${IMAGEDIR}/serial
 MONITOR=${IMAGEDIR}/monitor
 VNC=${IMAGEDIR}/vnc
 
-if [ ! -e ${IMAGEDIR} ]; then
-  mkdir -p ${IMAGEDIR}
-fi
+[ -e ${IMAGEDIR} ] || mkdir -p ${IMAGEDIR}
+[ -e ${IMAGEDIR}/r${SVNREV} ] || mkdir -p ${IMAGEDIR}/r${SVNREV}
 
 if [ "x$TEMPLATEIMG" = "x" ] ; then
 
@@ -108,13 +107,16 @@ if [ -f "${DISKIMG}" ] ; then
 fi
 
 templatedir=`dirname "${TEMPLATEIMG}"`
-diskimgdir=`dirname "${TEMPLATEIMG}"`
+diskimgdir=`dirname "${DISKIMG}"`
 if [ "x$templatedir" = "x$diskimgdir" ] ; then
   pushd $templatedir
   ${qemu_img} create  -b `basename "${TEMPLATEIMG}"` -f qcow2 `basename "${DISKIMG}"`
   popd
 else
-  ${qemu_img} create  -b "${TEMPLATEIMG}" -f qcow2 "${DISKIMG}"
+  ln -s ${TEMPLATEIMG} $diskimgdir/dapper-i386.img
+  pushd $diskimgdir
+    ${qemu_img} create  -b dapper-i386.img -f qcow2 "${DISKIMG}"
+  popd
 fi
 
 ${qemu_i386} -m 512 \
