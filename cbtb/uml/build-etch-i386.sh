@@ -63,6 +63,6 @@ sudo rm $rootdir/tmp/*.deb
 sudo umount $rootdir
 rmdir $rootdir
 
-mv $uda $BUILD_DIR/$DIST-$ARCH-zumastor-r$SVNREV.ext3
+mv $uda $BUILD_DIR/r$SVNREV/$DIST-$ARCH-zumastor-r$SVNREV.ext3
 
 popd

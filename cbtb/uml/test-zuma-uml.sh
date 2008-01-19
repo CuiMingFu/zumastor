@@ -18,7 +18,7 @@ if [ "x$ARCH" = "x" ] ; then
 fi
 
 if [ "x$DIST" = "x" ] ; then
-  DIST=dapper
+  DIST=etch
 fi
 
 
@@ -28,7 +28,7 @@ pushd ../..
   SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 popd
 
-templateimg=$build/${DIST}-${ARCH}-zumastor-r${SVNREV}.ext3
+templateimg=$build/r${SVNREV}/${DIST}-${ARCH}-zumastor-r${SVNREV}.ext3
 
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='scp -o StrictHostKeyChecking=no'
@@ -111,16 +111,16 @@ if [ $largest_hddsize -gt 0 ] ; then
   fi
 fi
 
-$build/linux-${ARCH}-r${SVNREV} \
-  ubd0=${tmpdir}/hda.img,$templateimg $hd fake_ide \
+$build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
+  ubd0=${tmpdir}/hda.img,$templateimg $hd \
   mem=512M \
   eth0=tuntap,$IFACE,$MACADDR,$VIRTHOST \
   con=null \
   & uml_pid=$!
 
 if [ "x$MACADDR2" != "x" ] ; then
-  $build/linux-${ARCH}-r${SVNREV} \
-    ubd0=${tmpdir}/hda2.img,$templateimg $hd2 fake_ide \
+  $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
+    ubd0=${tmpdir}/hda2.img,$templateimg $hd2 \
     mem=512M \
     eth0=tuntap,$IFACE2,$MACADDR2,$VIRTHOST \
     con=null \

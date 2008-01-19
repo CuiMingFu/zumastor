@@ -113,8 +113,9 @@ $SUDO umount $ext3dir
 # copy it back into the build/ directory, avoiding NFS issues and
 # potential races.
 $SUDO chown $USER $ext3dev
-mv $ext3dev $BUILD_DIR/$DIST-$ARCH-r$SVNREV.ext3
-ln -sf $DIST-$ARCH-r$SVNREV.ext3 $BUILD_DIR/$DIST-$ARCH.ext3 
+[ -d $BUILD_DIR/r$SVNREV ] || mkdir $BUILD_DIR/r$SVNREV
+mv $ext3dev $BUILD_DIR/r$SVNREV/$DIST-$ARCH-r$SVNREV.ext3
+ln -sf r${SVNREV}/$DIST-$ARCH-r$SVNREV.ext3 $BUILD_DIR/$DIST-$ARCH.ext3 
 
 # cleanup
 $SUDO rm -rf $rootdir
