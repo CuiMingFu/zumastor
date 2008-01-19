@@ -129,7 +129,8 @@ then
   then
    echo -n Building UML kernel binary
    make -j4 ARCH=um SUBARCH=i386 linux
-   mv linux ../linux-i386-r${SVNREV}
+   [ -d ../r${SVNREV} ] || mkdir ../r${SVNREV}
+   mv linux ../r${SVNREV}/linux-i386-r${SVNREV}
   else
     echo -n Building kernel package...
     fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
