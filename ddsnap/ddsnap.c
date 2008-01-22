@@ -1975,6 +1975,47 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 	return 0;
 }
 
+static int ddsnap_resize_devices(int serv_fd, u64 orgsize, u64 snapsize, u64 metasize)
+{
+	int err;
+	if ((err = outbead(serv_fd, RESIZE, struct resize_request, orgsize, snapsize, metasize))) {
+		warn("unable to send resize request: %s", strerror(-err));
+		return -1;
+	}
+	struct head head;
+	if ((err = readpipe(serv_fd, &head, sizeof(head))) < 0) {
+		warn("received incomplete packet header: %s", strerror(-err));
+		return -1;
+	}
+	if (head.code != RESIZE) {
+		if (head.code == STATUS_ERROR)
+			error_message_handler(serv_fd, "server reason why resizing failed", head.length);
+		else
+			unknown_message_handler(serv_fd, &head);
+		return -1;
+	}
+	if (head.length != sizeof(struct resize_request)) {
+		warn("state length mismatch: expected >=%zu, actual %u", sizeof(struct resize_request), head.length);
+		return -1;
+	}
+	struct resize_request reply;
+	if ((err = readpipe(serv_fd, &reply, head.length)) < 0) {
+		warn("received incomplete resize message: %s", strerror(-err));
+		return -1;
+	}
+	printf("Device sizes after resizing:\n\t");
+	printf("origin device %Lu\n\t", reply.orgsize);
+	printf("snapshot device %Lu\n\t", reply.snapsize);
+	printf("metadata device %Lu\n", reply.metasize);
+
+	if ((orgsize && reply.orgsize != orgsize) || (snapsize && reply.snapsize != snapsize) || (metasize && reply.metasize != metasize)) {
+		warn("Can not resize devices to the specified value: orgsize %Lu snapsize %Lu metasize %Lu!!", orgsize, snapsize, metasize);
+		return -1;
+	}
+
+	return 0;
+}
+
 static void mainUsage(void)
 {
 	printf("usage: ddsnap [-?|--help|--usage|--version] <subcommand>\n"
@@ -2108,6 +2149,14 @@ int main(int argc, char *argv[])
 		POPT_TABLEEND
 	};
 
+	char *orgsize_str = NULL, *snapsize_str = NULL, *metasize_str = NULL;
+	struct poptOption resizeOptions[] = {
+		{ "origin", 'o', POPT_ARG_STRING, &orgsize_str, 0, "New origin device size", "size" },
+		{ "snapshot", 's', POPT_ARG_STRING, &snapsize_str, 0, "New snapshot device size", "size" },
+		{ "metadata", 'm', POPT_ARG_STRING, &metasize_str, 0, "New metadata device size", "size" },
+		POPT_TABLEEND
+	};
+
 	poptContext mainCon;
 	struct poptOption mainOptions[] = {
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
@@ -2130,6 +2179,8 @@ int main(int argc, char *argv[])
 		  "Get statistics\n\t Function: Report snapshot usage statistics\n\t Usage: status [OPTION...] <sockname> [<snapshot>]", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &deltaOptions, 0,
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
+		  "Resize\n\t Function: Change origin/snapshot/metadata device size\n\t Usage: resize [OPTION...] <sockname>", NULL },
 		{ "version", 'V', POPT_ARG_NONE, NULL, 0, "Show version", NULL },
 		POPT_AUTOHELP
 		POPT_TABLEEND
@@ -3078,6 +3129,49 @@ int main(int argc, char *argv[])
 
 		fprintf(stderr, "%s %s: unrecognized delta subcommand: %s.\n", argv[0], command, subcommand);
 		return 1;
+	}
+	if (strcmp(command, "resize") == 0) {
+		struct poptOption options[] = {
+			{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &resizeOptions, 0, NULL, NULL },
+			POPT_AUTOHELP
+			POPT_TABLEEND
+		};
+
+		poptContext cdCon = poptGetContext(NULL, argc-1, (const char **)&(argv[1]), options, 0);
+		poptSetOtherOptionHelp(cdCon, "<server_socket>");
+
+		char cdOpt = poptGetNextOpt(cdCon);
+		if (cdOpt < -1) {
+			fprintf(stderr, "%s: %s: %s\n", argv[0], poptBadOption(cdCon, POPT_BADOPTION_NOALIAS), poptStrerror(cdOpt));
+			poptFreeContext(cdCon);
+			return 1;
+		}
+
+		u64 orgsize=0, snapsize=0, metasize=0;
+		if (orgsize_str != NULL)
+			orgsize = strtobytes64(orgsize_str);
+		if (snapsize_str != NULL)
+			snapsize = strtobytes64(snapsize_str);
+		if (metasize_str != NULL)
+			metasize = strtobytes64(metasize_str);
+		if (orgsize == INPUT_ERROR_64 || snapsize == INPUT_ERROR_64 || metasize == INPUT_ERROR_64) {
+			fprintf(stderr, "ddsnap: Invalid size input. Omit option, or use 0 for keep the old size\n");
+			return 1;
+		}
+		
+		const char *sockname = poptGetArg(cdCon);
+		if (sockname == NULL)
+			cdUsage(cdCon, 1, argv[0], "Must specify socket name to resize\n");
+		if (poptPeekArg(cdCon) != NULL)
+			cdUsage(cdCon, 1, argv[0], "Too many arguments to resize\n");
+
+		poptFreeContext(cdCon);
+
+		int sock = create_socket(sockname);
+
+		int ret = ddsnap_resize_devices(sock, orgsize, snapsize, metasize);
+
+		return ret;
 	}
 
 	fprintf(stderr, "%s: unrecognized subcommand: %s.\n", argv[0], command);
