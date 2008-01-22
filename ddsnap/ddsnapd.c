@@ -233,7 +233,7 @@ struct disksuper
 		u16 usecount; // persistent use count on snapshot device
 		u8 bit;    // internal snapshot number, not derived from tag
 		s8 prio;   // 0=normal, 127=highest, -128=lowest
-		char reserved[4]; /* adds up to 16 */
+		u64 sectors; // sectors of the snapshot
 	} snaplist[MAX_SNAPSHOTS]; // entries are contiguous, in creation order
 	u32 snapshots;
 	u32 etree_levels;
@@ -2441,7 +2441,7 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 create:
 	trace_on(warn("Create snapshot tag = %u, bit = %i)", snaptag, i););
 	snapshot = sb->image.snaplist + sb->image.snapshots++;
-	*snapshot = (struct snapshot){ .tag = snaptag, .bit = i, .ctime = time(NULL) };
+	*snapshot = (struct snapshot){ .tag = snaptag, .bit = i, .ctime = time(NULL), .sectors = sb->image.orgsectors };
 	sb->snapmask |= (1ULL << i);
 	set_sb_dirty(sb);
 	return i;
@@ -3543,6 +3543,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		u32 tag      = ((struct identify *)message.body)->snap;
 		sector_t off = ((struct identify *)message.body)->off;
 		sector_t len = ((struct identify *)message.body)->len;
+		u64 sectors;
 		u32 err = 0; /* success */
 		unsigned int error_len;
 		char err_msg[MAX_ERRMSG_SIZE];
@@ -3578,9 +3579,10 @@ static int incoming(struct superblock *sb, struct client *client)
 			}
 			client->flags |= SNAPCLIENT_BIT;
 			sb->usecount[snapshot->bit]++; // update the transient usecount only
-		}
-
-		if (len != sb->image.orgsectors) {
+			sectors = snapshot->sectors;
+		} else
+			sectors = sb->image.orgsectors;
+		if (len != sectors) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "volume size mismatch for snapshot %u", tag);
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0'; // make sure it's null terminated
 			err = ERROR_SIZE_MISMATCH;
@@ -3930,13 +3932,33 @@ static int incoming(struct superblock *sb, struct client *client)
 			warn("unable to send error for status message: %s", strerror(-err));
 		break;
 	}
-	case REQUEST_ORIGIN_SECTORS:
+	case REQUEST_SNAPSHOT_SECTORS:
 	{
-		int err;
+		u32 snap = ((struct status_request *)message.body)->snap;
+		struct snapshot const *snaplist = sb->image.snaplist;
+		struct snapshot_sectors reply;
+		char err_msg[MAX_ERRMSG_SIZE];
+		int i, err;
 
-		if ((err = outbead(sock, ORIGIN_SECTORS, struct origin_sectors, sb->image.orgsectors)) < 0)
-			warn("unable to send origin sectors message: %s", strerror(-err));
-		
+		reply.snap = snap;
+		reply.count = 0;
+		if (snap == (u32)~0UL) {
+			reply.count = sb->image.orgsectors;
+		} else {
+			for (i = 0; i < sb->image.snapshots; i++)
+				if (snaplist[i].tag == snap) {
+					reply.count = is_squashed(&snaplist[i]) ? 0 : snaplist[i].sectors;
+					break;
+				}
+		}
+		if (reply.count == 0) {
+			snprintf(err_msg, MAX_ERRMSG_SIZE, "Snapshot %u is not valid", snap);
+			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
+			if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
+				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
+				warn("unable to send error for snapshot_sectors message: %s", strerror(-err));
+		} else if (outbead(sock, SNAPSHOT_SECTORS, struct snapshot_sectors, reply.snap, reply.count) < 0)
+			warn("unable to send snapshot sectors message");
 		break;
 	}
 	case SHUTDOWN_SERVER:

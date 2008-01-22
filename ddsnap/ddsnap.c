@@ -984,42 +984,44 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 	return cl;
 }
 
-static u64 get_origin_sectors(int serv_fd)
+static u64 get_snapshot_sectors(int serv_fd, u32 snaptag)
 {
 	int err;
 
-	if ((err = outbead(serv_fd, REQUEST_ORIGIN_SECTORS, struct {}))) {
-		warn("unable to send request for origin sector count: %s", strerror(-err));
+	if ((err = outbead(serv_fd, REQUEST_SNAPSHOT_SECTORS, struct status_request, snaptag))) {
+		warn("unable to send request for snapshot sector count: %s", strerror(-err));
 		return 0;
 	}
 
 	struct head head;
 
 	if ((err = readpipe(serv_fd, &head, sizeof(head))) < 0) {
-		warn("unable to send request for origin sector count: %s", strerror(-err));
+		warn("received incomplete packet header: %s", strerror(-err));
 		return 0;
 	}
 
-	if (head.code != ORIGIN_SECTORS) {
-		unknown_message_handler(serv_fd, &head);
-		return 1;
+	if (head.code != SNAPSHOT_SECTORS) {
+		if (head.code != STATUS_ERROR)
+			unknown_message_handler(serv_fd, &head);
+		else
+			error_message_handler(serv_fd, "server reason why snapshot_sectors failed", head.length);
+		return 0;
 	}
 
-	struct origin_sectors body;
-
-	if (head.length != sizeof(body)) {
-		warn("origin sector message length mismatch: expected %zu, actual %Lu", sizeof(body), (llu_t) head.length);
-		return 1;
+	if (head.length != sizeof(struct snapshot_sectors)) {
+		warn("snapshot_sectors length mismatch: expected >=%zu, actual %u", sizeof(struct snapshot_sectors), head.length);
+		return 0;
 	}
 
-	if ((err = readpipe(serv_fd, &body, sizeof(body))) < 0) {
-		warn("unable to read origin sector message body: %s", strerror(-err));
-		return 1;
+	struct snapshot_sectors reply;
+
+	if ((err = readpipe(serv_fd, &reply, head.length)) < 0) {
+		warn("received incomplete snapshot_sectors message: %s", strerror(-err));
+		return 0;
 	}
 
-	return body.count;
+	return reply.count;
 }
-
 
 static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char const *devstem, u32 mode, int level, int ds_fd, char const *progress_file, u64 start_addr)
 {
@@ -1043,7 +1045,7 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 		cl->chunksize_bits = reply->meta.chunksize_bits;
 		free(reply);
 
-		u64 vol_size_bytes = get_origin_sectors(serv_fd) * 512, chunkmask = ~(-1 << cl->chunksize_bits);
+		u64 vol_size_bytes = get_snapshot_sectors(serv_fd, (u32)~0UL) * 512, chunkmask = ~(-1 << cl->chunksize_bits);
 		cl->count = (vol_size_bytes >> cl->chunksize_bits) + !!(vol_size_bytes & chunkmask);
 		cl->length = CHUNK_ARRAY_INIT;
 		cl->src_snap = src_snap;
@@ -1861,7 +1863,7 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 		printf("%s chunks free\n", number1);
 	}
 
-	commas(number1, sizeof(number1), get_origin_sectors(serv_fd) << SECTOR_BITS); // include this in status reply!!
+	commas(number1, sizeof(number1), get_snapshot_sectors(serv_fd, (u32)~0UL) << SECTOR_BITS); // include this in status reply!!
 	printf("Origin size: %s bytes\n", number1);
 	printf("Write density: %g\n", (double)reply->write_density/(double)0xffffffff);
 
@@ -2648,9 +2650,10 @@ int main(int argc, char *argv[])
 
 			return ret;
 		} else if (size) {
-			char const *sockname;
+			char const *sockname, *snaptagstr;
 
 			sockname = poptGetArg(cdCon);
+			snaptagstr = poptGetArg(cdCon);
 
 			if (sockname == NULL)
 				cdUsage(cdCon, 1, argv[0], "Must specify socket name to status\n");
@@ -2661,9 +2664,15 @@ int main(int argc, char *argv[])
 
 			int sock = create_socket(sockname);
 
-			printf("%Lu\n", get_origin_sectors(sock));
+			u32 snaptag;
+			if (snaptagstr == NULL)
+				snaptag = ~((u32)0U); /* meaning "origin snapshot" */
+			else if (parse_snaptag(snaptagstr, &snaptag) < 0) {
+				fprintf(stderr, "%s: invalid snapshot %s\n", argv[0], snaptagstr);
+				return 1;
+			}
+			printf("%Lu\n", get_snapshot_sectors(sock, snaptag));
 			close(sock);
-
 			return 0;
 		} else if (state) {
 			char const *sockname, *snaptagstr;
