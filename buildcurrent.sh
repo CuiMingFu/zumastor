@@ -60,6 +60,7 @@ SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
+ARCH=i386
 
 
 
