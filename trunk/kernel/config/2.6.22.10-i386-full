@@ -1,7 +1,7 @@
 #
 # Manually created full kernel config for zumastor releases
 #
-# Linux kernel version: 2.6.21.1
+# Linux kernel version: 2.6.22.10, from 2.6.21.1
 # Wed Nov 14 13:08:38 2007
 #
 CONFIG_X86_32=y
