@@ -984,44 +984,42 @@ static struct change_list *stream_changelist(int serv_fd, u32 src_snap, u32 tgt_
 	return cl;
 }
 
-static u64 get_snapshot_sectors(int serv_fd, u32 snaptag)
+static u64 get_origin_sectors(int serv_fd)
 {
 	int err;
 
-	if ((err = outbead(serv_fd, REQUEST_SNAPSHOT_SECTORS, struct status_request, snaptag))) {
-		warn("unable to send request for snapshot sector count: %s", strerror(-err));
+	if ((err = outbead(serv_fd, REQUEST_ORIGIN_SECTORS, struct {}))) {
+		warn("unable to send request for origin sector count: %s", strerror(-err));
 		return 0;
 	}
 
 	struct head head;
 
 	if ((err = readpipe(serv_fd, &head, sizeof(head))) < 0) {
-		warn("received incomplete packet header: %s", strerror(-err));
+		warn("unable to send request for origin sector count: %s", strerror(-err));
 		return 0;
 	}
 
-	if (head.code != SNAPSHOT_SECTORS) {
-		if (head.code != STATUS_ERROR)
-			unknown_message_handler(serv_fd, &head);
-		else
-			error_message_handler(serv_fd, "server reason why snapshot_sectors failed", head.length);
-		return 0;
+	if (head.code != ORIGIN_SECTORS) {
+		unknown_message_handler(serv_fd, &head);
+		return 1;
 	}
 
-	if (head.length != sizeof(struct snapshot_sectors)) {
-		warn("snapshot_sectors length mismatch: expected >=%zu, actual %u", sizeof(struct snapshot_sectors), head.length);
-		return 0;
+	struct origin_sectors body;
+
+	if (head.length != sizeof(body)) {
+		warn("origin sector message length mismatch: expected %zu, actual %Lu", sizeof(body), (llu_t) head.length);
+		return 1;
 	}
 
-	struct snapshot_sectors reply;
-
-	if ((err = readpipe(serv_fd, &reply, head.length)) < 0) {
-		warn("received incomplete snapshot_sectors message: %s", strerror(-err));
-		return 0;
+	if ((err = readpipe(serv_fd, &body, sizeof(body))) < 0) {
+		warn("unable to read origin sector message body: %s", strerror(-err));
+		return 1;
 	}
 
-	return reply.count;
+	return body.count;
 }
+
 
 static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char const *devstem, u32 mode, int level, int ds_fd, char const *progress_file, u64 start_addr)
 {
@@ -1045,7 +1043,7 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 		cl->chunksize_bits = reply->meta.chunksize_bits;
 		free(reply);
 
-		u64 vol_size_bytes = get_snapshot_sectors(serv_fd, (u32)~0UL) * 512, chunkmask = ~(-1 << cl->chunksize_bits);
+		u64 vol_size_bytes = get_origin_sectors(serv_fd) * 512, chunkmask = ~(-1 << cl->chunksize_bits);
 		cl->count = (vol_size_bytes >> cl->chunksize_bits) + !!(vol_size_bytes & chunkmask);
 		cl->length = CHUNK_ARRAY_INIT;
 		cl->src_snap = src_snap;
@@ -1863,7 +1861,7 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 		printf("%s chunks free\n", number1);
 	}
 
-	commas(number1, sizeof(number1), get_snapshot_sectors(serv_fd, (u32)~0UL) << SECTOR_BITS); // include this in status reply!!
+	commas(number1, sizeof(number1), get_origin_sectors(serv_fd) << SECTOR_BITS); // include this in status reply!!
 	printf("Origin size: %s bytes\n", number1);
 	printf("Write density: %g\n", (double)reply->write_density/(double)0xffffffff);
 
@@ -1971,47 +1969,6 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 	}
 
 	free(reply);
-
-	return 0;
-}
-
-static int ddsnap_resize_devices(int serv_fd, u64 orgsize, u64 snapsize, u64 metasize)
-{
-	int err;
-	if ((err = outbead(serv_fd, RESIZE, struct resize_request, orgsize, snapsize, metasize))) {
-		warn("unable to send resize request: %s", strerror(-err));
-		return -1;
-	}
-	struct head head;
-	if ((err = readpipe(serv_fd, &head, sizeof(head))) < 0) {
-		warn("received incomplete packet header: %s", strerror(-err));
-		return -1;
-	}
-	if (head.code != RESIZE) {
-		if (head.code == STATUS_ERROR)
-			error_message_handler(serv_fd, "server reason why resizing failed", head.length);
-		else
-			unknown_message_handler(serv_fd, &head);
-		return -1;
-	}
-	if (head.length != sizeof(struct resize_request)) {
-		warn("state length mismatch: expected >=%zu, actual %u", sizeof(struct resize_request), head.length);
-		return -1;
-	}
-	struct resize_request reply;
-	if ((err = readpipe(serv_fd, &reply, head.length)) < 0) {
-		warn("received incomplete resize message: %s", strerror(-err));
-		return -1;
-	}
-	printf("Device sizes after resizing:\n\t");
-	printf("origin device %Lu\n\t", reply.orgsize);
-	printf("snapshot device %Lu\n\t", reply.snapsize);
-	printf("metadata device %Lu\n", reply.metasize);
-
-	if ((orgsize && reply.orgsize != orgsize) || (snapsize && reply.snapsize != snapsize) || (metasize && reply.metasize != metasize)) {
-		warn("Can not resize devices to the specified value: orgsize %Lu snapsize %Lu metasize %Lu!!", orgsize, snapsize, metasize);
-		return -1;
-	}
 
 	return 0;
 }
@@ -2149,14 +2106,6 @@ int main(int argc, char *argv[])
 		POPT_TABLEEND
 	};
 
-	char *orgsize_str = NULL, *snapsize_str = NULL, *metasize_str = NULL;
-	struct poptOption resizeOptions[] = {
-		{ "origin", 'o', POPT_ARG_STRING, &orgsize_str, 0, "New origin device size", "size" },
-		{ "snapshot", 's', POPT_ARG_STRING, &snapsize_str, 0, "New snapshot device size", "size" },
-		{ "metadata", 'm', POPT_ARG_STRING, &metasize_str, 0, "New metadata device size", "size" },
-		POPT_TABLEEND
-	};
-
 	poptContext mainCon;
 	struct poptOption mainOptions[] = {
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
@@ -2179,8 +2128,6 @@ int main(int argc, char *argv[])
 		  "Get statistics\n\t Function: Report snapshot usage statistics\n\t Usage: status [OPTION...] <sockname> [<snapshot>]", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &deltaOptions, 0,
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
-		  "Resize\n\t Function: Change origin/snapshot/metadata device size\n\t Usage: resize [OPTION...] <sockname>", NULL },
 		{ "version", 'V', POPT_ARG_NONE, NULL, 0, "Show version", NULL },
 		POPT_AUTOHELP
 		POPT_TABLEEND
@@ -2701,10 +2648,9 @@ int main(int argc, char *argv[])
 
 			return ret;
 		} else if (size) {
-			char const *sockname, *snaptagstr;
+			char const *sockname;
 
 			sockname = poptGetArg(cdCon);
-			snaptagstr = poptGetArg(cdCon);
 
 			if (sockname == NULL)
 				cdUsage(cdCon, 1, argv[0], "Must specify socket name to status\n");
@@ -2715,15 +2661,9 @@ int main(int argc, char *argv[])
 
 			int sock = create_socket(sockname);
 
-			u32 snaptag;
-			if (snaptagstr == NULL)
-				snaptag = ~((u32)0U); /* meaning "origin snapshot" */
-			else if (parse_snaptag(snaptagstr, &snaptag) < 0) {
-				fprintf(stderr, "%s: invalid snapshot %s\n", argv[0], snaptagstr);
-				return 1;
-			}
-			printf("%Lu\n", get_snapshot_sectors(sock, snaptag));
+			printf("%Lu\n", get_origin_sectors(sock));
 			close(sock);
+
 			return 0;
 		} else if (state) {
 			char const *sockname, *snaptagstr;
@@ -3129,49 +3069,6 @@ int main(int argc, char *argv[])
 
 		fprintf(stderr, "%s %s: unrecognized delta subcommand: %s.\n", argv[0], command, subcommand);
 		return 1;
-	}
-	if (strcmp(command, "resize") == 0) {
-		struct poptOption options[] = {
-			{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &resizeOptions, 0, NULL, NULL },
-			POPT_AUTOHELP
-			POPT_TABLEEND
-		};
-
-		poptContext cdCon = poptGetContext(NULL, argc-1, (const char **)&(argv[1]), options, 0);
-		poptSetOtherOptionHelp(cdCon, "<server_socket>");
-
-		char cdOpt = poptGetNextOpt(cdCon);
-		if (cdOpt < -1) {
-			fprintf(stderr, "%s: %s: %s\n", argv[0], poptBadOption(cdCon, POPT_BADOPTION_NOALIAS), poptStrerror(cdOpt));
-			poptFreeContext(cdCon);
-			return 1;
-		}
-
-		u64 orgsize=0, snapsize=0, metasize=0;
-		if (orgsize_str != NULL)
-			orgsize = strtobytes64(orgsize_str);
-		if (snapsize_str != NULL)
-			snapsize = strtobytes64(snapsize_str);
-		if (metasize_str != NULL)
-			metasize = strtobytes64(metasize_str);
-		if (orgsize == INPUT_ERROR_64 || snapsize == INPUT_ERROR_64 || metasize == INPUT_ERROR_64) {
-			fprintf(stderr, "ddsnap: Invalid size input. Omit option, or use 0 for keep the old size\n");
-			return 1;
-		}
-		
-		const char *sockname = poptGetArg(cdCon);
-		if (sockname == NULL)
-			cdUsage(cdCon, 1, argv[0], "Must specify socket name to resize\n");
-		if (poptPeekArg(cdCon) != NULL)
-			cdUsage(cdCon, 1, argv[0], "Too many arguments to resize\n");
-
-		poptFreeContext(cdCon);
-
-		int sock = create_socket(sockname);
-
-		int ret = ddsnap_resize_devices(sock, orgsize, snapsize, metasize);
-
-		return ret;
 	}
 
 	fprintf(stderr, "%s: unrecognized subcommand: %s.\n", argv[0], command);

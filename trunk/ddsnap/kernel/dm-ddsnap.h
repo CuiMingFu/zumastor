@@ -66,10 +66,9 @@ enum csnap_codes
 	STATUS_ERROR,
 	REQUEST_SNAPSHOT_STATE,
 	SNAPSHOT_STATE,
-	REQUEST_SNAPSHOT_SECTORS, // !!! don't dedicate a whole message type to just this, return some other global stats here (and move me out of kernel)
-	SNAPSHOT_SECTORS,
+	REQUEST_ORIGIN_SECTORS, // !!! don't dedicate a whole message type to just this, return some other global stats here (and move me out of kernel)
+	ORIGIN_SECTORS,
 	STREAM_EXCEPTIONS, /* New in 0.5 */
-	RESIZE, /* New in 0.6 */
 };
 
 enum csnap_error_codes
@@ -136,8 +135,7 @@ static inline size_t snapshot_details_calc_size(unsigned row, unsigned snapshots
 /* !!! more things to move out of kernel !!! */
 
 struct state_message {uint32_t snap; uint32_t state; } PACKED;
-struct snapshot_sectors { uint32_t snap; uint64_t count; } PACKED;
-struct resize_request { uint64_t orgsize; uint64_t snapsize; uint64_t metasize; } PACKED;
+struct origin_sectors { uint64_t count; } PACKED;
 
 typedef uint16_t shortcount; /* !!! what is this all about */
 
