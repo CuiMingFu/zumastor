@@ -1492,38 +1492,6 @@ remount)
 	fi
 	exit $?
 	;;
-resize)
-	declare args cmd="$0 $1"
-	declare orgsize=0 snapsize=0 metasize=0
-	declare usage="usage: $cmd <vol> [-o|--origin <size>] [-s|--snapshot <size>] [-m|--metadata <size>]"
-
-	shift 1
-	args=`getopt -oho:s:m: -l help,origin:,snapshot:,metadata: -n"$cmd" -- "$@"` || \
-		{ echo $usage; exit 2; }
-	eval set -- "$args"  # remove getopt quotes and set new arguments
-	until [[ $1 = -- ]]; do
-		case "$1" in
-		-h|--help)
-			echo $usage
-			exit;;
-		-o|--origin) orgsize=$2; shift 1;;
-		-s|--snapshot) snapsize=$2; shift 1;;
-		-m|--metadata) metasize=$2; shift 1;;
-		*) echo whoops; exit 9;;
-		esac
-		shift 1
-	done
-	shift # remove --
-	[[ $# -eq 1 ]] || { echo $usage; exit 2; }
-	declare -r vol=$1
-	declare -r server=$SERVERS/$vol
-	ddsnap resize $server -o $orgsize -s $snapsize -m $metasize
-	[[ $? -eq 0 ]] || { echo "ddsnap resizing request failed"; exit 1; }
-	if [[ $orgsize != 0 ]]; then
-		umount_remove_device $vol -1 || { echo "Fail to remove the old origin block device"; exit 1; }
-		create_device $vol -1 || { echo "Fail to create the new origin block device"; exit 1; }
-	fi
-	exit 0
 esac
 
 [ $# -gt 0 ] && echo "Error in command: $@"
