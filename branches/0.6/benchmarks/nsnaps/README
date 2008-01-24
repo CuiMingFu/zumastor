@@ -1,0 +1,83 @@
+nsnaps is a benchmark that is used to provide performance data that relates the number of snapshots, N, taken versus 
+the time needed to untar a kernel source tree and sync. It can be run on two different configurations: nvram and 
+normal (without nvram) with a specified chunk size and block size. 
+
+How nsnaps works:
+	* Before running the specified configuration(s), nsnaps:
+		- runs N tests using a raw device and records the timing of the untar and the sync
+
+	* For each configuration specified, nsnaps:
+		- does a mkfs on the specified tar device
+		- mounts the tar device to a specified directory
+		- copies the kernel source tree tar to the mounted tar device
+		- umounts the tar device
+		- sets up ddsnap
+		- takes snapshot 0 (this is currently commented out)
+		- creates a file system
+		- begins to run N tests
+
+	* During each test, nsnaps performs the following operations:
+		- mounts the origin volume to a specified directory
+		- mounts the tar device 
+		- cats tarball to dev/null
+		- times the untar
+		- unmounts the tar device
+		- times the sync
+		- unmounts the origin volume
+		- takes a new snapshot
+
+How to run nsnaps:
+
+1. CONFIGURE
+	- Go into your  ~/zumastor/zumastor/test/nsnaps directory
+	- Open up the configuration file, config.sh, and modify each of the variables according to your setup.
+	  Please pay special attentions to the following variables. You need to config them according to your system setup.
+		TAR_DEV=/dev/tar
+		ORIG_DEV=/dev/origin
+		SNAP_DEV=/dev/snap
+		META_DEV=/dev/meta
+		RAW_DEV=/dev/raw
+	
+	-  Edit the run_all_configurations function in nsnaps.sh to include the configurations
+	   you would like to run. To set the number of tests (snapshots), modify the num_tests 
+	   variable in the same function. 
+
+	     For example:
+
+		/* run 16 snapshots on normal (without nvram) with 4k chunks */
+		local -r num_tests=16
+		run_configuration "native:normal:4k" 4k "" "" $num_tests
+
+		/* run 64 snapshots on nvram meta device $META_DEV with 64k chunks and a 4k block size */
+		local -r num_tests=64
+              	run_configuration "native:nvram:64k" 64k $META_DEV 4k $num_tests 
+
+2. RUN
+	- while in your ~/zumastor/zumastor/test/nsnaps directory run the nsnaps script
+	
+	  ./nsnaps.sh 
+	
+
+3. VIEW DATA
+	- The nsnaps script will automatically generate files that organize the timing data and it will
+	  create a plot of all the tests that were run
+ 
+	- ~/zumastor/zumastor/test/nsnaps/Config0 contains the performance data of the raw device
+	- ~/zumastor/zumastor/test/nsnaps/ConfigN contains the performance data of  the Nth configuration
+
+	- Inside each ConfigN directory you will find the following files:
+
+		runtestN - includes the time of the untar and sync for snapshot N
+
+		umountN - includes the time of the umount for snapshot N
+
+	- Inside ~/zumastor/zumastor/test/nsnaps, you fill find the following files:
+		
+		raw	    - lists a table of values for the real time, usr time, and sys time (untar + sync)
+			      for each test on the raw device	
+					
+		native:*:*k - lists a table of values for the real time, usr time, and sys time (untar + sync) 
+			      for each snapshot of a given configuration
+
+ 		all_tests.jpg - the graph of number of snapshots, N, taken versus the time needed to untar a 
+			        kernel source tree and sync for all configurations (including raw)

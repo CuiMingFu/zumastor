@@ -1,0 +1,130 @@
+Introduction
+
+This document describes a general set of tasks that could be accomplished
+to clean up the Zumastor source.  The cleanup is intended to make Zumastor
+more robust, more easily maintainable, more amenable to unit testing and more
+easily modified to add function in the future.
+
+The tasks are not (yet) prioritized and are in no particular order.  Nothing
+here is carved in stone.
+
+
+General.
+
+The ddsnapd code as a whole is all in one big file and its subsystems tend
+to be heavily intertwined with each other.  This could be improved.
+
+There are a few initialization routines that initialize a number of subsystems.
+These could be broken up along subsystem boundaries.  For example,
+init_snapstore() initializes part of allocation and of the B-tree code as well
+as journaling.
+
+
+B-Tree handling.
+
+The B-tree subsystem isn't the worst offender with respect to the above
+intertwining but it does have a few somewhat surprising dependencies.
+
+The single big dependency is the superblock.  Much of the code legitimately
+uses two on-disk fields there, etree_root and etree_levels.  Two routines,
+new_leaf() and new_node(), also use the metadata.alloc_per_node field, which
+is computed at initialization and contains the number of entries in a B-tree
+node block.  Unfortunately none of these are encapsulated in a separate
+structure and so the full superblock must be exposed.  A few routines use
+fields that are more properly owned by other subsystems, such as
+journal_size(!), snapmask, allocsize and a couple of others.
+
+In addition, the superblock pointer is passed through to other, lower-level
+functions such as those responsible for block I/O, allocation and journaling
+as well as for maintenance of the superblock itself (e.g. save_sb()).
+
+The proposal is that the superblock be restructured slightly and the B-tree
+code (at least) be modified to hide the superfluous information.  This can
+be done in at least a couple of different ways.
+
+First, the low-hanging fruit.  In delete_tree_range(), the reference to
+journal_size can be eliminated by moving the tiny code fragment that uses it
+to its own routine (which then becomes part of the journaling code) and
+passing it a "void *" reference to the superblock.  In fact, many B-tree
+routines can be passed the superblock pointer as a "void *", since they do
+nothing more than pass it through.
+
+As a side effect of this, references to other superblock fields would have
+to be encapsulated with specific superblock functions, such as in
+delete_tree_range() where "sb->snapmask &= ~snapmask" could turn into
+something like "sb_mask_snapmask(sb, ~snapmask)."  The snapmask field is
+also used elsewhere in the B-tree code but as it is not updated in those
+places it can be passed in separately.
+
+The allocsize field is only used in new_node() and new_leaf(), to zero the
+blocks allocated by the call to new_block().  This could be eliminated with
+a call to a new allocation (or buffer) routine, zero_block().
+
+A couple of B-tree routines refer to the allocation data structures "metadata"
+and "snapdata," but only to pass them through to lower-level routines
+(ensure_free_chunks() in the case of make_unique() and free_chunk() in the
+case of free_exception()).  The free_exception() routine is just a wrapper
+for free_chunk() and is called only from make_unique() and
+delete_snapshots_from_leaf().  In both cases, the structures could be passed
+through as "void *" references passed into the calling function.
+
+The etree_levels and etree_root fields are used and maintained by the B-tree
+code itself.  They could be moved into their own substructure, passing a
+pointer to that substructure to the appropriate routines.
+
+The final case is that of the alloc_per_node field.  This is in the
+"allocspace" structure, which is deprecated.  The field is computed during
+initialization and is used in add_exception_to_tree() and delete_tree_range()
+to know how many entries will fit in a B-tree "node" block.  It could be made
+a part of the etree_levels/etree_root substructure, giving it an on-disk
+incarnation and meaning that it would only have to be computed once, when
+the volume is created.  This seems silly considering that it's trivially
+computed from other values but it may be the most effective solution.
+Alternatives include passing it in separately or putting it in a memory-only
+structure that has references to etree_levels and etree_root, passing that
+rather than an on-disk version of the structure.
+
+
+Allocation
+
+The "struct allocspace" definition has an "everything bogus here!!!"
+comment next to it:
+
+struct allocspace { // everything bogus here!!!
+        struct allocspace_img *asi;     /* Points at image.metadata/snapdata. */
+        u32 allocsize;                  /* Size of a chunk in bytes.          */
+        u32 chunk_sectors_bits;      /* Bits of number of sectors in a chunk. */
+        u32 alloc_per_node;             /* Number of enode index entries per  */
+                                        /* tree node. (metadata only).        */
+};
+
+The on-disk allocspace_img structure looks like:
+
+        struct allocspace_img
+        {
+                sector_t bitmap_base;   /* Allocation bitmap starting sector. */
+                sector_t chunks; /* if zero then snapdata is combined in metadata space */
+                sector_t freechunks;
+                chunk_t  last_alloc;    /* Last chunk allocated.              */
+                u64      bitmap_blocks; /* Num blocks in allocation bitmap.   */
+                u32      allocsize_bits; /* Bits of number of bytes in chunk. */
+        } metadata, snapdata;
+
+A (mercifully brief) suggestion is that we:
+
+      * Hide "allocsize" in a macro or inline and compute it on the fly from
+        allocsize_bits.
+      * Hide "chunk_sectors_bits" similarly, computing it from SECTOR_SHIFT
+        (in buffer.h) and allocsize_bits.
+      * Make alloc_per_node part of B-tree data, as mentioned above.
+      * Of course change all occurrences of "sb->xxxxdata.asi" to
+        "sb->image.xxxdata."
+
+
+Journalling
+
+The commit_transaction() routine shouldn't really peek into the dirty-buffer
+list with list_empty(&dirty_buffers) or by directly walking the dirty-buffer
+list.  Perhaps there should be a real interface that returns a list of dirty
+buffers, possibly iteratively?  Or, alternatively, a walk-the-dirty-list
+function that takes a callback to be invoked on each dirty buffer?

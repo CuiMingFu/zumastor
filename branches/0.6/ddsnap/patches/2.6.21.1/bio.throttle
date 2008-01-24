@@ -1,0 +1,142 @@
+diff -purN linux-2.6.21.1-orig/block/ll_rw_blk.c linux-2.6.21.1/block/ll_rw_blk.c
+--- linux-2.6.21.1-orig/block/ll_rw_blk.c	2007-11-09 17:16:15.000000000 -0800
++++ linux-2.6.21.1/block/ll_rw_blk.c	2007-11-14 19:53:28.000000000 -0800
+@@ -3116,12 +3116,19 @@ static inline int should_fail_request(st
+  */
+ void generic_make_request(struct bio *bio)
+ {
+-	request_queue_t *q;
++	request_queue_t *q = bdev_get_queue(bio->bi_bdev);
+ 	sector_t maxsector;
+ 	sector_t old_sector;
+ 	int ret, nr_sectors = bio_sectors(bio);
+ 	dev_t old_dev;
+ 
++	if (q && q->metric && !bio->bi_queue) {
++		int need = bio->bi_throttle = q->metric(bio);
++		bio->bi_queue = q;
++		/* FIXME: potential race if atomic_sub is called in the middle of condition check */
++		wait_event_interruptible(q->throttle_wait, atomic_read(&q->available) >= need);
++		atomic_sub(need, &q->available);
++	}
+ 	might_sleep();
+ 	/* Test device or partition size, when known. */
+ 	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
+@@ -3152,7 +3159,6 @@ void generic_make_request(struct bio *bi
+ 	do {
+ 		char b[BDEVNAME_SIZE];
+ 
+-		q = bdev_get_queue(bio->bi_bdev);
+ 		if (!q) {
+ 			printk(KERN_ERR
+ 			       "generic_make_request: Trying to access "
+diff -purN linux-2.6.21.1-orig/drivers/md/dm.c linux-2.6.21.1/drivers/md/dm.c
+--- linux-2.6.21.1-orig/drivers/md/dm.c	2007-11-09 17:16:15.000000000 -0800
++++ linux-2.6.21.1/drivers/md/dm.c	2007-11-14 19:54:13.000000000 -0800
+@@ -880,6 +880,22 @@ static int dm_any_congested(void *conges
+ 	return r;
+ }
+ 
++static unsigned dm_metric(struct bio *bio)
++{
++	return bio->bi_vcnt;
++}
++
++unsigned dm_inflight_total(struct dm_target *target)
++{
++	struct mapped_device *md;
++	request_queue_t *queue;
++	md = dm_table_get_md(target->table);
++	queue = md->queue;
++	dm_put(md);
++	return (queue->capacity - atomic_read(&queue->available));
++}
++EXPORT_SYMBOL_GPL(dm_inflight_total);
++
+ /*-----------------------------------------------------------------
+  * An IDR is used to keep track of allocated minor numbers.
+  *---------------------------------------------------------------*/
+@@ -958,6 +974,7 @@ out:
+ 
+ static struct block_device_operations dm_blk_dops;
+ 
++#define DEFAULT_THROTTLE_CAPACITY 1000
+ /*
+  * Allocate and initialise a blank device with a given minor.
+  */
+@@ -997,6 +1014,11 @@ static struct mapped_device *alloc_dev(i
+ 		goto bad1_free_minor;
+ 
+ 	md->queue->queuedata = md;
++	md->queue->metric = dm_metric;
++	/* A dm device constructor may change the throttle capacity */
++	atomic_set(&md->queue->available, md->queue->capacity = DEFAULT_THROTTLE_CAPACITY);
++	init_waitqueue_head(&md->queue->throttle_wait);
++
+ 	md->queue->backing_dev_info.congested_fn = dm_any_congested;
+ 	md->queue->backing_dev_info.congested_data = md;
+ 	blk_queue_make_request(md->queue, dm_request);
+diff -purN linux-2.6.21.1-orig/fs/bio.c linux-2.6.21.1/fs/bio.c
+--- linux-2.6.21.1-orig/fs/bio.c	2007-11-09 17:16:16.000000000 -0800
++++ linux-2.6.21.1/fs/bio.c	2007-11-14 19:53:28.000000000 -0800
+@@ -142,6 +142,8 @@ void bio_init(struct bio *bio)
+ 	bio->bi_end_io = NULL;
+ 	atomic_set(&bio->bi_cnt, 1);
+ 	bio->bi_private = NULL;
++	bio->bi_throttle = 0;
++	bio->bi_queue = NULL;
+ }
+ 
+ /**
+@@ -1025,7 +1027,12 @@ void bio_endio(struct bio *bio, unsigned
+ 		bytes_done = bio->bi_size;
+ 	}
+ 
+-	bio->bi_size -= bytes_done;
++	if (!(bio->bi_size -= bytes_done) && bio->bi_throttle) {
++		struct request_queue *q = bio->bi_queue;
++		atomic_add(bio->bi_throttle, &q->available);
++		bio->bi_throttle = 0; /* just in case */
++		wake_up(&q->throttle_wait);
++	}
+ 	bio->bi_sector += (bytes_done >> 9);
+ 
+ 	if (bio->bi_end_io)
+diff -purN linux-2.6.21.1-orig/include/linux/bio.h linux-2.6.21.1/include/linux/bio.h
+--- linux-2.6.21.1-orig/include/linux/bio.h	2007-11-09 17:16:17.000000000 -0800
++++ linux-2.6.21.1/include/linux/bio.h	2007-11-14 19:53:28.000000000 -0800
+@@ -109,6 +109,9 @@ struct bio {
+ 	bio_end_io_t		*bi_end_io;
+ 	atomic_t		bi_cnt;		/* pin count */
+ 
++	struct request_queue	*bi_queue;	/* for throttling */
++	unsigned		bi_throttle;	/* throttle metric */
++
+ 	void			*bi_private;
+ 
+ 	bio_destructor_t	*bi_destructor;	/* destructor */
+diff -purN linux-2.6.21.1-orig/include/linux/blkdev.h linux-2.6.21.1/include/linux/blkdev.h
+--- linux-2.6.21.1-orig/include/linux/blkdev.h	2007-11-09 17:16:17.000000000 -0800
++++ linux-2.6.21.1/include/linux/blkdev.h	2007-11-14 19:53:28.000000000 -0800
+@@ -394,6 +394,10 @@ struct request_queue
+ 	struct work_struct	unplug_work;
+ 
+ 	struct backing_dev_info	backing_dev_info;
++	unsigned (*metric)(struct bio *bio);	/* bio throttle metric */
++	wait_queue_head_t	throttle_wait;
++	atomic_t		available;
++	unsigned		capacity;
+ 
+ 	/*
+ 	 * The queue owner gets to use this for whatever they like.
+diff -purN linux-2.6.21.1-orig/include/linux/device-mapper.h linux-2.6.21.1/include/linux/device-mapper.h
+--- linux-2.6.21.1-orig/include/linux/device-mapper.h	2007-11-09 17:16:17.000000000 -0800
++++ linux-2.6.21.1/include/linux/device-mapper.h	2007-11-14 19:54:13.000000000 -0800
+@@ -191,6 +191,7 @@ const char *dm_device_name(struct mapped
+ struct gendisk *dm_disk(struct mapped_device *md);
+ int dm_suspended(struct mapped_device *md);
+ int dm_noflush_suspending(struct dm_target *ti);
++unsigned dm_inflight_total(struct dm_target *target);
+ 
+ /*
+  * Geometry functions.

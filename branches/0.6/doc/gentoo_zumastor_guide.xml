@@ -1,0 +1,384 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE guide SYSTEM "/usr/share/sgml/guide/xml-dtd-2.1/guide.dtd">
+<!-- $Header$ -->
+
+<guide link="/doc/gentoo_zumastor_guide.xml" lang="en">
+<title>Gentoo Zumastor Guide</title>
+
+<author title="Author">
+  <mail link="cbsmith@gmail.com">Christopher Smith</mail>
+</author>
+
+<abstract>
+This guide shows you how to get a basic zumastor master node with
+snapshots running on Gentoo, and then how to replicate that to a
+second slave server. Actual deployments may be more complex - the goal
+here is to get up and running as simply as possible.
+</abstract>
+
+<!-- The content of this document is licensed under the CC-BY-SA license -->
+<!-- See http://creativecommons.org/licenses/by-sa/2.5 -->
+<license/>
+
+<version>1.0</version>
+<date>2007-11-20</date>
+<chapter>
+<title>Before You Begin</title>
+<section>
+<title>Partitioning</title>
+<body>
+<p>
+Zumastor requires some storage space for storing snapshot data (and
+for the volume itself if you are creating a new filesystem). If you
+are starting from scratch, install operating systems using custom
+partitioning, preferably leaving a large LVM volume group (named sysvg
+in this example) for use when creating origin and snapshot
+devices. While you ar at it, you might as well create an origin and
+snapshot store:
+</p>
+<pre caption="Sample LVM Setup">
+<i>pvcreate /dev/hda7
+vgcreate sysvg /dev/hda7
+lvcreate --size 20g -n test sysvg
+lvcreate --size 40g -n test_snap sysvg</i>
+</pre>
+</body>
+</section>
+</chapter>
+<chapter>
+<title>Setting Up The Overlay</title>
+<section>
+<title>Install Layman</title>
+<body>
+
+<p>
+Zumastor is most easily installed by way of an overlay, managed
+through layman. If you already have layman installed, you can jump
+ahead to <uri link="#add_overlay">Add the Zumastor Overlay</uri>. If
+you don't know what I'm talking about, you might want to read the <uri
+link="http://www.gentoo.org/proj/en/overlays/userguide.xml">Gentoo
+Overlays Guide</uri>. For the impatient, I've lifted the key bits
+(note that this must all be done as root):
+</p>
+<pre caption="Installing layman">
+<i>emerge layman
+echo "source /usr/portage/local/layman/make.conf" >> /etc/make.conf</i>
+</pre>
+<p>
+Congratulations, you've installed layman
+</p>
+</body>
+</section>
+<section id="add_overlay">
+<title>Add the Zumastor Overlay</title>
+<body>
+<p>
+The Zumastor overlay isn't (yet) an officially sanctioned Gentoo overlay, so adding it is a bit more complicated than usual.
+</p>
+<warn>
+Overlays are perhaps the best known way to mess up a Gentoo setup... even the officially sanctioned overlays. Consider this fair warning.
+</warn>
+<p>
+If you (again as root) open up /etc/layman/layman.cfg in your editor
+of choice, you will find a line that looks something like this:
+</p>
+<pre caption="layman.cfg fragment">
+overlays   : http://www.gentoo.org/proj/en/overlays/layman-global.txt
+</pre>
+<p>
+URL's for addtional overlays belong on their own line. So, to add our overlay listing, so that it looks like this:
+</p>
+<pre caption="Edited layman.cfg fragment">
+overlays   : http://www.gentoo.org/proj/en/overlays/layman-global.txt
+             <i>http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml</i>
+</pre>
+<p>
+You've now added Zumastor's overlay listing to layman. Now you need to
+add Zumastor's overlay (still as root):
+</p>
+<pre caption="Adding the Zumastor overlay">
+# <i>layman -f -a zumastor</i>
+</pre>
+</body>
+</section>
+</chapter>
+<chapter>
+<title>Installing Zumastor</title>
+<section>
+<title>Emerging Zumastor</title>
+<body>
+<p>
+The next step is to emerge the relevant ebuilds. Because this is still
+experimental, everything is masked, so our first order of business is
+to unmask them (still as root ;-):
+</p>
+<pre caption="Unmasking Zumastor ebuilds">
+# <i>echo "sys-kernel/zumastor-sources ~x86" >> /etc/portage/package.keywords</i>
+# <i>echo "sys-block/zumastor ~x86" >> /etc/portage/package.keywords</i>
+</pre>
+<note>
+If you are building for a 64-bit platform, you should of course use ~amd64 instead of ~x86.
+</note>
+<p>
+Now we emerge the packages:
+</p>
+<pre caption="Emerging Zumastor">
+# <i>emerge zumastor-sources zumastor</i>
+</pre>
+</body>
+</section>
+<section>
+<title>Configuring/Building A Zumastor Kernel</title>
+<body>
+<p>
+If you are running Gentoo, you've built/configured a kernel
+before. Doing the same with the zumastor-source package is really no
+different. All you need change is adding the CONFIG_DM_DDSNAP option
+(as module or otherwise). CONFIG_DM_DDSNAP is located under "Device
+Drivers" -> "Multi-device support" -> "Distributed Data Snapshot
+target".
+</p>
+<p>
+The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.
+</p>
+</body>
+</section>
+</chapter>
+<chapter>
+<title>Running Zumastor</title>
+<section>
+<title>Boot the New Kernel</title>
+<body>
+<p>
+Now it is time to reboot in to the new kernel you've built. Once you
+have, test out the zumastor init script by starting and stopping
+it. You can check it's status while running like so:
+</p>
+<pre caption="Checking that Zumastor is running">
+# <i>zumastor status --usage</i>
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|-- cron/
+|-- mount/
+|-- running
+`-- servers/
+</pre>
+<p>
+If all works well, you can add it to your default run level.
+</p>
+<pre caption="Adding Zumastor to Default Runlevel">
+# <i>rc-update add zumastor default</i>
+</pre>
+</body>
+</section>
+<section>
+<title>Start Snapshotting</title>
+<body>
+<p>
+First you need to define your volume:
+</p>
+<pre caption="Define your volume">
+# <i>zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize</i>
+js_bytes was 512000, bs_bits was 12 and cs_bits was 12
+cs_bits 14
+chunk_size is 16384 &amp; js_chunks is 32
+Initializing 5 bitmap blocks...
+pid = 5879
+Thu May 10 13:45:54 2007: [5880] snap_server_setup: ddsnapd server bound to socket /var/run/zumastor/servers/testvol
+pid = 5881
+Successfully created and initialized volume 'testvol'.
+You can now create a filesystem on /dev/mapper/testvol
+</pre>
+<p>
+Next you create a filesystem of your choice on the volume:
+</p>
+<pre caption="Create a filesystem on testvol">
+# <i>mkfs.ext3 /dev/mapper/testvol</i>
+</pre>
+<p>
+Now lets set up automated daily snapshots:
+</p>
+<pre caption="Automate hourly and daily snapshots">
+# <i>zumastor define master testvol -h 24 -d 7</i>
+</pre>
+<p>
+Now, you can verify the new setup by checking zumastor's status:
+</p>
+<pre caption="Verifying automated snapshots">
+# <i>zumastor status --usage</i>
+
+VOLUME testvol:
+Data chunk size: 16384
+Used data: 0
+Free data: 0
+Metadata chunk size: 16384
+Used metadata: 56
+Free metadata: 2621384
+Origin size: 21474836480
+Write density: 0
+Creation time: Tue May 15 18:33:23 2007
+  Snap            Creation time   Chunks Unshared   Shared
+totals                                 0        0        0
+Status: running
+Configuration:
+/var/lib/zumastor/volumes/testvol
+|-- device/
+|   |-- origin -> /dev/sysvg/test
+|   `-- snapstore -> /dev/sysvg/test_snap
+|-- master/
+|   |-- next
+|   |-- schedule/
+|   |   |-- daily
+|   |   `-- hourly
+|   |-- snapshots/
+|   `-- trigger|
+`-- targets/
+
+RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|   `-- testvol=
+|-- cron/
+|   `-- testvol
+|-- mount/
+|   `-- testvol/
+|-- running
+`-- servers/
+    `-- testvol=
+</pre>
+<p>
+As time progresses, you should see the snapshots appear in the Configuration section under master/snapshot.
+</p>
+</body>
+</section>
+<section>
+<title>Trust But Verify</title>
+<body>
+<p>
+Now let's see if the snapshots are really working. Let's put a testfile on the volume:
+</p>
+<pre caption="Add a test file">
+# <i>date >> /var/run/zumastor/mount/testvol/testfile; sync</i>
+</pre>
+<p>
+Now we'll force a snapshot:
+</p>
+<pre caption="Force an hourly style snapshot">
+zumastor snapshot testvol hourly
+</pre>
+<p>
+Now we'll overwrite the contents of the file and take another snapshot.
+</p>
+<pre caption="Mutate and snapshot again">
+# <i>date >> /var/run/zumastor/mount/testvol/testfile</i>
+# <i>zumastor snapshot testvol hourly</i>
+</pre>
+<p>
+Since we can see each of the snapshots, let's take a look at what is there:
+</p>
+<pre caption="Compare snapshots">
+# <i>diff /var/run/zumastor/mount/testvol\(2\)/testfile /var/run/zumastor/mount/testvol\(2\)/testfile</i>
+1a2
+> Wed Nov 21 16:29:25 PST 2007
+</pre>
+</body>
+</section>
+</chapter>
+<chapter>
+<title>Remote Replication</title>
+<section>
+<title>Get SSH setup</title>
+<body>
+<p>
+ On each machine, run ssh-keygen as root. Copy the .ssh/id_dsa.pub
+ file from each account to .ssh/authorized_keys on the other. This
+ authorizes root on each machine to connect without a password to the
+ other. More restricted access may be used in actual deployment.
+</p>
+</body>
+</section>
+<section>
+<title>Setup Master</title>
+<body>
+<p>
+Now you need to define a target to replicate to.
+</p>
+<pre caption="Define target on master">
+# <i>zumastor define target testvol sparticus:11235 -p 30</i>
+</pre>
+<p>
+This tells our master to replicate to port 11235 on sparticus every 30 seconds. Don't forget the "-p 30", otherwise replication will not happen. You should now see something like:
+</p>
+<pre caption="Evidence of replication">
+...
+`-- targets/
+    `-- sparticus/
+        |-- period
+        |-- port
+        `-- trigger|
+...
+</pre>
+<p>
+In your zumastor status.
+</p>
+</body>
+</section>
+<section>
+<title>Setup Slave</title>
+<body>
+<p>
+Now let's set up sparticus:
+</p>
+<pre caption="Define volume and configure source on target">
+# <i>ssh sparticus</i>
+Last login: Wed Nov 21 16:20:11 2007 from lentulus
+sparticus ~ # <i>zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize</i>
+sparticus ~ # <i>zumastor define source testvol lentulus --period 600</i>
+</pre>
+</body>
+</section>
+<section>
+<title>Let's Replicate</title>
+<body>
+<p>
+Let's get this party started:
+</p>
+<pre caption="Start replication">
+sparticus ~ # <i>zumastor start source testvol</i>
+</pre>
+<p>
+Alternatively, you may kick off replication manually each time from the master.
+</p>
+<pre caption="Start replication from the master">
+lentulus ~ # <i>zumastor replicate testvol sparticus</i>
+</pre>
+<p>
+ Once initial replication is started, ddsnap processes should begin
+ consuming CPU cycles and moving tens of megabits per second between
+ the nodes. Initially, the entire origin device will need to be moved,
+ so wait 15 minutes before looking on the target for snapshots. When
+ replication is complete, df on the slave should show the same
+ /var/run/zumstor/testvol volume locally mounted.
+</p>
+</body>
+</section>
+<section>
+<title>Just To Be Sure</title>
+<body>
+<p>
+You can't be too sure about these things, so let's make sure it is actually happening:
+</p>
+<pre caption="Verify replication">
+lentulus ~ # <i>date >> /var/run/master/mount/testvol/testfile</i>
+lentulus ~ # <i>sleep 60</i>
+<comment>(Waiting for data to replicate)</comment>
+lentulus ~ # <i>ssh sparticus cat /var/run/zumastor/mount/testvol/testfile</i>
+Wed Nov 21 18:44:01 2007
+</pre>
+</body>
+</section>
+</chapter>
+</guide>

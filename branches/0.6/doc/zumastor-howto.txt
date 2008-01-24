@@ -1,0 +1,818 @@
+///////////////////
+This document is written in asciidoc format.
+To convert it to HTML (or pdf, or...), install asciidoc-8.2.5 as follows:
+
+ wget http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz
+ tar -xzvf asciidoc-8.2.5.tar.gz
+ cd asciidoc-8.2.5
+ perl -p -i -e 's,BINDIR=/usr/local/bin,BINDIR=/usr/local/asciidoc/bin,;s,MANDIR=/usr/local/man,MANDIR=/usr/local/asciidoc/man,' install.sh
+ sudo mkdir -p /usr/local/asciidoc/bin
+ sudo sh install.sh 
+
+Then use the command
+ /usr/local/asciidoc/bin/asciidoc -a toc -a numbered zumastor-howto.txt 
+to convert this document to HTML.
+///////////////////
+
+Zumastor HOWTO
+==============
+Dan Kegel <dank@kegel.com>
+v0.0, Dec 2007
+
+
+Introduction
+------------
+This document will explain what Zumastor is, how it differs from
+other snapshot and replication tools, how to install it,
+and how to use it.
+
+What is Zumastor?
+-----------------
+It has been difficult to convince users of commercial NAS applicances
+to switch to Linux.  In particular, some commercial NAS boxes have
+had better support for snapshots and remote replication than Linux does.
+Zumastor is an effort to fix that.
+
+Snapshots
+~~~~~~~~~
+Snapshots can be useful as part of an hourly backup system.  Instead of
+shutting down all applications for the entire duration of the backup, you
+can shut them down for just the second or two needed to take a snapshot.
+
+If your goal is to protect users from accidental deletion of files,
+you may want to take snapshots every hour, and leave the last few
+snapshots around; users who accidentally delete a file can just look in
+the snapshot.
+
+LVM already lets administrators create snapshots, but its design has the
+surprising property that every block you change on the original volume
+consumes one block for each snapshot.  The resulting speed and space
+penalty usually makes the use of more than one or two snapshots at a
+time impractical.
+
+Zumastor keeps all snapshots for a particular volume in a common snapshot
+store, and shares blocks the way one would expect.  Thus making a
+change to one block of a file in the original volume only uses one block
+in the snapshot store no matter how many snapshots you have.
+
+Remote Replication
+~~~~~~~~~~~~~~~~~~
+Andrew Tridgell's rsync is a wonderful tool for replicating files remotely. 
+However, when doing periodic replication of large numbers of 
+infrequently changing files, the overhead for figuring out what files
+need to be sent can be extreme.
+
+Zumastor keeps track of which block change between one snapshot
+and the next, and can easily send just the changed blocks.
+Thus Zumastor can do periodic replication of large filesystems much more 
+efficiently than rsync can.
+
+License
+-------
+Zumastor is licensed under GPLv2.
+
+Development
+-----------
+Zumastor development happens on an svn repository, mailing list, irc
+channel, and issue tracker linked to from our home page at 
+http://zumastor.org[].
+
+Most development is done by a small group of contributors
+(Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, and Chris Smith), but we welcome patches from the community.
+(Jonathan Van Eenwyk contributed a cool offline backup feature, 
+but http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz[his patch] has not yet been merged.  Let us know if you need this.)
+
+Status
+------
+Zumastor has a stable release (0.4) which is limited (e.g. only supports 2TB
+volumes) but very stable.  We are focusing on documentation
+and user feedback now, and hope to have the 0.5 stable release 
+out soon.  Please download and test the 0.5 snapshots and give us feedback
+via the issue tracker, mailing list, or IRC channel at http://zumastor.org[].
+
+We have a number of kernel patches, and will push them upstream as
+soon as possible.  See http://zumastor.org[] for a list.
+
+Limitations
+-----------
+
+Volume Size
+~~~~~~~~~~~
+We have verified that Zumastor can handle 1TB volumes.
+As of 0.5-r997, it should be able to handle volumes of dozens of terabytes.
+We are now verifying that it can handle 3TB volumes.  
+See http://code.google.com/p/zumastor/issues/detail?id=10[bug 10].
+
+Snapshot Count
+~~~~~~~~~~~~~~
+Each volume can have at most 64 snapshots.  This limit may
+be raised or removed in future releases; see http://code.google.com/p/zumastor/issues/detail?id=6[bug 6].
+
+Performance
+~~~~~~~~~~~
+On a single spindle, compared to a non-Zumastor volume, writes to an origin 
+volume under Zumastor can require six extra seeks, which
+can be a significant performance penalty for some applications.
+Multiple spindles and RAID controller caches can reduce this problem
+significantly.  Reducing the number of seeks is a high priority goal for 
+future releases.
+Until that happens, Zumastor is best suited for read-mostly applications.
+
+RAM
+~~~
+Zumastor's snapshot exception index uses about 1MB of RAM per gigabyte of snapshot change blocks,
+but the index's size is fixed at ddsnapd startup time.  You can tune it with the --cachesize
+option to 'zumastor define volume'; the default size of the cache is 128MB (or one
+quarter of physical RAM, whichever is smaller).
+You may need to tune it to get good performance with very large volumes.
+
+A future release may use a more compact index; see http://code.google.com/p/zumastor/issues/detail?id=5[bug 5].
+
+Zumastor User Interface
+-----------------------
+Zumastor exposes itself to users in several ways:
+
+* An admin script, /etc/init.d/zumastor
+* A commandline tool, /bin/zumastor
+* Origin mount points, e.g. /var/run/zumastor/mount/myvolumename
+* Snapshot mount points, e.g. /var/run/zumastor/snapshot/myvolumename/yyyy.mm.dd-hh.mm.ss
+
+Zumastor admin script
+~~~~~~~~~~~~~~~~~~~~~
+The admin script, /etc/init.d/zumastor, simply starts or stops the
+Zumastor daemon responsible for mounting Zumastor volumes.  Normally this
+is run once at system startup time by init, but you may need to run it
+manually in unusual circumstances.
+
+For instance, if you tell Zumastor to use origin volumes or snapshot
+stores on loopback devices that are not set up at boot time, and then
+reboot, Zumastor can't mount them automatically; you have to set them up
+and then restart Zumastor with the command `/etc/init.d/zumastor restart`.
+
+Zumastor commandline tool
+~~~~~~~~~~~~~~~~~~~~~~~~~
+The sysadmin uses /bin/zumastor to configure snapshot stores,
+take or delete snapshots, and set up remote replication.
+See http://zumastor.org/man/zumastor.8.html[the zumastor man page] for more information.
+
+The zumastor command is really just a very fancy wrapper around 
+the underlying command, ddsnap.  You probably won't ever need to 
+use ddsnap directly, but if you're curious, see http://zumastor.org/man/ddsnap.8.html[the ddsnap man page].
+
+Origin and Snapshot mount points
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Zumastor deals with two kinds of volumes: 'origin' volumes
+and 'snapshot' volumes.  Simply put, origin volumes are what you 
+take snapshots of.
+Zumastor mounts these volumes for you in appropriately named 
+subdirectories of /var/run/zumastor/mount.
+In other words, you do not need to add any of these to /etc/fstab.  
+The zumastor init script will mount the volume and all its snapshots 
+automatically at boot time.
+
+Zumastor mounts all of snapshot volumes in appropriately named
+subdirectories of /var/run/zumastor/snapshot.
+Each snapshot mount point is named for the creation time of that snapshot,
+in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
+for each specified snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).
+
+Zumastor skips one number each snapshot for housekeeping reasons, so
+home(1000) would be roughly the 500th snapshot of home.  
+The snapshot number never decreases (though perhaps it would
+wrap if you did billions of snapshots...)
+
+By default, Zumastor mounts all its volumes under /var/run/zumastor/mount,
+and mounts all its volume snapshots under /var/run/zumastor/snapshot.
+You can change the mount point of a volume with the +--mountpoint+ option
+of the command +zumastor define volume+ or with the +zumastor remount+
+command, as described in Zumastor man page.
+Similarly, you can change the mount points of a volume snapshot with the
++--snappath+ option of the command +zumastor define volume+.
+
+Installing Zumastor
+-------------------
+Zumastor requires changes to the Linux kernel that are not yet
+in the vanilla kernel, so a patched kernel is required.
+You can install Zumastor on any recent distribution if you're
+willing to do it by hand.  Automated installation is available
+for Debian / Ubuntu and Gentoo.  (RHEL, Fedora, and Suse
+are probably next on our list of distros to support, please 
+let us know if you're willing to contribute RPM .spec files.)
+For developers, we also support automated installation with UML.
+
+Debian / Ubuntu
+~~~~~~~~~~~~~~~
+Prebuilt kernel packages for recent Debian / Ubuntu systems
+are available.  
+Stable releases are at http://zumastor.org/downloads/releases[],
+and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
+The directories there are named by branch and svn revision,
+e.g. 0.4-r999 is the 0.4 branch as of svn revision 999.
+Once you've picked a version, download and install its four .deb
+packages, along with dmsetup (which it depends on).  For instance:
+
+....................
+$ sudo apt-get install dmsetup
+$ wget -m -np zumastor.org/downloads/snapshots/0.5-r1004
+$ mv zumastor.org/downloads/snapshots/0.5-r1004 .
+$ rm -rf zumastor.org
+$ sudo dpkg -i 0.5-r1004/*.deb
+....................
+
+The install takes several minutes.
+Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
+
+You should probably play with it in a virtual environment
+first.  (You can even do this on Windows!)
+
+Example: installing Zumastor on Ubuntu inside a VMWare player
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1. Install vmware player on your machine.  (If you're using Ubuntu,
+it might be as simple as +apt-get install vmware-player+.)
+
+2. Download a vmware image with Ubuntu preinstalled.  For instance, go to
+http://www.thoughtpolice.co.uk/vmware[],
+choose the Ubuntu Server 6.06 download, click
+on the "fast torrent!" link, and tell Firefox to open the torrent file;
+this should pop up kTorrent to download the 189 megabyte image.
+The image is several files zipped together, so unzip it before trying to use it (e.g. +unzip ~/ubuntu-server-6.06-i386.zip+).
+
+3. Start up vmware player (Applications / System Tools / VMWare Player)
+and tell it to load the .vmx file in the directory where you unpacked the vmware image.
+
+4. Inside vmware, log in to the virtual ubuntu box 
+(using the username and password from the site where you downloaded the image).
+
+5. Inside vmware, download and install dmsetup and the Zumastor packages
+as described above.
+
+6. Halt the virtual machine (e.g. +sudo halt+).
+
+7. Work around a problem with VMWare and newer kernels by
+editing the file ubuntu-server-6.06.1-i386.vmx to replace 'lsilogic' on line 4 with 'buslogic'.
+(Thanks to http://gentoo-wiki.com/HOWTO_Install_Gentoo_on_VMware[the gentoo doc] for that tip.)
+
+8. Boot the virtual machine again.  (If booting fails with
+the error "Unable to find volume group 'Ubuntu'", perhaps you
+skipped step seven?)
+
+Congratulations, you now have a virtual system with Zumastor installed!
+
+Example: installing Zumastor on Ubuntu inside a QEMU virtual machine
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1. Install qemu on your machine.  (If you're using Ubuntu,
+it might be as simple as +apt-get install qemu+.)
+
+2. Download an Ubuntu or Debian installation CD image.  Use one
+of the more complete images if you don't want to configure network
+access for the test image.  Here are links to download Ubuntu Dapper
+via
+http://mirrors.kernel.org/ubuntu-releases/dapper/ubuntu-6.06.1-server-i386.iso[http]
+or
+http://torrent.ubuntu.com:6969/file?info_hash=%0F%EF%D4K%9DW%B9%99w%0A%00%DB%60%21%CF%EBV%87%7Bq[torrent].
+
+3. Create an empty file to become the image's block device using either dd or qemu-img:
++dd if=/dev/zero bs=1M seek=10k count=0 of=zqemu.raw+
+
+4. Start qemu, booting from CD the first time to install a base system:
++qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot d+
+
+5. Chose manual partitioning, create a 2G partition for / on /dev/sda and
+leave the rest unallocated.  You may or may not want a 1G swap.
+Create any user you wish and remember the password.
+
+6. Boot again off the newly install disk image, this time with userspace
+networking enabled:
++qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot c -net user -net nic+
+
+7. Log in to the virtual machine, and inside it, download and install dmsetup and the Zumastor packages
+as described above.
+
+8. Boot the virtual machine again.  
+
+Congratulations, you now have a virtual system with Zumastor installed!
+
+Building Ubuntu packages from source
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Most people won't need to do this, but just in case, here's how to build our Ubuntu packages:
+
+1. Make sure you have the necessary build tools installed:
++aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion+
+
+2. Get the latest code: +svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor+
+
+3. Run the build script: +cd zumastor; ./buildcurrent kernel/config/full+
+This builds three Debian packages: one for the kernel, one for ddsnap, and one for zumastor.
+It will download the required kernel tarball from kernel.org (currently 2.6.22.10).  
+Note: The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in +kernel/config/full+.  If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+ to be +(y or m)+
+
+(Also, pcquiles mentioned in http://zumastor.org/irclogs/2007-12-04.txt[irc] that he is working on Ubuntu packaging for a Xen+Zumastor kernel; if you were thinking of integrating Zumastor into upstream Debian or Ubuntu, check out his work first.)
+
+Gentoo
+~~~~~~
+The Zumastor project has a Gentoo overlay to simplify deployment of
+Zumastor using Gentoo's Portage package system. To use the overlay in
+an automated fashion you'll want to make sure you have the Gentoo
+overlay manager, layman, installed.
+
+........
+# emerge layman
+# echo "source /usr/portage/local/layman/make.conf" >> /etc/make.conf
+........
+
+Next you'll want to add the Zumastor overlay diretory to layman's
+/etc/layman/layman.cfg. You want to update the "overlays"
+variable. Note that layman's config format want's each new entry in
+the overlays list to be on a new line. After you have updated it, the
+section of the file where overlays is set will look something like:
+
+........
+overlays	: http://www.gentoo.org/proj/en/overlays/layman-global.txt
+		  http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml
+........
+
+You will then want to add the Zumastor overlay to layman:
+
+........
+# layman -f -a zumastor
+........
+
+The zumastor ebuilds are currently masked, so the next think you'll
+need to do is to unmask them:
+
+........
+# echo "sys-kernel/zumastor-sources ~x86" >> /etc/portage/package.keywords
+# echo "sys-block/zumastor ~x86" >> /etc/portage/package.keywords
+........
+
+After all that preamble, we are now ready to install Zumastor and the
+Zumastor kernel sources:
+
+........
+# emerge zumastor-sources zumastor
+........
+
+Congratulations, you have now installed the zumastor software and
+kernel sources. You'll need to build a kernel as per usual, with one
+exception: you need to ensure that you enable the CONFIG_DM_DDSNAP
+kernel option when you configure your kernel. It can be found in
+"Device Drivers" -> "Multi-device support" -> "Distributed Data
+Snapshot target".
+
+The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.
+
+Example: installing Zumastor on Gentoo inside a VMWare player
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+We have a prebuilt Gentoo vmware image at
+http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z[].  You'll
+need to unpack that image with 7zip (believe it or not, compressing
+with 7zip saved a lot more space than with rzip, and lrzip crashed on
+it.  Go figure.)
+
+Be sure to check the settings to make sure that the RAM allocation is
+reasonable for your system. When you look at the settings you'll
+notice there are two SCSI drives installed on the image. The first one
+contains the Gentoo image, and the second is a blank, set aside for
+your Zumastor datastore. You may wish to resize the second one to
+better suit your needs.
+
+Power on the virtual image and select the Zumastor kernel. The root
+password on the image is set to "zumastor", so you should login as
+root and immediately change the password. You should also look at the
+contents of /etc/conf.d/clock to make sure that the timezone and clock
+settings are correct for your system. I'd also recommend syncing and
+updating through portage/layman, just to be sure you have the latest
+software.
+
+Once you've got the image the way you want it, it is time to set up
+the Zumastor storage space. You'll need to use lvm to create a
+physical volume and volume group:
+
+........
+# pvcreate /dev/sdb
+# vgcreate sysvg /dev/sdb
+# lvcreate --size 500MB -n test sysvg
+# lvcreate --size 1500MB -n test sysvg
+........
+
+Your Gentoo image is now ready for Zumastor.
+
+Source
+~~~~~~
+If you use a distro not covered above, you can install if you're 
+willing to patch your kernel and compile everything manually.  See
+the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
+
+UML
+~~~
+UML is potentially the fastest and easiest way to try out Zumastor,
+at least if you're a developer who likes working with the commandline.
+
+There is a simple shell script, 
+*http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh[test/uml/demo.sh]*,
+which starts UML, runs a few simple tests to make sure Zumastor is 
+basically working, and shuts UML back down.
+It's somewhat Ubuntu/Debian specific, but could probably be made compatible
+with rpm-based distos (patches gratefully accepted).
+
+Developers who wish to contribute changes to Zumastor should
+make sure that demo.sh passes before and after their changes.  
+
+Before you run demo.sh, you should look through it.  
+It starts off by doing six configuration steps, three of 
+which use sudo to gain root privs:
+
+1. As root, it installs any missing packages with apt-get.
+
+2. It downloads some large files (Linux sources, UML system images)
+which can take quite a while on a slow connection.
+These files are cached in the 'build' subdirectory at the
+top of the zumastor tree so they don't need to be downloaded again.
+
+3. It builds UML in the directory 'working/linux-2.6.xxx' if it's
+not present.
+
+4. It creates a root filesystem for UML.
+
+5. As root, it configures the UML root filesystem.
+
+6. As root, it runs 'setup_network_root.sh' to configure your system
+to allow ssh to the UML instances.  For instance, it modifies /etc/hosts 
+to include the lines
+...................
+192.168.100.1 uml_1
+192.168.100.2 uml_2
+...................
+
+Finally, after all that setup, it starts running the UML tests (whew!).
+
+If you want to do a squeaky-clean run, do "rm -rf working".
+Otherwise demo.sh will reuse the UML and images in that directory
+to save time.
+
+You may want to do 'sudo true' before running demo.sh just
+to make sure sudo has your password, so the sudo in the
+middle of the script doesn't prompt you and hang forever.
+
+Also, you may want to add ", timestamp_timeout=100" to the
+end of the Defaults line in your /etc/sudoers file so
+sudo doesn't time out so quickly.
+
+Now that you've read all of the above :-), go ahead and run "bash demo.sh" now.
+On my oldish Athlon 64 3000, it takes 23 minutes (plus download time)
+on the first run, and 10 minutes on the second run.
+
+Once demo.sh passes, or even if it doesn't quite, you might
+want to start and log in to a UML instance manually.
+The four simple shell scripts, xssh.sh, xget.sh, xput.sh, and 
+xstop.sh, let you log in to, get a file from, put a file on, and stop 
+the uml instance set up by demo.sh.
+These are handy for poking at things manually.
+
+Troubleshooting
+---------------
+
+When creating a new snapshot store on an existing device from a
+previous test runs, be sure to zero the snapshot store 
+by e.g. giving the -i option to "zumastor define volume".
+Otherwise creating the first snapshot may fail with "snapshot already exists".
+
+Many zumastor commands are not synchronous.  For instance,
+"zumastor snapshot" doesn't take effect right away; it can take
+several seconds for the snapshot to be taken and mounted.
+These nonsynchronous commands can't show any error messages directly,
+so you have to look in the log files /var/log/zumastor/VOLNAME/{master,server}
+for errors.
+
+Examples
+--------
+
+Verify that LVM2 is installed
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many of these examples require LVM, so install that first if it's not already.
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.)
+........
+$ sudo apt-get install lvm2
+$ sudo /etc/init.d/lvm start
+$ pvcreate
+........
+If pvcreate complains +No program "pvcreate" found for your current version of LVM+, you probably forgot to start the lvm service.
+
+
+Verify that Zumastor is installed and started
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+............
+$ zumastor
+Usage: /bin/zumastor {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]
+............
+
+Note: this doesn't yet complain properly if you forgot to reboot
+into a kernel that supports zumastor.  (It will later, when you try to
+define a volume.)
+
+Create a simple snapshotted volume on a loopback file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before you go messing with real devices, it's useful
+to experiment with plain old files dressed up to look
+like devices via the loopback device.  
+
+Annoyingly, the loopback device naming scheme changed at some point; 
+on some systems it's /dev/loop/0, on others it's /dev/loop0. 
+You may need to adjust the path to suit your version of Linux.
+
+...........
+# dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+# losetup -d /dev/loop/0 || true
+# losetup /dev/loop/0 /media/vg.img
+# pvcreate /dev/loop/0
+# vgcreate sysvg /dev/loop/0
+# lvcreate --name test --size 100MB sysvg
+# lvcreate --name test_snap --size 100MB sysvg
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+..........
+If this complains 
+..........
+/bin/zumastor[889]: error: dmsetup returned 1
+create failed
+/bin/zumastor: define volume 'zumatest' failed
+..........
+you may have forgotten to reboot into the Zumastor-enabled kernel
+you installed earlier.
+
+What if Zumastor can't mount the devices at boot time?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Starting with the previous example, 
+reboot the virtual machine and log back in as root.  
+Notice that +df+ doesn't show any Zumastor volumes mounted.
+That's because when Zumastor started at boot time, it
+couldn't see the loopback device, because we didn't arrange 
+for it to be set up automatically at boot time.  
+(This won't happen with real devices!)
+So do it manually now, then tell LVM about it, then tell Zumastor about it:
+.....
+$ sudo sh
+# losetup /dev/loop/0 /media/vg.img
+# vgchange -ay
+# bash /etc/init.d/zumastor restart
+# df | grep zumatest
+.....
+You should now see the expected set of volumes and snapshots mounted.
+
+If vgchange -ay doesn't detect your volume group, do +rm /etc/lvm/.cache+
+and try again.
+
+
+Remove the volume and loopback file created above
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.........
+# zumastor forget volume zumatest
+# lvremove sysvg
+# losetup -d /dev/loop/0
+# rm /media/vg.img
+.........
+
+
+Create a single snapshotted volume on a real device
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Find an big empty partition. Let's say it's a 10GB /dev/hda3.
+Here's how to use LVM to put a volume and its snapshot store onto it:
+
+........
+# pvcreate /dev/hda3
+  Physical volume "/dev/hda3" successfully created
+# vgcreate sysvg /dev/hda3
+  Volume group "sysvg" successfully created
+# lvcreate --name test --size 5G sysvg
+  Logical volume "test" created
+# lvcreate --name test_snap --size 5G sysvg
+  Logical volume "test_snap" created
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+Wed Nov 21 19:32:58 2007: [3622] snap_server_setup: ddsnapd bound to socket /var/run/zumastor/servers/zumatest
+pid = 3623
+Successfully created and initialized volume 'zumatest'.
+# mkfs.ext3 /dev/mapper/zumatest
+........
+
+You now have an unmounted filesystem which can be snapshotted.
+
+Mount a new volume and set up periodic snapshots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To mount the new volume you created in the previous example,
+and set up hourly snapshots, do:
+........
+# zumastor define master zumatest --hourly 24
+........
+Setting this volume as a "master" causes it be to mounted on 
+/var/run/zumastor/mount/zumatest.
+The +--hourly 24+ specifies that we want to keep the 24 most recent hourly snapshots (a days worth).
+A snapshot will be created once an hour via the zumastor hourly cron
+script.  We can accelerate this by manually telling zumastor to take an
+"hourly" snapshot right now, with the +zumastor snapshot+ command:
+
+........
+# zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest  5160576    131228   4767204   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  5160576    131228   4767204   3% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48
+..........
+
+If you do some IO on the filesystem you should notice only the origin device, mounted on +/var/run/zumastor/mount/zumatest+ changes:
+.....
+# echo "This is the first file!" > /var/run/zumastor/zumatest/foo.txt
+# df | grep zumatest
+/dev/mapper/zumatest  99150       4128   89902   5% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48
+.....
+
+As expected, the origin's "Used" block count goes up by one,
+but the snapshot's doesn't change.
+
+Now take another snapshot, and look at df again:
+......
+# zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest  99150    4128   89902   5% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48
+/dev/mapper/zumatest(2)  99150    4128   89902   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.31.15
+......
+Notice that the first snapshot was named 
++zumatest(0)+, but the new one is named +zumatest(2)+.
+(Why the gap?  Zumastor uses another snapshot internally during
+replication.  Yes, this is a bit of a rough edge.)
+
+[NOTE]
+If you want to export Zumastor snapshots via NFS or Samba, you need to use the +export+ or +samba+
+options with the +zumastor define master+ command. See sections "Exporting a Zumastor volume via NFS" 
+and "Exporting a Zumastor volume via Samba" for such examples.
+
+Where do old snapshots go?
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Assuming you've set up a volume to keep 24 hourly snapshots
+around with the command +zumastor define master zumatest --hourly 24+
+as in the last example, what happens when the 25th snapshot is taken?
+
+To find out, you can run a loop that takes lots of snapshots.
+Run it, then use df to see how many snapshots are around afterwards:
+.......
+# num=0
+# while test $num -lt 50
+  do 
+    zumastor snapshot zumatest hourly
+    num=`expr $num + 1`
+    echo $num
+  done
+# df -P | grep zumatest
+.......
+You should see 24 snapshots (the limit set when we did the +zumastor define master+)
+plus the origin volume.  Each time you run +zumastor snapshot ...+
+it creates a new snapshot, and deletes any that are 'too old'.
+
+How can I run the above examples using UML?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First off, cd into test/uml.
+
+Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.
+
+Then you can easily start and log in to a UML instance by running ./xssh.sh.
+
+Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".
+
+
+Exporting a Zumastor volume via NFS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Install the NFS server packages:
++
+--------------------------------------
+# aptitude install nfs-common nfs-kernel-server
+--------------------------------------
++
+2. Add the following lines to the NFS exports file `/etc/exports`
+(where 'testvol' is the Zumastor volume to be exported):
++
+--------------------------------------
+/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/snapshot/testvol *(ro,fsid=1,nohide,no_subtree_check,crossmnt)
+--------------------------------------
++
+The ``fsid=xxx'' option is required to ensure that the NFS server uses the same
+file handle after a restart or remount of an exported volume.  If it is not
+specified, when the snapshot is remounted the file handle will change and the
+client will receive a stale file handle error. Any 32 bit number can be used for
+fsid value but it must be unique across all exported filesystems.
++
+The ``crossmnt'' option is required to allow client access to exported snapshot
+directories mounted under the Zumastor volume, see below.
++
+3. If you want to also export zumastor *snapshots*, you'll need to use
+the +--export+ option with the command +zumastor define master+ described in section
+"Mount a new volume and set up periodic snapshots" above.
++
+--------------------------------------
+zumastor define master zumatest --hourly 24 --export
+--------------------------------------
++
+You'll also need to modify your system's NFS startup script to
+reread /etc/exports on restart.  For Ubuntu, we provide a patch that
+does this for you:
++
+--------------------------------------
+# cd /etc/init.d/
+# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
+# patch -p0 < nfs-kernel-server.patch
+# rm -f nfs-kernel-server.patch
+--------------------------------------
+
+To export zumastor volumes from a different path, you can either symlink the zumastor volumes
+to that path or use the +--mountpoint+ and +--snappath+ options
+with the command +zumastor define volume+ described in section "Origin and Snapshot mount points" above.
+
+Recovering files through NFS using a Zumastor snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First, make sure you have used the +--export+ option with the +zumastor define master+ 
+command and modified your NFS server's startup script
+as described in the section "Exporting a Zumastor volume via NFS" above.
+
+Then mount the Zumastor volume as normal on an NFS client, for instance:
+--------------------------------------
+mount -tnfs nfs-server:/var/run/zumastor/snapshot/testvol /mnt
+ls /mnt
+--------------------------------------
+
+There will be a number of snapshot directories under /mnt.
+Each of these directories is named for the time at which that snapshot was
+taken and symlinked to the corresponding snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).
+To recover a file, find it in the appropriate snapshot directory and
+copy it to the desired location.
+
+[NOTE]
+A future revision of Zumastor may add options to make the snapshots
+visible inside each directory, which would let you access them from any
+place under the volume mount point.
+
+Exporting a Zumastor volume via Samba
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Here is an example of setting up Samba on Zumastor using the USER authentication flavor.
+
+1. Install the Samba server packages:
++
+--------------------------------------
+# aptitude install samba
+--------------------------------------
++
+2. Edit file `/etc/samba/smb.conf`, configuring the ``workgroup'' option according to your domain setup, 
+commenting out the ``obey pam restrictions = yes'' option, and adding the following lines 
+(where 'testvol' is the Zumastor volume to be exported and 'homevol' is the name of 
+the exported Samba volume):
++
+--------------------------------------
+[homevol]
+
+path = /var/run/zumastor/mount/testvol
+comment = test volume
+browseable = yes
+case sensitive = no
+read only = no
+vfs objects = shadow_copy
+--------------------------------------
++
+The ``vfs objects = shadow_copy'' option is required for accessing snapshot directories via
+CIFS's *previous version* interface, see below.
++
+3. Setup smbpasswd for the volume 'homevol'. Please replace 'testuser' with the user name you want to 
+use for accessing the exported Samba volume from a client. You don't need the +useradd+ command if 
+'testuser' has already existed on the Samba server.
++
+--------------------------------------
+#useradd testuser
+#smbpasswd -a testuser
+New SMB password: your-secure-passwd
+Retype new SMB password: your-secure-passwd 
+--------------------------------------
++
+4. If you want to also export zumastor *snapshots* via CIFS's *previous version* interface, you'll need to use
+the +--samba+ option with the command +zumastor define master+ described in section
+"Mount a new volume and set up periodic snapshots" above.
++
+--------------------------------------
+zumastor define master zumatest --hourly 24 --samba
+--------------------------------------
+
+Recovering files through Samba using a Zumastor snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First, make sure you have used the +samba+ option with the +zumastor define master+
+command as described in the section "Exporting a Zumastor volume via Samba" above.
+Then you can recover files from a Windows Samba client as follows.
+
+1. Open Windows Explorer and enter the Samba server name followed by the exported volume name in the explorer bar, e.g.,
++\\samba-server\homevol\+. Enter 'testuser' and 'your-secure-passwd' in the poped up authtication window, where 'testuser'
+and 'your-secure-passwd' are the username and password your have set up on the Samba server, as described in section
+"Exporting a Zumastor volume via Samba" above.
+
+2. Go to the file or directory you want to recover. Right click it and select +Properties+. You will see the
++Previous versions+ tab appear on the top. Select it and you will see a list of snapshots in the window.
+Select a snapshot. Then you can view, copy, or restore any file from that snapshot.
