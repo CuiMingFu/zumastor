@@ -139,7 +139,7 @@ then
       kernel-image-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb \
       kernel-headers-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb
     do
-      [ -f $kfile ] && mv $kfile r${SVNREV}/
+      [ -f ../$kfile ] && mv ../$kfile ${BUILD_DIR}/r${SVNREV}/
     done
   fi
   popd >> $LOG
