@@ -62,8 +62,10 @@ function zuma_install {
 	wget http://zumabuild/trunk/kernel-headers-build_i386.deb
 	wget http://zumabuild/trunk/kernel-image-build_i386.deb
 	cd ..
+	ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
 	scp $SCP_OPTS -r zumabuild root@$source:/root/
 	ssh $SSH_OPTS $source "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $source"; exit 1; }
+	ssh $SSH_OPTS $target "rm -rf /root/zumabuild"
 	scp $SCP_OPTS -r zumabuild root@$target:/root/
 	ssh $SSH_OPTS $target "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $target"; exit 1; }
 }
@@ -98,8 +100,22 @@ function monitor_replication {
 	local -r vol=$1
 	local smodify tmodify scurrent tcurrent shangtime thangtime
 
-	smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target/hold"`
-	tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source/hold"`
+	if ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$vol/targets/$target/send >& /dev/null"; then
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target/send"`
+	elif ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$vol/targets/$target/hold >& /dev/null"; then
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target/hold"`
+	else
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target"`
+	fi
+
+	if ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$vol/source/apply >& /dev/null"; then
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source/apply"`
+	elif ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$vol/source/hold >& /dev/null"; then
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source/hold"`
+	else
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source"`
+	fi
+
 	scurrent=`ssh $SSH_OPTS $source "date +%s"`
 	tcurrent=`ssh $SSH_OPTS $target "date +%s"`
 	shangtime=$(( scurrent - smodify ))
@@ -109,6 +125,8 @@ function monitor_replication {
 		echo | mail -s 'ZUMASTOR LARGE VOLUME COPY TEST HANGING' $notifyemail
 		exit 1
 	fi
+
+	df -h | grep zsoftware
 	pgrep rsync >& /dev/null || { echo | mail -s 'ZUMASTOR LARGE VOLUME COPY TEST FINISHED' $notifyemail ; exit 0; }
 }
 
@@ -144,8 +162,7 @@ ssh $SSH_OPTS $source "zumastor define target $vol $target:$target_port -p 3600"
 # set up nfs access
 ssh $SSH_OPTS $source "exportfs -o'rw,fsid=1000,crossmnt,nohide' *:/var/run/zumastor/mount/$vol"
 ssh $SSH_OPTS $source "chmod a+rw /var/run/zumastor/mount/$vol"
-sudo mkdir -p /zsoftware
-sudo chmod a+rwx /zsoftware
+[[ -e /zsoftware ]] || { sudo mkdir /zsoftware; sudo chmod a+rwx /zsoftware; }
 sudo mount -tnfs $source:/var/run/zumastor/mount/$vol /zsoftware
 
 # start the large volume copy via nfs
