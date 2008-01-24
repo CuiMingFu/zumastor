@@ -2,7 +2,7 @@
 # zumastor automated build script
 # Shapor Naghibzadeh <shapor@google.com>
 
-KERNEL_VERSION=2.6.21.1
+KERNEL_VERSION=2.6.22.10
 BUILD_DIR=build # relative to current directory
 LOG=/dev/null
 TIME=`date +%s`
