@@ -221,7 +221,6 @@ function create_device {
 	local -r info=$VOLUMES/$vol
 	local -r agent=${AGENTS}/$vol
 	local -r server=${SERVERS}/$vol
-	local -r size=$(ddsnap status $server --size) || return 1
 	local -r sdev=$info/device/snapstore
 	local -r odev=$info/device/origin
 	local -r name=$(volume_name $vol $id)
@@ -235,6 +234,9 @@ function create_device {
 		9) log "error: checking snapshot state"; return 1 ;;
 		*) log "error: unknown state return code $?"; return 1 ;;
 		esac
+		size=$(ddsnap status $server --size $id) || return 1
+	else
+		size=$(ddsnap status $server --size) || return 1
 	fi 
 
 	echo 0 $size ddsnap $sdev $odev $agent $id | dmsetup create $name >/dev/null 2>&1 || { log "error: dmsetup returned $?"; return 1; }

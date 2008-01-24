@@ -71,11 +71,11 @@ static const char *csnap_names[] = {
 	"STATUS_ERROR",
 	"REQUEST_SNAPSHOT_STATE",
 	"SNAPSHOT_STATE",
-	"REQUEST_ORIGIN_SECTORS",
-	"ORIGIN_SECTORS",
+	"REQUEST_SNAPSHOT_SECTORS",
+	"SNAPSHOT_SECTORS",
 };
 #define EVENT_FIRST PROTOCOL_ERROR	/* FIXME: must be first packet name */
-#define EVENT_NUMNAMES ORIGIN_SECTORS+1	/* FIXME: must be last packet name */
+#define EVENT_NUMNAMES SNAPSHOT_SECTORS+1	/* FIXME: must be last packet name */
 #define EVENT_BAD ((enum csnap_codes) 0)
 #define EVENT_ANY ((enum csnap_codes) -1)
 

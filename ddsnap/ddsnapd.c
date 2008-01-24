@@ -233,7 +233,7 @@ struct disksuper
 		u16 usecount; // persistent use count on snapshot device
 		u8 bit;    // internal snapshot number, not derived from tag
 		s8 prio;   // 0=normal, 127=highest, -128=lowest
-		char reserved[4]; /* adds up to 16 */
+		u64 sectors; // sectors of the snapshot
 	} snaplist[MAX_SNAPSHOTS]; // entries are contiguous, in creation order
 	u32 snapshots;
 	u32 etree_levels;
@@ -2441,7 +2441,7 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 create:
 	trace_on(warn("Create snapshot tag = %u, bit = %i)", snaptag, i););
 	snapshot = sb->image.snaplist + sb->image.snapshots++;
-	*snapshot = (struct snapshot){ .tag = snaptag, .bit = i, .ctime = time(NULL) };
+	*snapshot = (struct snapshot){ .tag = snaptag, .bit = i, .ctime = time(NULL), .sectors = sb->image.orgsectors };
 	sb->snapmask |= (1ULL << i);
 	set_sb_dirty(sb);
 	return i;
@@ -2937,7 +2937,7 @@ static int change_bits(struct superblock *sb, u64 start_chunk, u64 end_chunk, u6
  *     Reserve new bitmap chunks in new bitmap
  */
 
-static void update_bitmap(struct superblock *sb, struct allocspace *as, u64 newchunks, u64 new_basechunk, u64 new_metachunks)
+static int update_bitmap(struct superblock *sb, struct allocspace *as, u64 newchunks, u64 new_basechunk, u64 new_metachunks)
 {
 	u64 oldchunks = as->asi->chunks;
 	unsigned oldbitmaps = as->asi->bitmap_blocks;
@@ -2954,14 +2954,16 @@ static void update_bitmap(struct superblock *sb, struct allocspace *as, u64 newc
 	/* snapshot shrinking */
 	if (newchunks <= oldchunks) {
 		/* check if any chunk to be freed is currently in use */
-		if (change_bits(sb, newchunks, oldchunks - 1, oldbase, 0))
-			error("some chunks to be freed are still in use!!!");
+		if (change_bits(sb, newchunks, oldchunks - 1, oldbase, 0)) {
+			warn("some chunks to be freed are still in use!!!");
+			return -1;
+		}
 		/* clear bits for unused bitmap chunks */
 		if (newbitmaps < oldbitmaps) {
 			change_bits(sb, oldchunks_meta + newbitmaps, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
 			as->asi->bitmap_blocks = newbitmaps;
 		}
-		return;
+		return 0;
 	}
 
 	/* no need to relocate bitmap if we don't need more bitmap chunks */
@@ -2976,13 +2978,15 @@ static void update_bitmap(struct superblock *sb, struct allocspace *as, u64 newc
 				buffer->data[(newchunks >> 3) & (blocksize - 1)] |= 0xff << (newchunks & 7);
 			brelse_dirty(buffer);
 		}
-		return;
+		return 0;
 	}
 
 	warn("expand bitmap: oldbase %Lu, newbase %Lu, new_metachunks %Lu", oldbase, newbase, new_metachunks);
 	/* need to add enough metadata space when expanding metadata/snapshot store */
-	if (new_metachunks < newbitmaps)
-		error("Not enough space for bitmap relocation, please add more metadata space!!!");
+	if (new_metachunks < newbitmaps) {
+		warn("Not enough space for bitmap relocation, please add more metadata space!!!");
+		return -1;
+	}
 
 	/* copy old bitmap chunks to the newbase */
 	for (i = 0; i < oldbitmaps; i++) {
@@ -3017,46 +3021,36 @@ static void update_bitmap(struct superblock *sb, struct allocspace *as, u64 newc
 	/* clear bits for old bitmap chunks and reserve new bitmap chunks at new bitmap base */
 	change_bits(sb, oldchunks_meta, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
 	change_bits(sb, new_basechunk, new_basechunk + newbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 1);
+	return 0;
 }
 
-int fd_size(int fd, u64 *bytes); // bogus, do the size checks in ddsnap.c
-
-static int sb_get_device_sizes(struct superblock *sb)
+static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize, u64 metasize)
 {
-	u64 size, newsize;
-	int error;
+	u64 metachunks, snapchunks, orgchunks;
 	u64 new_bitmap_basechunk = 0;
 	u64 new_metachunks = 0;
 
-	if ((error = fd_size(sb->metadev, &size)) < 0) {
-		warn("Error %i: %s determining metadata store size", error, strerror(-error));
-		return error;
-	}
-	newsize = size >> sb->image.metadata.allocsize_bits;
-	warn("sb->image.metadata.chunks %Lu newsize %Lu", sb->image.metadata.chunks, newsize);
-	if (sb->image.metadata.chunks != newsize) {
+	metachunks = metasize >> sb->image.metadata.allocsize_bits;
+	if (metachunks && sb->image.metadata.chunks != metachunks) {
 		u64 oldbitmaps = sb->image.metadata.bitmap_blocks;
-		warn("metadev size changes from %Lu to %Lu", sb->image.metadata.chunks, newsize);
+		warn("metadev size changes from %Lu to %Lu", sb->image.metadata.chunks, metachunks);
 		/* no need to do bitmap update during initialization (i.e., metadata.chunks ==0) */
 		if (sb->image.metadata.chunks) {
 			new_bitmap_basechunk = sb->image.metadata.chunks;
-			new_metachunks = newsize - sb->image.metadata.chunks;
-			update_bitmap(sb, &sb->metadata, newsize, new_bitmap_basechunk, new_metachunks);
+			new_metachunks = metachunks - sb->image.metadata.chunks;
+			if (update_bitmap(sb, &sb->metadata, metachunks, new_bitmap_basechunk, new_metachunks) < 0)
+				return -1;
 			new_bitmap_basechunk += sb->metadata.asi->bitmap_blocks;
 			new_metachunks -= sb->metadata.asi->bitmap_blocks;
 		}
-		sb->image.metadata.freechunks += newsize - sb->image.metadata.chunks + oldbitmaps - sb->image.metadata.bitmap_blocks;
-		sb->image.metadata.chunks = newsize;
+		sb->image.metadata.freechunks += metachunks - sb->image.metadata.chunks + oldbitmaps - sb->image.metadata.bitmap_blocks;
+		sb->image.metadata.chunks = metachunks;
 	}
 
 	if (sb->metadev != sb->snapdev) {
-		if ((error = fd_size(sb->snapdev, &size)) < 0) {
-			warn("Error %i: %s determining snapshot store size", error, strerror(-error));
-			return error;
-		}
-		newsize = size >> sb->image.snapdata.allocsize_bits;
-		if (sb->image.snapdata.chunks != newsize) {
-			warn("snapdev size changes from %Lu to %Lu", sb->image.snapdata.chunks, newsize);
+		snapchunks = snapsize >> sb->image.snapdata.allocsize_bits;
+	       	if (snapchunks && sb->image.snapdata.chunks != snapchunks) {
+			warn("snapdev size changes from %Lu to %Lu", sb->image.snapdata.chunks, snapchunks);
 			/* 
 			 * For bitmap relocation purpose, we allow snapdev expanding only if metadev 
 			 * is also expanded. In that case, new_bitmap_basechunk and new_metachunks
@@ -3064,23 +3058,49 @@ static int sb_get_device_sizes(struct superblock *sb)
 			 */
 			if (sb->image.snapdata.chunks) {
 				u64 oldbitmaps = sb->image.snapdata.bitmap_blocks;
-				update_bitmap(sb, &sb->snapdata, newsize, new_bitmap_basechunk, new_metachunks);
+				if (update_bitmap(sb, &sb->snapdata, snapchunks, new_bitmap_basechunk, new_metachunks) < 0)
+					return -1;
 				sb->image.metadata.freechunks += oldbitmaps - sb->image.snapdata.bitmap_blocks;
 			}
-			sb->image.snapdata.freechunks += newsize - sb->image.snapdata.chunks;
-			sb->image.snapdata.chunks = newsize;
+			sb->image.snapdata.freechunks += snapchunks - sb->image.snapdata.chunks;
+			sb->image.snapdata.chunks = snapchunks;
 		}
 	}
 
-	if ((error = fd_size(sb->orgdev, &size)) < 0) {
+	orgchunks = orgsize >> SECTOR_BITS;
+	if (orgchunks && sb->image.orgsectors != orgchunks) {
+		warn("orgdev size changes from %Lu to %Lu", sb->image.orgsectors, orgchunks);
+		sb->image.orgsectors = orgchunks;
+	}
+	return 0;
+}
+
+int fd_size(int fd, u64 *bytes); // bogus, do the size checks in ddsnap.c
+
+static int sb_get_device_sizes(struct superblock *sb)
+{
+	u64 metasize, snapsize, orgsize;
+	int error;
+
+	if ((error = fd_size(sb->metadev, &metasize)) < 0) {
+		warn("Error %i: %s determining metadata store size", error, strerror(-error));
+		return error;
+	}
+
+	if (sb->metadev != sb->snapdev) {
+		if ((error = fd_size(sb->snapdev, &snapsize)) < 0) {
+			warn("Error %i: %s determining snapshot store size", error, strerror(-error));
+			return error;
+		}
+	} else
+		snapsize = metasize;
+
+	if ((error = fd_size(sb->orgdev, &orgsize)) < 0) {
 		warn("Error %i: %s determining origin volume size", errno, strerror(-errno));
 		return error;
 	}
-	newsize = size >> SECTOR_BITS;
-	if (sb->image.orgsectors != newsize) {
-		warn("orgdev size changes from %Lu to %Lu", sb->image.orgsectors, newsize);
-		sb->image.orgsectors = newsize;
-	}
+
+	change_device_sizes(sb, orgsize, snapsize, metasize);
 	return 0;
 }
 
@@ -3543,6 +3563,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		u32 tag      = ((struct identify *)message.body)->snap;
 		sector_t off = ((struct identify *)message.body)->off;
 		sector_t len = ((struct identify *)message.body)->len;
+		u64 sectors;
 		u32 err = 0; /* success */
 		unsigned int error_len;
 		char err_msg[MAX_ERRMSG_SIZE];
@@ -3578,9 +3599,10 @@ static int incoming(struct superblock *sb, struct client *client)
 			}
 			client->flags |= SNAPCLIENT_BIT;
 			sb->usecount[snapshot->bit]++; // update the transient usecount only
-		}
-
-		if (len != sb->image.orgsectors) {
+			sectors = snapshot->sectors;
+		} else
+			sectors = sb->image.orgsectors;
+		if (len != sectors) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "volume size mismatch for snapshot %u", tag);
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0'; // make sure it's null terminated
 			err = ERROR_SIZE_MISMATCH;
@@ -3930,13 +3952,62 @@ static int incoming(struct superblock *sb, struct client *client)
 			warn("unable to send error for status message: %s", strerror(-err));
 		break;
 	}
-	case REQUEST_ORIGIN_SECTORS:
+	case REQUEST_SNAPSHOT_SECTORS:
+	{
+		u32 snap = ((struct status_request *)message.body)->snap;
+		struct snapshot const *snaplist = sb->image.snaplist;
+		struct snapshot_sectors reply;
+		char err_msg[MAX_ERRMSG_SIZE];
+		int i, err;
+
+		reply.snap = snap;
+		reply.count = 0;
+		if (snap == (u32)~0UL) {
+			reply.count = sb->image.orgsectors;
+		} else {
+			for (i = 0; i < sb->image.snapshots; i++)
+				if (snaplist[i].tag == snap) {
+					reply.count = is_squashed(&snaplist[i]) ? 0 : snaplist[i].sectors;
+					break;
+				}
+		}
+		if (reply.count == 0) {
+			snprintf(err_msg, MAX_ERRMSG_SIZE, "Snapshot %u is not valid", snap);
+			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
+			if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
+				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
+				warn("unable to send error for snapshot_sectors message: %s", strerror(-err));
+		} else if (outbead(sock, SNAPSHOT_SECTORS, struct snapshot_sectors, reply.snap, reply.count) < 0)
+			warn("unable to send snapshot sectors message");
+		break;
+	}
+	case RESIZE:
 	{
 		int err;
+		char err_msg[MAX_ERRMSG_SIZE];
+		u64 orgsize = ((struct resize_request *)message.body)->orgsize;
+		u64 snapsize = ((struct resize_request *)message.body)->snapsize;
+		u64 metasize = ((struct resize_request *)message.body)->metasize;
 
-		if ((err = outbead(sock, ORIGIN_SECTORS, struct origin_sectors, sb->image.orgsectors)) < 0)
-			warn("unable to send origin sectors message: %s", strerror(-err));
-		
+		if (sb->metadev == sb->snapdev) {
+			if (snapsize && metasize && snapsize != metasize) {
+				snprintf(err_msg, MAX_ERRMSG_SIZE, "snapshot device and metadata device are the same, can't resize them to two values");
+				if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
+					(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
+					warn("unable to send resize reply error message: %s", strerror(-err));
+				break;
+			}
+			if (!metasize)
+				metasize = snapsize;
+		}
+		err = change_device_sizes(sb, orgsize, snapsize, metasize);
+		check_freespace(sb);
+		/* return the device sizes after change_device_sizes */
+		orgsize = sb->image.orgsectors << SECTOR_BITS;
+		metasize = sb->image.metadata.chunks << sb->image.metadata.allocsize_bits;
+		snapsize = (sb->metadev == sb->snapdev) ? (sb->image.metadata.chunks << sb->image.metadata.allocsize_bits) : (sb->image.snapdata.chunks << sb->image.snapdata.allocsize_bits);
+		if (outbead(sock, RESIZE, struct resize_request, orgsize, snapsize, metasize) < 0)
+			warn("unable to send resize reply");
 		break;
 	}
 	case SHUTDOWN_SERVER:
