@@ -34,7 +34,7 @@ nodes, and has a tftpboot directory.  eg.
     mkdir 0.4
     cd 0.4
     svn checkout http://zumastor.googlecode.com/svn/branches/0.4/ zumastor
-    svn checkout http://zumastor.googlecode.com/svn/branches/0.4/cbtb/tests zumastor
+    svn checkout http://zumastor.googlecode.com/svn/branches/0.4/cbtb/tests zumastor-tests
 
   c) copy and examine as required the scripts this directory to the top level
      directory (~ or ~/0.4), to prevent directly running scripts from
@@ -48,7 +48,9 @@ nodes, and has a tftpboot directory.  eg.
     tunbr ./dapper-i386.sh
     mv dapper-i386.img zumastor/build/dapper-i386-r`svnversion`.img
     (TODO: not current, need to update.  Both build and install use existing
-     dapper images, and not the same one due to development changes)
+     dapper images, and not the same one due to development changes.
+     directories and binaries are moved, copied, or hardlinked from
+     trunk's build/ directory on a new release branch)
 
   e) Launch the continuous build
     cd ~   or  cd ~/0.4
