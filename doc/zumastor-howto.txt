@@ -816,3 +816,116 @@ and 'your-secure-passwd' are the username and password your have set up on the S
 2. Go to the file or directory you want to recover. Right click it and select +Properties+. You will see the
 +Previous versions+ tab appear on the top. Select it and you will see a list of snapshots in the window.
 Select a snapshot. Then you can view, copy, or restore any file from that snapshot.
+
+Resize a Zumastor volume
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose you have a Zumastor volume 'testvol' that uses '/dev/sysvg/test' lvm device as the origin and
+'/dev/sysvg/test_snap' lvm device as the snapshot store.
+Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system 
+running on top of it.
+
+Enlarge the origin device of a Zumastor volume
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. First, make sure you have shut down all of the services running on top of the Zumastor volume,
+such as NFS or Samba.
+
+2. Resize the lvm device of the origin volume with the 'newsize'. Here 'newsize' may be suffixed 
+by unit designator such as K, M, or G.
++
+--------------------------------------
+lvresize /dev/sysvg/test -L newsize
+--------------------------------------
++
+3. Resize zumastor origin volume with the +zumastor resize --origin+ command.
+Then resize the EXT3 file system with the +e2fsck/resize2fs+ utilities from the
++e2fsprogs+ debian package (you need to install the package first if it is not already installed).
+Here, we need to first stop +zumastor master+, which will umount the
+origin volume as well as all of the existing snapshots. After the EXT3 resizing, we restart
++zumastor master+, which will mount the origin volume with the new size.
++
+--------------------------------------
+zumastor stop master testvol
+zumastor resize testvol --origin newsize
+e2fsck -f /dev/mapper/testvol
+resize2fs /dev/mapper/testvol newsize
+zumastor start master testvol
+--------------------------------------
++
+Now check the size of the Zumastor volume with +df | grep testvol+.
+You will see that the size of the origin volume has changed but the size of
+all the existing snapshots is unchanged.
+ 
+Shrink the origin device of a Zumastor volume
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The steps to shrink the origin device of a Zumastor volume is similar to those for
+enlarging the origin device, but need to be ran in different orders.
+
+1. Shut down all of the services running on top of the Zumastor volume.
+
+2. Stop +zumastor master+. Then shrink the EXT3 file system.
++
+--------------------------------------
+zumastor stop master testvol
+e2fsck -f /dev/mapper/testvol
+resize2fs /dev/mapper/testvol newsize
+--------------------------------------
++
+3. Shrink the zumastor origin device. Before running the +zumastor resize --origin+
+command, we need to first have all of the data on the shrinked space to be copied out to the
+snapshot store. Otherwise, you may get access error when reading/writing an existing snapshot.
+The copyout can be executed by overwriting the shrinked space with the +dd+ command.
+E.g., when shrinking the origin device from 4G to 1G, you can use
++dd if=/dev/zero of=/dev/mapper/testvol bs=64k seek=16k count=48k+.
+Depends on the old size of your origin device, this step may take a long time.
+After that, restart +zumastor master+.
++
+--------------------------------------
+dd if=/dev/zero of=/dev/mapper/testvol bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
+sync
+zumastor resize testvol --origin newsize
+zumastor start master testvol
+--------------------------------------
++
+Now check the size of the Zumastor volume with +df | grep testvol+.
+You should see that the size of the origin volume has changed but the size of
+all the existing snapshots is unchanged.
+
+4. Now it is safe to shrink the origin lvm device.
++
+--------------------------------------
+lvresize /dev/sysvg/test -L newsize
+--------------------------------------
+
+Enlarge the snapshot store of a Zumastor volume
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
+run the +zumastor resize --snapshot+ command after enlarging the snapshot lvm device.
+--------------------------------------
+lvresize /dev/sysvg/test_snap -L newsize
+zumastor resize testvol --snapshot newsize
+--------------------------------------
+After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
+
+Shrink the snapshot store of a Zumastor volume
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
+to be run carefully. First, run the +zumastor resize --snapshot+ command to shrink
+the Zumastor snapshot store. The command may fail if the existing snapshot store does
+not have enough continuous free space. In this case, try a larger value.
+If the  +zumastor resize --snapshot+ command succeeds, you can run the +lvresize+
+command to shrink the snapshot lvm device.
+Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
+may damage the whole Zumastor volume.
+--------------------------------------
+zumastor resize testvol --snapshot newsize
+lvresize /dev/sysvg/test_snap -L newsize
+--------------------------------------
+After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
+
+[NOTE]
+You can follow the similar procedures when resizing a Zumastor volume with a different file 
+system running on top of it. For example, you can replace the
++e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/testvol+ to resize a reiserfs file system.
+If you want to resize a Zumastor volume that uses raw partitions instead of
+lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
