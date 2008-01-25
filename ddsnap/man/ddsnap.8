@@ -31,6 +31,9 @@ ddsnap \- block device snapshot and replication
 .B ddsnap usecount
 .I socket_name snap_tag \fP[\fIdiff_amount\fP]
 .br
+.B ddsnap resize
+.I socket_name [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.br
 .B ddsnap status
 [\-v|--verbose] \fIsocket_name\fP [\fIsnapshot\fP]
 .br
@@ -148,6 +151,10 @@ Sets the priority of the snapshot with the given sockname and snap_tag to the gi
 .I socket_name snap_tag [diff_amount]
 .br
 Changes the use count of the snapshot with the given sockname and snap_tag by adding diff_amount to current snapshot usecount.  If diff_amount is omitted, 0 is assumed.
+.IP \fBresize
+.I socket_name [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.br
+Resize the origin/snapshot/metadata device of an existing ddsnap volume.
 .IP \fBstatus
 [\-v|--verbose] \fIsocket_name\fP [\fIsnapshot\fP]
 .br

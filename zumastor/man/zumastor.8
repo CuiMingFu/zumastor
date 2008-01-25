@@ -27,6 +27,9 @@ zumastor \- block device snapshot and replication management
 .B zumastor replicate
 .I volume host \fB[options]\fP
 .br
+.B zumastor resize
+.I volume \fB[options]\fP
+.br
 .B zumastor status
 [\fIvolume\fP [\fIsnap\fP]] \fB[options]\fP
 
@@ -107,6 +110,10 @@ Explicitly initiate a volume snapshot within the specified snapshot rotation. If
 .I volume host \fP[\fB-s\fP|\fB--snapnum\fP \fIsnap\fP] [\fB-d\fP|\fB--delay\fP \fIseconds\fP]
 
 Explicitly initiate a volume replication cycle to the specified host. If \fIsnap\fP is specified then the snapshot with id \fIsnap\fP will be replicated, unless a more recent snapshot has already been replicated. If \fIsnap\fP is omitted then the most recent volume snapshot will be replicated. If \fIseconds\fP is specified, the script will sleep for the specified number of seconds before triggering a replication cycle. This is used internally to support periodic replication. The default is 0, meaning immediately.
+.IP \fBresize\fP
+.I volume \fP[\fB-o\fP|\fB--origin\fP \fInewsize\fP] [\fB-s\fP|\fB--snapshot\fP \fInewsize\fP] [\fB-m\fP|\fB--metadata\fP \fInewsize\fP]
+
+Resize the origin/snapshot/metadata device of a zumastor volume to \fInewsize\fP.
 .IP \fBstatus\fP
 [\fIvolume\fP [\fIsnap\fP]] [\fB-u\fP|\fB--usage\fP]
 
