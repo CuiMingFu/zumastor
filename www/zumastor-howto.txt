@@ -1,2 +1,0 @@
-This document has moved to SVN,
-http://zumastor.googlecode.com/svn/trunk/doc/zumastor-howto.txt
