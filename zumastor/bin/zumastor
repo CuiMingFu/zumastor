@@ -29,6 +29,11 @@ function drop_snapshot {
 
 	log "dropping snapshot for $vol($snap)"
 	usecount=$(ddsnap usecount $server $snap) || { log "couldn't get usecount for vol '$vol' snap '$snap'"; return 1; }
+	if [[ $usecount -eq 0 ]]; then
+		remove_device $vol $snap
+		ddsnap delete $server $snap || { log "failed to delete snapshot '$vol($snap)'"; return 1; }
+		return 0
+	fi
 	[[ $usecount -eq 1 ]] || { log "trying to remove snapshot with usecount '$usecount'"; return 1; }
 	remove_device $vol $snap || { log "remove device failed for $vol($snap) "; return 1; }
 

@@ -2425,8 +2425,13 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 	struct snapshot *snapshot;
 
 	/* check if we are out of snapshots */
-	if ((snapshots >= MAX_SNAPSHOTS) && auto_delete_snapshot(sb))
-		return -EFULL;
+	if (snapshots >= MAX_SNAPSHOTS) {
+	       	auto_delete_snapshot(sb);
+		if (snapshots >= MAX_SNAPSHOTS) {
+			warn("the number of snapshots is beyond the %d limit", MAX_SNAPSHOTS);
+			return -EFULL;
+		}
+	}
 
 	/* tag already used? */
 	if (find_snap(sb, snaptag))
