@@ -929,3 +929,49 @@ system running on top of it. For example, you can replace the
 +e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/testvol+ to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
+
+Test and Benchmark Tools
+------------------------
+
+We provide several test and benchmark tools that you may want to run first before using Zumastor
+to host your critical data. The benchmark results depend a lot on the underlying hardware.
+E.g., with a single-spindle disk, you would expect about five times slowdown on write throughput.
+But with a ramdisk, you may observe no performance overhead introduced by Zumastor, even when
+a number of snapshots have been taken.
+
+Large volume copy test
+~~~~~~~~~~~~~~~~~~~~~~
+We recommend users to first try a large volume copy test to make sure that
+Zumastor works properly for the volume size you intend to use.
+A simple test script is provided
+that copies a large volume to an exported zumastor volume via nfs and at
+the same time take hourly replication between the zumastor nfs server and a backup server.
+The scipt locates at http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh[].
+Please take a look at the script and specify the configuration parameters according
+to your setup.
+
+Nsnaps benchmark
+~~~~~~~~~~~~~~~~
+Nsnaps benchmark provides performance data that relates the number of snapshots taken versus
+the time needed to untar a Linux kernel source tree and sync. The test scipts locate at
+http://zumastor.googlecode.com/svn/trunk/benchmarks/nsnaps/[]. Please take a look at the
+README file included in that directory before running the test.
+
+Bonnie benchmark
+~~~~~~~~~~~~~~~~
+Bonnie is a program to test hard drives and file systems performance.
+You can obtain the Bonnie Debian package with the +apt-get install bonnie+ command.
+After that, you can run the Bonnie benchmark with the wrapper we provide at
+http://zumastor.googlecode.com/svn/trunk/benchmarks/bonnie[].
+
+Fstress benchmark
+~~~~~~~~~~~~~~~~~
+Fstress is a benchmark that is used to test NFS server performance, i.e., average
+latency for a mixed number of client operations at different load levels.
+The source code provided from our repository,
+http://zumastor.googlecode.com/svn/trunk/benchmarks/fstress[],
+was originally obtainded from Duke and includes several small changes to port
+the code to the latest Linux systems.
+Please take a look at the README file included in that directory for the
+instructions and examples on running the benchmark.
+
