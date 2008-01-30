@@ -1454,6 +1454,25 @@ static void check_leaf(struct eleaf *leaf, u64 snapmask)
 	// printf("top@%i", leaf->map[i].offset);
 }
 
+#define MAX_BTREE_DIRTY	10 // max dirty buffers generated in a btree operation, depends on how bushy the btree is
+
+/*
+ * Check if the number of dirty buffers meets or exceeds the size of the 
+ * journal itself less the maximum number of dirty B-Tree buffers (i.e. 
+ * reserving enough space for B-Tree operations), commit the current 
+ * transaction, thereby flushing the buffer cache.
+ */
+static void dirty_buffer_count_check(struct superblock *sb)
+{
+	if ((int)dirty_buffer_count >= (int)(sb->image.journal_size - MAX_BTREE_DIRTY)) {
+		if (dirty_buffer_count > sb->image.journal_size) {
+			warn("number of dirty buffers %d is too large for journal %u", dirty_buffer_count, sb->image.journal_size);
+			abort();
+		}
+		commit_transaction(sb);
+	}
+}
+
 /* FIXME: the structure is only used to pass info between two functions */
 struct delete_info
 {
@@ -1505,6 +1524,7 @@ static void _delete_snapshots_from_leaf(struct superblock *sb, struct eleaf *lea
 				*--dest = *p;
 			else
 				free_exception(sb, p->chunk);
+			dirty_buffer_count_check(sb);
 		}
 		leaf->map[i].offset = (char *)dest - (char *)leaf;
 	}
@@ -1622,24 +1642,6 @@ static void brelse_free(struct superblock *sb, struct buffer *buffer)
 }
 
 /*
- * Set the given buffer as dirty, then check the number of dirty buffers and
- * if that number meets or exceeds the size of the journal itself less the
- * maximum number of dirty B-Tree buffers (i.e. reserving enough space for
- * B-Tree operations), commit the current transaction, thereby flushing the
- * buffer cache.
- */
-#define MAX_BTREE_DIRTY	10 // max dirty buffers generated in a btree operation, depends on how bushy the btree is
-static void set_buffer_dirty_check(struct buffer *buffer, struct superblock *sb)
-{
-	set_buffer_dirty(buffer);
-	if ((int)dirty_buffer_count >= (int)(sb->image.journal_size - MAX_BTREE_DIRTY)) {
-		if (dirty_buffer_count > sb->image.journal_size)
-			warn("number of dirty buffers %d is too large for journal %u", dirty_buffer_count, sb->image.journal_size);
-		commit_transaction(sb);
-	}
-}
-
-/*
  * Delete all chunks in the B-tree for the snapshot(s) indicated by the
  * passed snapshot mask, beginning at the passed chunk.
  *
@@ -1672,7 +1674,7 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 	while (1) { /* in-order leaf walk */
 		trace_off(show_leaf(buffer2leaf(leafbuf)););
 		if (delete_snapshots_from_leaf(sb, buffer2leaf(leafbuf), snapmask))
-			set_buffer_dirty_check(leafbuf, sb);
+			set_buffer_dirty(leafbuf);
 		/*
 		 * If we have a previous leaf (i.e. we're past the first),
 		 * try to merge the current leaf with it.
@@ -1691,8 +1693,9 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 				trace_off(warn(">>> can merge leaf %p into leaf %p", leafbuf, prevleaf););
 				merge_leaves(prev, this);
 				remove_index(path, level);
-				set_buffer_dirty_check(prevleaf, sb);
+				set_buffer_dirty(prevleaf);
 				brelse_free(sb, leafbuf);
+				dirty_buffer_count_check(sb);
 				goto keep_prev_leaf;
 			}
 			brelse(prevleaf);
@@ -1733,8 +1736,9 @@ keep_prev_leaf:
 						trace(warn(">>> can merge node %p into node %p", this, prev););
 						merge_nodes(prev, this);
 						remove_index(path, level - 1);
-						set_buffer_dirty_check(hold[level].buffer, sb);
+						set_buffer_dirty(hold[level].buffer);
 						brelse_free(sb, path[level].buffer);
+						dirty_buffer_count_check(sb);
 						goto keep_prev_node;
 					}
 					brelse(hold[level].buffer);
@@ -1765,6 +1769,7 @@ keep_prev_node:
 						/* Point root at the first level. */
 						sb->image.etree_root = hold[1].buffer->sector;
 						brelse_free(sb, hold[0].buffer);
+						dirty_buffer_count_check(sb);
 						levels = --sb->image.etree_levels;
 						memcpy(hold, hold + 1, levels * sizeof(hold[0]));
 						set_sb_dirty(sb);
@@ -1800,12 +1805,7 @@ keep_prev_node:
 			} while (level < levels - 1);
 		}
 
-		if (dirty_buffer_count >= sb->image.journal_size - MAX_BTREE_DIRTY) {
-			if (dirty_buffer_count > sb->image.journal_size)
-				warn("number of dirty buffers is too large for journal");
-			trace_off(warn("flushing dirty buffers to disk"););
-			commit_transaction(sb);
-		}
+		dirty_buffer_count_check(sb);
 		/*
 		 * Get the leaf indicated in the next index entry in the node
 		 * at this level.
