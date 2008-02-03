@@ -224,21 +224,13 @@ and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
 Directories are named by branch and svn revision.
 e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
 Once you've picked a version, download and install its four .deb
-packages, along with dmsetup (which it depends on).  For instance:
+packages.  (Install dmsetup first.)  For instance:
 
 ....................
 $ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-1318
+$ wget -m -np zumastor.org/downloads/releases/0.6-r1318
 $ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
-$ sudo dpkg -i 0.6-r1318/*.deb
-....................
-or, until the above URL goes live,
-....................
-$ sudo apt-get install dmsetup
-$ wget -m -np http://kegel.com/zumastor/downloads/releases/0.6/0.6-r1318/
-$ mv kegel.com/zumastor/downloads/releases/0.6-r1318 .
-$ rm -rf kegel.com
 $ sudo dpkg -i 0.6-r1318/*.deb
 ....................
 

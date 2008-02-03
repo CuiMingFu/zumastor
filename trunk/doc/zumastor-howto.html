@@ -574,22 +574,13 @@ and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">htt
 Directories are named by branch and svn revision.
 e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
 Once you've picked a version, download and install its four .deb
-packages, along with dmsetup (which it depends on).  For instance:</p></div>
+packages.  (Install dmsetup first.)  For instance:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>$ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-1318
+$ wget -m -np zumastor.org/downloads/releases/0.6-r1318
 $ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
-$ sudo dpkg -i 0.6-r1318/*.deb</tt></pre>
-</div></div>
-<div class="para"><p>or, until the above URL goes live,</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>$ sudo apt-get install dmsetup
-$ wget -m -np http://kegel.com/zumastor/downloads/releases/0.6/0.6-r1318/
-$ mv kegel.com/zumastor/downloads/releases/0.6-r1318 .
-$ rm -rf kegel.com
 $ sudo dpkg -i 0.6-r1318/*.deb</tt></pre>
 </div></div>
 <div class="para"><p>The install takes several minutes.
@@ -1463,7 +1454,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-03 12:40:36 PDT
+Last updated 2008-02-03 12:50:18 PDT
 </div>
 </div>
 </body>
