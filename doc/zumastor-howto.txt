@@ -171,7 +171,7 @@ In other words, you do not need to add any of these to /etc/fstab.
 The zumastor init script will mount the volume and all its snapshots 
 automatically at boot time.
 
-Zumastor mounts all of snapshot volumes in appropriately named
+Zumastor mounts snapshot volumes in appropriately named
 subdirectories of /var/run/zumastor/snapshot.
 Each snapshot mount point is named for the creation time of that snapshot,
 in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
@@ -207,14 +207,17 @@ If you use a distro not covered below, you can install if you're
 willing to patch your kernel and compile everything manually.  See
 the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
 
-Prebuilt Debian / Ubuntu Packages
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prebuilt Debian / Ubuntu Packages from zumastor.org
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Prebuilt kernel packages for recent Debian / Ubuntu systems
-are available.  You have two different sets to choose from:
+are available from zumastor.org.
+You should probably play with Zumastor in a virtual environment 
+before installing on your real systems.  (You can even do this on Windows!)
 
-First, direct from zumastor.org, you can download generic packages 
-which should work with any version of Ubuntu from Dapper to Gutsy, 
-but that don't support Xen.
+These packages should work with any version of Ubuntu from Dapper to Gutsy, 
+but they don't support Xen, and they don't have a matching restricted
+modules package.  Instead, they have most important modules compiled in.
+If you need more native Ubuntu packages, see the next section.
 
 Stable releases are at http://zumastor.org/downloads/releases[],
 and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
@@ -242,58 +245,59 @@ $ sudo dpkg -i 0.6-r1318/*.deb
 The install takes several minutes.
 Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
 
-Alternately, pgquiles does builds of more standard Ubuntu Gutsy packages
-from our trunk.  Here are his instructions for installing them (caution, 
-his repository also has updated versions of some other packages):
+Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Alternately, pgquiles offers a respository containing standard 
+Ubuntu Gutsy packages built from our trunk.  These support Xen,
+so if you need Xen, use his packages rather than the zumastor.org ones.
+But caution, his respository contains many other packages, so don't do 
+"apt-get upgrade" when using it! 
 
-.......................
+As of Feb 3rd, this repository still contains version 0.4 of Zumastor,
+so you probably should not use his repository until it's updated.
+
+Here are his instructions for installing using his his repository:
+
 1. Add these lines to /etc/apt/sources.list
++
+.......................
 deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
 deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
+.......................
++
+Then run +sudo apt-get update+.
 
 2. Install zumastor, ddsnap and a zumastor-enabled kernel:
-sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap
-
-3. Reboot (needed to use the new kernel)
-
-There is a problem with my PPA, though: I have quite a lot of other packages, 
-therefore an "apt-get upgrade" will try to replace some official Ubuntu packages.
++
 .......................
-
-You should probably play with Zumastor in a virtual environment
-first.  (You can even do this on Windows!)
+sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup
+.......................
+3. Reboot (needed to use the new kernel)
 
 Example: installing Zumastor on Ubuntu inside a VMWare player
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-1. Install vmware player on your machine.  (If you're using Ubuntu,
-it might be as simple as +apt-get install vmware-player+.
-On Windows, grab the latest version from http://vmware.com/download/player[].)
+1.  Install VMWare Player
+VMWare offers their player for free download at http://vmware.com/download/player[].
+* If you're on Feisty, it's easier, just do +apt-get install vmware-player+.
+* For all other versions of Ubuntu, you have to use the vendor's 
+install script. There's a nice tutorial for the timid at 
+http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710[smokinglinux.com]. 
+Take the easy way out and choose all defaults when installing. 
 
-2. Download a vmware image with Ubuntu preinstalled.  For instance, go to
-http://www.thoughtpolice.co.uk/vmware[],
-choose the Ubuntu Server 6.06 download, click
-on the "fast torrent!" link, and tell Firefox to open the torrent file;
-this should pop up kTorrent to download the 189 megabyte image.
-The image is several files zipped together, so unzip it before trying to use it (e.g. +unzip ~/ubuntu-server-6.06-i386.zip+).
+2. Download a vmware image with Ubuntu preinstalled.  
+Dan Kegel, one of the Zumastor developers, 
+prepared a standard Ubuntu Gutsy Jeos 7.10 vmware image
+that's a svelte 78MB download; you can grab it at
+http://kegel.com/linux/jeos-vmware-player/[].
+The image is several files 7zipped together, so unpack it before trying to 
+use it (e.g. +sudo apt-get install p7zip; p7zip -d ~/ubuntu-7.10-jeos-vmware.7z+).
 
-3. Start up vmware player (Applications / System Tools / VMWare Player)
-and tell it to load the .vmx file in the directory where you unpacked the vmware image.
-
-4. Inside vmware, log in to the virtual ubuntu box 
+3.  Then boot the virtual machine with the command +vmplayer gutsy.vmx+.
+Inside vmware, log in to the virtual ubuntu box 
 (using the username and password from the site where you downloaded the image).
 
-5. Inside vmware, download and install dmsetup and the Zumastor packages
+4. Inside vmware, download and install dmsetup and the Zumastor packages
 as described above.
-
-6. Halt the virtual machine (e.g. +sudo halt+).
-
-7. Work around a problem with VMWare and newer kernels by
-editing the file ubuntu-server-6.06.1-i386.vmx to replace 'lsilogic' on line 4 with 'buslogic'.
-(Thanks to http://gentoo-wiki.com/HOWTO_Install_Gentoo_on_VMware[the gentoo doc] for that tip.)
-
-8. Boot the virtual machine again.  (If booting fails with
-the error "Unable to find volume group 'Ubuntu'", perhaps you
-skipped step seven?)
 
 Congratulations, you now have a virtual system with Zumastor installed!
 

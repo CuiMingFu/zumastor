@@ -529,7 +529,7 @@ subdirectories of /var/run/zumastor/mount.
 In other words, you do not need to add any of these to /etc/fstab.
 The zumastor init script will mount the volume and all its snapshots
 automatically at boot time.</p></div>
-<div class="para"><p>Zumastor mounts all of snapshot volumes in appropriately named
+<div class="para"><p>Zumastor mounts snapshot volumes in appropriately named
 subdirectories of /var/run/zumastor/snapshot.
 Each snapshot mount point is named for the creation time of that snapshot,
 in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
@@ -560,12 +560,15 @@ For developers, we also support automated installation with UML.</p></div>
 <div class="para"><p>If you use a distro not covered below, you can install if you're
 willing to patch your kernel and compile everything manually.  See
 the writeup at <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL">http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL</a>.</p></div>
-<h3 id="_prebuilt_debian_ubuntu_packages">8.2. Prebuilt Debian / Ubuntu Packages</h3><div style="clear:left"></div>
+<h3 id="_prebuilt_debian_ubuntu_packages_from_zumastor_org">8.2. Prebuilt Debian / Ubuntu Packages from zumastor.org</h3><div style="clear:left"></div>
 <div class="para"><p>Prebuilt kernel packages for recent Debian / Ubuntu systems
-are available.  You have two different sets to choose from:</p></div>
-<div class="para"><p>First, direct from zumastor.org, you can download generic packages
-which should work with any version of Ubuntu from Dapper to Gutsy,
-but that don't support Xen.</p></div>
+are available from zumastor.org.
+You should probably play with Zumastor in a virtual environment
+before installing on your real systems.  (You can even do this on Windows!)</p></div>
+<div class="para"><p>These packages should work with any version of Ubuntu from Dapper to Gutsy,
+but they don't support Xen, and they don't have a matching restricted
+modules package.  Instead, they have most important modules compiled in.
+If you need more native Ubuntu packages, see the next section.</p></div>
 <div class="para"><p>Stable releases are at <a href="http://zumastor.org/downloads/releases">http://zumastor.org/downloads/releases</a>,
 and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">http://zumastor.org/downloads/snapshots</a>.
 Directories are named by branch and svn revision.
@@ -591,52 +594,79 @@ $ sudo dpkg -i 0.6-r1318/*.deb</tt></pre>
 </div></div>
 <div class="para"><p>The install takes several minutes.
 Ignore the warnings about deleting symbolic links <tt>&#8230;/build</tt> and <tt>&#8230;/source</tt>.</p></div>
-<div class="para"><p>Alternately, pgquiles does builds of more standard Ubuntu Gutsy packages
-from our trunk.  Here are his instructions for installing them (caution,
-his repository also has updated versions of some other packages):</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>1. Add these lines to /etc/apt/sources.list
-deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
-deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
-
-2. Install zumastor, ddsnap and a zumastor-enabled kernel:
-sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap
-
-3. Reboot (needed to use the new kernel)
-
-There is a problem with my PPA, though: I have quite a lot of other packages,
-therefore an "apt-get upgrade" will try to replace some official Ubuntu packages.</tt></pre>
-</div></div>
-<div class="para"><p>You should probably play with Zumastor in a virtual environment
-first.  (You can even do this on Windows!)</p></div>
-<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_vmware_player">8.2.1. Example: installing Zumastor on Ubuntu inside a VMWare player</h4>
+<h3 id="_prebuilt_debian_ubuntu_packages_from_ppa_launchpad_net_pgquiles">8.3. Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles</h3><div style="clear:left"></div>
+<div class="para"><p>Alternately, pgquiles offers a respository containing standard
+Ubuntu Gutsy packages built from our trunk.  These support Xen,
+so if you need Xen, use his packages rather than the zumastor.org ones.
+But caution, his respository contains many other packages, so don't do
+"apt-get upgrade" when using it!</p></div>
+<div class="para"><p>As of Feb 3rd, this repository still contains version 0.4 of Zumastor,
+so you probably should not use his repository until it's updated.</p></div>
+<div class="para"><p>Here are his instructions for installing using his his repository:</p></div>
 <div class="olist"><ol>
 <li>
 <p>
-Install vmware player on your machine.  (If you're using Ubuntu,
-it might be as simple as <tt>apt-get install vmware-player</tt>.
-On Windows, grab the latest version from <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.)
+Add these lines to /etc/apt/sources.list
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
+deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse</tt></pre>
+</div></div>
+<div class="para"><p>Then run <tt>sudo apt-get update</tt>.</p></div>
+</li>
+<li>
+<p>
+Install zumastor, ddsnap and a zumastor-enabled kernel:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Reboot (needed to use the new kernel)
+</p>
+</li>
+</ol></div>
+<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_vmware_player">8.3.1. Example: installing Zumastor on Ubuntu inside a VMWare player</h4>
+<div class="olist"><ol>
+<li>
+<p>
+Install VMWare Player
+VMWare offers their player for free download at <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
+</p>
+<div class="ilist"><ul>
+<li>
+<p>
+If you're on Feisty, it's easier, just do <tt>apt-get install vmware-player</tt>.
 </p>
 </li>
 <li>
 <p>
-Download a vmware image with Ubuntu preinstalled.  For instance, go to
-<a href="http://www.thoughtpolice.co.uk/vmware">http://www.thoughtpolice.co.uk/vmware</a>,
-choose the Ubuntu Server 6.06 download, click
-on the "fast torrent!" link, and tell Firefox to open the torrent file;
-this should pop up kTorrent to download the 189 megabyte image.
-The image is several files zipped together, so unzip it before trying to use it (e.g. <tt>unzip ~/ubuntu-server-6.06-i386.zip</tt>).
+For all other versions of Ubuntu, you have to use the vendor's
+install script. There's a nice tutorial for the timid at
+<a href="http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710">smokinglinux.com</a>.
+Take the easy way out and choose all defaults when installing.
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Download a vmware image with Ubuntu preinstalled.
+Dan Kegel, one of the Zumastor developers,
+prepared a standard Ubuntu Gutsy Jeos 7.10 vmware image
+that's a svelte 78MB download; you can grab it at
+<a href="http://kegel.com/linux/jeos-vmware-player/">http://kegel.com/linux/jeos-vmware-player/</a>.
+The image is several files 7zipped together, so unpack it before trying to
+use it (e.g. <tt>sudo apt-get install p7zip; p7zip -d ~/ubuntu-7.10-jeos-vmware.7z</tt>).
 </p>
 </li>
 <li>
 <p>
-Start up vmware player (Applications / System Tools / VMWare Player)
-and tell it to load the .vmx file in the directory where you unpacked the vmware image.
-</p>
-</li>
-<li>
-<p>
+Then boot the virtual machine with the command <tt>vmplayer gutsy.vmx</tt>.
 Inside vmware, log in to the virtual ubuntu box
 (using the username and password from the site where you downloaded the image).
 </p>
@@ -647,28 +677,9 @@ Inside vmware, download and install dmsetup and the Zumastor packages
 as described above.
 </p>
 </li>
-<li>
-<p>
-Halt the virtual machine (e.g. <tt>sudo halt</tt>).
-</p>
-</li>
-<li>
-<p>
-Work around a problem with VMWare and newer kernels by
-editing the file ubuntu-server-6.06.1-i386.vmx to replace <em>lsilogic</em> on line 4 with <em>buslogic</em>.
-(Thanks to <a href="http://gentoo-wiki.com/HOWTO_Install_Gentoo_on_VMware">the gentoo doc</a> for that tip.)
-</p>
-</li>
-<li>
-<p>
-Boot the virtual machine again.  (If booting fails with
-the error "Unable to find volume group <em>Ubuntu</em>", perhaps you
-skipped step seven?)
-</p>
-</li>
 </ol></div>
 <div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
-<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.2.2. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h4>
+<h4 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.3.2. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h4>
 <div class="olist"><ol>
 <li>
 <p>
@@ -726,7 +737,7 @@ Boot the virtual machine again.
 </li>
 </ol></div>
 <div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
-<h3 id="_debian_ubuntu_packages_from_source">8.3. Debian/Ubuntu packages from source</h3><div style="clear:left"></div>
+<h3 id="_debian_ubuntu_packages_from_source">8.4. Debian/Ubuntu packages from source</h3><div style="clear:left"></div>
 <div class="para"><p>Most people won't need to do this, but just in case, here's how to build
 our .deb packages.  Zumastor is currently built as three packages:
 a patched kernel package, a ddsnap (snapshot device userspace) package,
@@ -765,7 +776,7 @@ If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP
 that he has working Ubuntu packages for a Xen+Zumastor kernel;
 if you were thinking of integrating Zumastor into upstream Debian or Ubuntu,
 check out his work first.)</p></div>
-<h3 id="_gentoo">8.4. Gentoo</h3><div style="clear:left"></div>
+<h3 id="_gentoo">8.5. Gentoo</h3><div style="clear:left"></div>
 <div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
 Zumastor using Gentoo's Portage package system. To use the overlay in
 an automated fashion you'll want to make sure you have the Gentoo
@@ -812,7 +823,7 @@ Snapshot target".</p></div>
 <div class="para"><p>The Zumastor project also recommends a few options be enabled to
 assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
 CONFIG_DEBUG_INFO.</p></div>
-<h4 id="_example_installing_zumastor_on_gentoo_inside_a_vmware_player">8.4.1. Example: installing Zumastor on Gentoo inside a VMWare player</h4>
+<h4 id="_example_installing_zumastor_on_gentoo_inside_a_vmware_player">8.5.1. Example: installing Zumastor on Gentoo inside a VMWare player</h4>
 <div class="para"><p>We have a prebuilt Gentoo vmware image at
 <a href="http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z">http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z</a>.  You'll
 need to unpack that image with 7zip (believe it or not, compressing
@@ -842,7 +853,7 @@ physical volume and volume group:</p></div>
 # lvcreate --size 1500MB -n test sysvg</tt></pre>
 </div></div>
 <div class="para"><p>Your Gentoo image is now ready for Zumastor.</p></div>
-<h3 id="_uml">8.5. UML</h3><div style="clear:left"></div>
+<h3 id="_uml">8.6. UML</h3><div style="clear:left"></div>
 <div class="para"><p>UML is potentially the fastest and easiest way to try out Zumastor,
 at least if you're a developer who likes working with the commandline.</p></div>
 <div class="para"><p>There is a simple shell script,
@@ -920,7 +931,7 @@ the uml instance set up by demo.sh.
 These are handy for poking at things manually.</p></div>
 <div class="para"><p>Note that these tests are not the ones run by our continuous
 build and test system; see below for those.</p></div>
-<h3 id="_cbtb_uml">8.6. CBTB UML</h3><div style="clear:left"></div>
+<h3 id="_cbtb_uml">8.7. CBTB UML</h3><div style="clear:left"></div>
 <div class="para"><p>There is experimental support for using UML on Debian / Ubuntu systems
 to run the same tests that our continuous build and test system runs; see
 <a href="http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README">http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README</a>.
@@ -1452,7 +1463,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-03 05:19:27 PDT
+Last updated 2008-02-03 12:40:36 PDT
 </div>
 </div>
 </body>
