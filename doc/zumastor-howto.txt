@@ -17,7 +17,7 @@ to convert this document to HTML.
 Zumastor HOWTO
 ==============
 Dan Kegel <dank@kegel.com>
-v0.0, Dec 2007
+v0.6, Feb 2008
 
 
 Introduction
@@ -78,30 +78,31 @@ channel, and issue tracker linked to from our home page at
 http://zumastor.org[].
 
 Most development is done by a small group of contributors
-(Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, and Chris Smith), but we welcome patches from the community.
+(mainly Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, and Drake Diedrich),
+but we welcome patches from the community.
 (Jonathan Van Eenwyk contributed a cool offline backup feature, 
 but http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz[his patch] has not yet been merged.  Let us know if you need this.)
 
-Status
-------
-Zumastor has a stable release (0.4) which is limited (e.g. only supports 2TB
-volumes) but very stable.  We are focusing on documentation
-and user feedback now, and hope to have the 0.5 stable release 
-out soon.  Please download and test the 0.5 snapshots and give us feedback
-via the issue tracker, mailing list, or IRC channel at http://zumastor.org[].
+Release History
+---------------
+Version 0.6, released on 4 Feb 2008, added support for offline resizing,
+and fixed a bug that could cause data loss.  (For developers, it also 
+added a way to run our autobuilder tests before committing changes.)
+See
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
+
+Version 0.5, released on 10 Jan 1008,
+added support for volumes larger than 2TB
+and for exporting snapshots via NFS and CIFS.  See 
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
+
+Version 0.4, released on 1 Dec 2007, was the first public release.
 
 We have a number of kernel patches, and will push them upstream as
 soon as possible.  See http://zumastor.org[] for a list.
 
 Limitations
 -----------
-
-Volume Size
-~~~~~~~~~~~
-We have verified that Zumastor can handle 1TB volumes.
-As of 0.5-r997, it should be able to handle volumes of dozens of terabytes.
-We are now verifying that it can handle 3TB volumes.  
-See http://code.google.com/p/zumastor/issues/detail?id=10[bug 10].
 
 Snapshot Count
 ~~~~~~~~~~~~~~
@@ -193,30 +194,36 @@ Installing Zumastor
 -------------------
 Zumastor requires changes to the Linux kernel that are not yet
 in the vanilla kernel, so a patched kernel is required.
-You can install Zumastor on any recent distribution if you're
+You can install Zumastor on any recent distribution as long as you're
 willing to do it by hand.  Automated installation is available
 for Debian / Ubuntu and Gentoo.  (RHEL, Fedora, and Suse
 are probably next on our list of distros to support, please 
 let us know if you're willing to contribute RPM .spec files.)
 For developers, we also support automated installation with UML.
 
-Debian / Ubuntu
-~~~~~~~~~~~~~~~
+Source
+~~~~~~
+If you use a distro not covered below, you can install if you're 
+willing to patch your kernel and compile everything manually.  See
+the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
+
+Prebuilt Debian / Ubuntu Packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Prebuilt kernel packages for recent Debian / Ubuntu systems
 are available.  
 Stable releases are at http://zumastor.org/downloads/releases[],
 and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
 The directories there are named by branch and svn revision,
-e.g. 0.4-r999 is the 0.4 branch as of svn revision 999.
+e.g. 0.5-r1264 is the 0.5 branch as of svn revision 1264.
 Once you've picked a version, download and install its four .deb
 packages, along with dmsetup (which it depends on).  For instance:
 
 ....................
 $ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/snapshots/0.5-r1004
-$ mv zumastor.org/downloads/snapshots/0.5-r1004 .
+$ wget -m -np zumastor.org/downloads/releases/0.5-r1264
+$ mv zumastor.org/downloads/releases/0.5-r1264 .
 $ rm -rf zumastor.org
-$ sudo dpkg -i 0.5-r1004/*.deb
+$ sudo dpkg -i 0.5-r1264/*.deb
 ....................
 
 The install takes several minutes.
@@ -228,7 +235,8 @@ first.  (You can even do this on Windows!)
 Example: installing Zumastor on Ubuntu inside a VMWare player
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 1. Install vmware player on your machine.  (If you're using Ubuntu,
-it might be as simple as +apt-get install vmware-player+.)
+it might be as simple as +apt-get install vmware-player+.
+On Windows, grab the latest version from http://vmware.com/download/player[].)
 
 2. Download a vmware image with Ubuntu preinstalled.  For instance, go to
 http://www.thoughtpolice.co.uk/vmware[],
@@ -292,21 +300,48 @@ as described above.
 
 Congratulations, you now have a virtual system with Zumastor installed!
 
-Building Ubuntu packages from source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Most people won't need to do this, but just in case, here's how to build our Ubuntu packages:
+Debian/Ubuntu packages from source
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most people won't need to do this, but just in case, here's how to build 
+our .deb packages.  Zumastor is currently built as three packages:
+a patched kernel package, a ddsnap (snapshot device userspace) package, 
+and a zumastor (management cli) package.
 
-1. Make sure you have the necessary build tools installed:
-+aptitude install kernel-package ncurses-dev fakeroot libldap2-dev slang1-dev libevent-dev libkrb53 libkrb5-dev libc6-dev subversion+
+1.
+Make sure you have the necessary build tools installed, e.g.:
+..........................................................
+$ sudo aptitude install debhelper devscripts fakeroot kernel-package libc6-dev \
+libevent-dev libkrb5-dev libkrb53 libldap2-dev libpopt-dev ncurses-dev \
+slang1-dev subversion zlib1g-dev
+..........................................................
 
-2. Get the latest code: +svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor+
+2.
+Get the latest code:
+..............................................................
+$ svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor
+..............................................................
 
-3. Run the build script: +cd zumastor; ./buildcurrent kernel/config/full+
-This builds three Debian packages: one for the kernel, one for ddsnap, and one for zumastor.
-It will download the required kernel tarball from kernel.org (currently 2.6.22.10).  
-Note: The script takes a parameter which is a .config file for the kernel.  There is distribution-like config in the repository in +kernel/config/full+.  If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+ to be +(y or m)+
+3.
+Run the build script.  This will build all three packages.
+...............
+$ cd zumastor
+$ ./buildcurrent.sh kernel/config/full
+...............
 
-(Also, pcquiles mentioned in http://zumastor.org/irclogs/2007-12-04.txt[irc] that he is working on Ubuntu packaging for a Xen+Zumastor kernel; if you were thinking of integrating Zumastor into upstream Debian or Ubuntu, check out his work first.)
+This will download kernel source from kernel.org.  
+The version downloaded is controlled by the file 
+http://zumastor.googlecode.com/svn/trunk/KernelVersion[KernelVersion]
+at the top of the Zumastor source tree.
+The script takes a parameter which is a .config file for the kernel.
+There is distribution-like config in the repository in 
+http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full[kernel/config/full].  
+If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+.
+
+(Note: pcquiles mentioned on
+http://zumastor.org/irclogs/2007-12-04.txt[irc]
+that he has working Ubuntu packages for a Xen+Zumastor kernel; 
+if you were thinking of integrating Zumastor into upstream Debian or Ubuntu,
+check out his work first.)
 
 Gentoo
 ~~~~~~
@@ -399,12 +434,6 @@ physical volume and volume group:
 
 Your Gentoo image is now ready for Zumastor.
 
-Source
-~~~~~~
-If you use a distro not covered above, you can install if you're 
-willing to patch your kernel and compile everything manually.  See
-the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
-
 UML
 ~~~
 UML is potentially the fastest and easiest way to try out Zumastor,
@@ -470,6 +499,21 @@ The four simple shell scripts, xssh.sh, xget.sh, xput.sh, and
 xstop.sh, let you log in to, get a file from, put a file on, and stop 
 the uml instance set up by demo.sh.
 These are handy for poking at things manually.
+
+Note that these tests are not the ones run by our continuous
+build and test system; see below for those.
+
+CBTB UML
+~~~~~~~~
+There is experimental support for using UML on Debian / Ubuntu systems
+to run the same tests that our continuous build and test system runs; see 
+http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README[].
+This modifies your system, for instance, by installing Apache to act as a local
+debian package repository for use by the UML instances, so it
+may not be everybody's cup of tea.  But it does get the time
+to test small changes to the cbtb test scripts down below ten minutes,
+which should help people developing new automated tests --
+at least if they're willing to run Debian or Ubuntu.
 
 Troubleshooting
 ---------------
