@@ -210,26 +210,57 @@ the writeup at http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL[].
 Prebuilt Debian / Ubuntu Packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Prebuilt kernel packages for recent Debian / Ubuntu systems
-are available.  
+are available.  You have two different sets to choose from:
+
+First, direct from zumastor.org, you can download generic packages 
+which should work with any version of Ubuntu from Dapper to Gutsy, 
+but that don't support Xen.
+
 Stable releases are at http://zumastor.org/downloads/releases[],
 and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
-The directories there are named by branch and svn revision,
-e.g. 0.5-r1264 is the 0.5 branch as of svn revision 1264.
+Directories are named by branch and svn revision.
+e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
 Once you've picked a version, download and install its four .deb
 packages, along with dmsetup (which it depends on).  For instance:
 
 ....................
 $ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.5-r1264
-$ mv zumastor.org/downloads/releases/0.5-r1264 .
+$ wget -m -np zumastor.org/downloads/releases/0.6-1318
+$ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
-$ sudo dpkg -i 0.5-r1264/*.deb
+$ sudo dpkg -i 0.6-r1318/*.deb
+....................
+or, until the above URL goes live,
+....................
+$ sudo apt-get install dmsetup
+$ wget -m -np http://kegel.com/zumastor/downloads/releases/0.6/0.6-r1318/
+$ mv kegel.com/zumastor/downloads/releases/0.6-r1318 .
+$ rm -rf kegel.com
+$ sudo dpkg -i 0.6-r1318/*.deb
 ....................
 
 The install takes several minutes.
 Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
 
-You should probably play with it in a virtual environment
+Alternately, pgquiles does builds of more standard Ubuntu Gutsy packages
+from our trunk.  Here are his instructions for installing them (caution, 
+his repository also has updated versions of some other packages):
+
+.......................
+1. Add these lines to /etc/apt/sources.list
+deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
+deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
+
+2. Install zumastor, ddsnap and a zumastor-enabled kernel:
+sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap
+
+3. Reboot (needed to use the new kernel)
+
+There is a problem with my PPA, though: I have quite a lot of other packages, 
+therefore an "apt-get upgrade" will try to replace some official Ubuntu packages.
+.......................
+
+You should probably play with Zumastor in a virtual environment
 first.  (You can even do this on Windows!)
 
 Example: installing Zumastor on Ubuntu inside a VMWare player
