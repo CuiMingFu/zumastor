@@ -462,14 +462,15 @@ soon as possible.  See <a href="http://zumastor.org">http://zumastor.org</a> for
 <div class="sectionbody">
 <h3 id="_snapshot_count">6.1. Snapshot Count</h3><div style="clear:left"></div>
 <div class="para"><p>Each volume can have at most 64 snapshots.  This limit may
-be raised or removed in future releases; see <a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
-<h3 id="_performance">6.2. Performance</h3><div style="clear:left"></div>
-<div class="para"><p>On a single spindle, compared to a non-Zumastor volume, writes to an origin
-volume under Zumastor can require six extra seeks, which
-can be a significant performance penalty for some applications.
-Multiple spindles and RAID controller caches can reduce this problem
-significantly.  Reducing the number of seeks is a high priority goal for
-future releases.
+be raised or removed in future releases; see
+<a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
+<h3 id="_write_performance">6.2. Write Performance</h3><div style="clear:left"></div>
+<div class="para"><p>Although writes to a Zumastor volume are scalable in that
+their cost doesn't depend on the number of snapshots,
+there is still significant constant overhead; see
+<a href="http://code.google.com/p/zumastor/issues/detail?id=52">bug 52</a>.
+Multiple spindles and RAID controller caches can reduce this problem.
+Reducing the write overhead is an important goal for future releases.
 Until that happens, Zumastor is best suited for read-mostly applications.</p></div>
 <h3 id="_ram">6.3. RAM</h3><div style="clear:left"></div>
 <div class="para"><p>Zumastor's snapshot exception index uses about 1MB of RAM per gigabyte of snapshot change blocks,
@@ -567,7 +568,8 @@ You should probably play with Zumastor in a virtual environment
 before installing on your real systems.  (You can even do this on Windows!)</p></div>
 <div class="para"><p>These packages should work with any version of Ubuntu from Dapper to Gutsy,
 but they don't support Xen, and they don't have a matching restricted
-modules package.  Instead, they have most important modules compiled in.
+modules package.  Instead, they have most important modules compiled in
+(which explains why the kernel package is 160MB!).
 If you need more native Ubuntu packages, see the next section.</p></div>
 <div class="para"><p>Stable releases are at <a href="http://zumastor.org/downloads/releases">http://zumastor.org/downloads/releases</a>,
 and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">http://zumastor.org/downloads/snapshots</a>.
@@ -578,21 +580,37 @@ packages.  (Install dmsetup first.)  For instance:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>$ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-r1318
+$ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
 $ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
 $ sudo dpkg -i 0.6-r1318/*.deb</tt></pre>
 </div></div>
+<div class="para"><p>Don't forget the trailing slash on wget, else it will download
+all directories, not just the one you want!</p></div>
 <div class="para"><p>The install takes several minutes.
 Ignore the warnings about deleting symbolic links <tt>&#8230;/build</tt> and <tt>&#8230;/source</tt>.</p></div>
+<div class="para"><p>On Dapper, everything works great.  When I tried on Jeos, I ran into
+two problems: no /boot/grub/menu.lst entry, and no dm-ddnsap kernel module
+loaded.  This is a bug.
+Here's how to check for and work around those problems for now:</p></div>
+<div class="para"><p>The postinstall script for the kernel module should have run
+update-grub to create an entry in /boot/grub/menu.lst, but
+for some reason, that's not working on Jeos.
+If /boot/grub/menu.lst doesn't mention Zumastor, run
+update-grub by hand.</p></div>
+<div class="para"><p>Check the Zumastor entry in /boot/grub/menu.lst to see what it
+gives as the root filesystem.  If it's root=/dev/sda1, the Zumastor
+kernel might not be happy; changes this to root=/dev/hda1.</p></div>
+<div class="para"><p>Reboot and choose the Zumastor-enabled kernel, and
+make sure the system comes up ok.</p></div>
+<div class="para"><p>Run <tt>lsmod | grep ddsnap</tt> and make sure you see dm-ddsnap listed.
+This module should be loaded from /lib/modules/2.6.22.10-zumastor-r1306.
+If it's not, try <tt>depmod -a; modprobe dm-ddsnap</tt></p></div>
 <h3 id="_prebuilt_debian_ubuntu_packages_from_ppa_launchpad_net_pgquiles">8.3. Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles</h3><div style="clear:left"></div>
 <div class="para"><p>Alternately, pgquiles offers a respository containing standard
-Ubuntu Gutsy packages built from our trunk.  These support Xen,
-so if you need Xen, use his packages rather than the zumastor.org ones.
-But caution, his respository contains many other packages, so don't do
+Ubuntu Gutsy packages built from our trunk.
+Caution, his respository contains many other packages, so don't do
 "apt-get upgrade" when using it!</p></div>
-<div class="para"><p>As of Feb 3rd, this repository still contains version 0.4 of Zumastor,
-so you probably should not use his repository until it's updated.</p></div>
 <div class="para"><p>Here are his instructions for installing using his his repository:</p></div>
 <div class="olist"><ol>
 <li>
@@ -608,19 +626,18 @@ deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe 
 </li>
 <li>
 <p>
-Install zumastor, ddsnap and a zumastor-enabled kernel:
+Install zumastor, ddsnap, dmsetup, and a zumastor-enabled kernel.
+There are two to choose from: linux-image-zumastor (only zumastor) and
+linux-image-xenzumastor (Xen and Zumastor).  For instance:
 </p>
 <div class="literalblock">
 <div class="content">
 <pre><tt>sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup</tt></pre>
 </div></div>
 </li>
-<li>
-<p>
-Reboot (needed to use the new kernel)
-</p>
-</li>
 </ol></div>
+<div class="para"><p>Finally, reboot and choose the Zumastor-enabled kernel, and
+make sure the system comes up ok.</p></div>
 <h4 id="_example_installing_zumastor_on_ubuntu_inside_a_vmware_player">8.3.1. Example: installing Zumastor on Ubuntu inside a VMWare player</h4>
 <div class="olist"><ol>
 <li>
@@ -762,11 +779,8 @@ The script takes a parameter which is a .config file for the kernel.
 There is distribution-like config in the repository in
 <a href="http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full">kernel/config/full</a>.
 If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP</tt>.</p></div>
-<div class="para"><p>(Note: pcquiles mentioned on
-<a href="http://zumastor.org/irclogs/2007-12-04.txt">irc</a>
-that he has working Ubuntu packages for a Xen+Zumastor kernel;
-if you were thinking of integrating Zumastor into upstream Debian or Ubuntu,
-check out his work first.)</p></div>
+<div class="para"><p>(Note: see also the debian build files pgquiles has written; see
+"Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles" above.)</p></div>
 <h3 id="_gentoo">8.5. Gentoo</h3><div style="clear:left"></div>
 <div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
 Zumastor using Gentoo's Portage package system. To use the overlay in
@@ -950,7 +964,9 @@ for errors.</p></div>
 <div class="sectionbody">
 <h3 id="_verify_that_lvm2_is_installed">10.1. Verify that LVM2 is installed</h3><div style="clear:left"></div>
 <div class="para"><p>Many of these examples require LVM, so install that first if it's not already.
-(This example is for Debian / Ubuntu, but it's similar for Fedora et al.)</p></div>
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.
+If you don't have /etc/init.d/lvm, lvm might be under udev's control;
+on Ubuntu Gutsy Jeos, it's controlled by /etc/udev/rules/85-lvm2.rules.)</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>$ sudo apt-get install lvm2
@@ -977,13 +993,15 @@ You may need to adjust the path to suit your version of Linux.</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt># dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
-# losetup -d /dev/loop/0 || true
-# losetup /dev/loop/0 /media/vg.img
-# pvcreate /dev/loop/0
-# vgcreate sysvg /dev/loop/0
+# losetup -d /dev/loop0 || true
+# losetup /dev/loop0 /media/vg.img
+# pvcreate /dev/loop0
+# vgcreate sysvg /dev/loop0
 # lvcreate --name test --size 100MB sysvg
+# mkfs.ext3 /dev/ssvg/test
 # lvcreate --name test_snap --size 100MB sysvg
-# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize</tt></pre>
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+# zumastor define master zumatest</tt></pre>
 </div></div>
 <div class="para"><p>If this complains</p></div>
 <div class="literalblock">
@@ -994,6 +1012,20 @@ create failed
 </div></div>
 <div class="para"><p>you may have forgotten to reboot into the Zumastor-enabled kernel
 you installed earlier.</p></div>
+<div class="para"><p>If lvcreate complains</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/proc/misc: No entry for device-mapper found
+Is device-mapper driver missing from kernel?</tt></pre>
+</div></div>
+<div class="para"><p>you may be hitting
+<a href="https://bugs.launchpad.net/ubuntu/+source/devmapper/+bug/178889">Ubuntu bug 178889</a>;
+try adding <tt>dm_mod</tt> to <tt>/etc/modules</tt> or do <tt>modprobe dm_mod</tt> manually.</p></div>
+<div class="para"><p>Verify that zumastor has mounted the volume by doing</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># df | grep zumatest</tt></pre>
+</div></div>
 <h3 id="_what_if_zumastor_can_t_mount_the_devices_at_boot_time">10.4. What if Zumastor can't mount the devices at boot time?</h3><div style="clear:left"></div>
 <div class="para"><p>Starting with the previous example,
 reboot the virtual machine and log back in as root.
@@ -1006,7 +1038,7 @@ So do it manually now, then tell LVM about it, then tell Zumastor about it:</p><
 <div class="literalblock">
 <div class="content">
 <pre><tt>$ sudo sh
-# losetup /dev/loop/0 /media/vg.img
+# losetup /dev/loop0 /media/vg.img
 # vgchange -ay
 # bash /etc/init.d/zumastor restart
 # df | grep zumatest</tt></pre>
@@ -1019,7 +1051,7 @@ and try again.</p></div>
 <div class="content">
 <pre><tt># zumastor forget volume zumatest
 # lvremove sysvg
-# losetup -d /dev/loop/0
+# losetup -d /dev/loop0
 # rm /media/vg.img</tt></pre>
 </div></div>
 <h3 id="_create_a_single_snapshotted_volume_on_a_real_device">10.6. Create a single snapshotted volume on a real device</h3><div style="clear:left"></div>
@@ -1454,7 +1486,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-03 12:50:18 PDT
+Last updated 2008-02-04 13:51:47 PDT
 </div>
 </div>
 </body>
