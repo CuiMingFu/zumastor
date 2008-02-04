@@ -107,16 +107,17 @@ Limitations
 Snapshot Count
 ~~~~~~~~~~~~~~
 Each volume can have at most 64 snapshots.  This limit may
-be raised or removed in future releases; see http://code.google.com/p/zumastor/issues/detail?id=6[bug 6].
+be raised or removed in future releases; see 
+http://code.google.com/p/zumastor/issues/detail?id=6[bug 6].
 
-Performance
-~~~~~~~~~~~
-On a single spindle, compared to a non-Zumastor volume, writes to an origin 
-volume under Zumastor can require six extra seeks, which
-can be a significant performance penalty for some applications.
-Multiple spindles and RAID controller caches can reduce this problem
-significantly.  Reducing the number of seeks is a high priority goal for 
-future releases.
+Write Performance
+~~~~~~~~~~~~~~~~~
+Although writes to a Zumastor volume are scalable in that
+their cost doesn't depend on the number of snapshots,
+there is still significant constant overhead; see 
+http://code.google.com/p/zumastor/issues/detail?id=52[bug 52].
+Multiple spindles and RAID controller caches can reduce this problem.
+Reducing the write overhead is an important goal for future releases.
 Until that happens, Zumastor is best suited for read-mostly applications.
 
 RAM
@@ -215,8 +216,8 @@ You should probably play with Zumastor in a virtual environment
 before installing on your real systems.  (You can even do this on Windows!)
 
 These packages should work with any version of Ubuntu from Dapper to Gutsy, 
-but they don't support Xen, and they don't have a matching restricted
-modules package.  Instead, they have most important modules compiled in.
+but they aren't built quite like standard Ubuntu kernel packages,
+so they might not fit all needs.
 If you need more native Ubuntu packages, see the next section.
 
 Stable releases are at http://zumastor.org/downloads/releases[],
@@ -228,25 +229,46 @@ packages.  (Install dmsetup first.)  For instance:
 
 ....................
 $ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-r1318
+$ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
 $ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
 $ sudo dpkg -i 0.6-r1318/*.deb
 ....................
 
+Don't forget the trailing slash on wget, else it will download
+all directories, not just the one you want!
+
 The install takes several minutes.
 Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
+
+On Dapper, everything works great.  When I tried on Jeos, I ran into
+two problems: no /boot/grub/menu.lst entry, and no dm-ddnsap kernel module
+loaded.  This is a bug.
+Here's how to check for and work around those problems for now:
+
+The postinstall script for the kernel module should have run
+update-grub to create an entry in /boot/grub/menu.lst, but
+for some reason, that's not working on Jeos. 
+If /boot/grub/menu.lst doesn't mention Zumastor, run
+update-grub by hand.
+
+Check the Zumastor entry in /boot/grub/menu.lst to see what it
+gives as the root filesystem.  If it's root=/dev/sda1, the Zumastor
+kernel might not be happy; changes this to root=/dev/hda1.
+
+Reboot and choose the Zumastor-enabled kernel, and
+make sure the system comes up ok.
+
+Run `lsmod | grep ddsnap` and make sure you see dm-ddsnap listed.
+This module should be loaded from /lib/modules/2.6.22.10-zumastor-r1306.
+If it's not, try `depmod -a; modprobe dm-ddsnap`
 
 Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Alternately, pgquiles offers a respository containing standard 
-Ubuntu Gutsy packages built from our trunk.  These support Xen,
-so if you need Xen, use his packages rather than the zumastor.org ones.
-But caution, his respository contains many other packages, so don't do 
+Ubuntu Gutsy packages built from our trunk.  
+Caution, his respository contains many other packages, so don't do 
 "apt-get upgrade" when using it! 
-
-As of Feb 3rd, this repository still contains version 0.4 of Zumastor,
-so you probably should not use his repository until it's updated.
 
 Here are his instructions for installing using his his repository:
 
@@ -259,12 +281,16 @@ deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe 
 +
 Then run +sudo apt-get update+.
 
-2. Install zumastor, ddsnap and a zumastor-enabled kernel:
+2. Install zumastor, ddsnap, dmsetup, and a zumastor-enabled kernel.
+There are two to choose from: linux-image-zumastor (only zumastor) and 
+linux-image-xenzumastor (Xen and Zumastor).  For instance:
 +
 .......................
 sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup
 .......................
-3. Reboot (needed to use the new kernel)
+
+Finally, reboot and choose the Zumastor-enabled kernel, and
+make sure the system comes up ok.
 
 Example: installing Zumastor on Ubuntu inside a VMWare player
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -364,11 +390,8 @@ There is distribution-like config in the repository in
 http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full[kernel/config/full].  
 If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+.
 
-(Note: pcquiles mentioned on
-http://zumastor.org/irclogs/2007-12-04.txt[irc]
-that he has working Ubuntu packages for a Xen+Zumastor kernel; 
-if you were thinking of integrating Zumastor into upstream Debian or Ubuntu,
-check out his work first.)
+(Note: see also the debian build files pgquiles has written; see 
+"Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles" above.)
 
 Gentoo
 ~~~~~~
@@ -563,7 +586,9 @@ Examples
 Verify that LVM2 is installed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Many of these examples require LVM, so install that first if it's not already.
-(This example is for Debian / Ubuntu, but it's similar for Fedora et al.)
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.
+If you don't have /etc/init.d/lvm, lvm might be under udev's control;
+on Ubuntu Gutsy Jeos, it's controlled by /etc/udev/rules/85-lvm2.rules.)
 ........
 $ sudo apt-get install lvm2
 $ sudo /etc/init.d/lvm start
@@ -595,13 +620,15 @@ You may need to adjust the path to suit your version of Linux.
 
 ...........
 # dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
-# losetup -d /dev/loop/0 || true
-# losetup /dev/loop/0 /media/vg.img
-# pvcreate /dev/loop/0
-# vgcreate sysvg /dev/loop/0
+# losetup -d /dev/loop0 || true
+# losetup /dev/loop0 /media/vg.img
+# pvcreate /dev/loop0
+# vgcreate sysvg /dev/loop0
 # lvcreate --name test --size 100MB sysvg
+# mkfs.ext3 /dev/ssvg/test
 # lvcreate --name test_snap --size 100MB sysvg
 # zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+# zumastor define master zumatest
 ..........
 If this complains 
 ..........
@@ -611,6 +638,20 @@ create failed
 ..........
 you may have forgotten to reboot into the Zumastor-enabled kernel
 you installed earlier.
+
+If lvcreate complains
+............................
+/proc/misc: No entry for device-mapper found
+Is device-mapper driver missing from kernel?
+............................
+you may be hitting 
+https://bugs.launchpad.net/ubuntu/+source/devmapper/+bug/178889[Ubuntu bug 178889];
+try adding `dm_mod` to `/etc/modules` or do `modprobe dm_mod` manually.
+
+Verify that zumastor has mounted the volume by doing
+............................
+# df | grep zumatest
+............................
 
 What if Zumastor can't mount the devices at boot time?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -624,7 +665,7 @@ for it to be set up automatically at boot time.
 So do it manually now, then tell LVM about it, then tell Zumastor about it:
 .....
 $ sudo sh
-# losetup /dev/loop/0 /media/vg.img
+# losetup /dev/loop0 /media/vg.img
 # vgchange -ay
 # bash /etc/init.d/zumastor restart
 # df | grep zumatest
@@ -640,7 +681,7 @@ Remove the volume and loopback file created above
 .........
 # zumastor forget volume zumatest
 # lvremove sysvg
-# losetup -d /dev/loop/0
+# losetup -d /dev/loop0
 # rm /media/vg.img
 .........
 
