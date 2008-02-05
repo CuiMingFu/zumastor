@@ -9,140 +9,40 @@
 <body>
 
 <h1>Zumastor Linux Storage Project</h1>
-
-<div class="section">
 <img src="linux1.png" class="floatRight" alt="Zumastor Logo">
-<ul>
- <li><a href="#overview">Overview</a></li>
- <li><a href="#doc">Documentation</a></li>
- <li><a href="#downloads">Downloads</a></li>
- <li><a href="#development">Development</a></li>
- <li><a href="#patches">Kernel Patches</a></li>
-</ul>
-</div>
-
-<div class="section" id="overview">
-<a name="overview"></a>
-<h2>Overview</h2>
-Zumastor adds enterprise storage features to Linux, primarily
-improved snapshots and remote replication.
-It is licensed under <a href="http://www.gnu.org/licenses/gpl.html">GNU General Public License 2.0</a>.
+Zumastor is Free software that adds enterprise storage features (primarily improved snapshots and remote replication) to Linux.
 <p>
-<a href="http://sources.redhat.com/cluster/csnap/">Daniel Phillips started the project in 2003</a>
-and continues driving it forward today.
-
-<div class="subsection" id="status">
- <h3>Status</h3>
- <ul> 
- <li>13 Dec 2007: <a href="http://lwn.net/SubscriberLink/261626/f608ccfe3ce19d28/">lwn.net covered Dan P.'s writeout deadlock avoidance patch</a>.
- <li>12 Dec 2007: zumastor benchmarks posted to <a href="http://lkml.org/lkml/2007/12/12/237">lkml</a>.
- <li>5 Dec 2007: Most documentation has been merged into the <a href="http://zumastor.googlecode.com/svn/trunk/doc/zumastor-howto.html">zumastor HOWTO</a>.  (We're still merging the replication doc in from the Gentoo and source walkthroughs.)
- <li>4 Dec 2007: <a href="http://zumastor.org/irclogs/2007-12-04.txt">Pau Garcia i Quiles mentioned on irc</a> that he has "-zumastor and -xenzumastor" packages for Ubuntu; see http://ppa.launchpad.net/pgquiles/ubuntu/pool/main/l/linux-source-2.6.22 for his work-in-progress
- <li>30 Nov 2007: Zumastor 0.4 stable release and 0.5 snapshots now available for <a href="#downloads">download</a>.  
- <li>22 Nov 2007: UML and QEMU demo walkthroughs now online.  This should make it easy to kick Zumastor's tires on virtual machines.  It should also make it easier for new developers to start contributing to Zumastor.
- </ul>
-</div>
-
-<div class="subsection" id="features">
- <h3>Features</h3>
- <ul>
- <li>Point-in-time Snapshots
- <ul>
-  <li>Adds snapshotting to any Linux filesystem, without re-formatting (ext3, xfs, reiser, etc)
-  <li>Near-zero-cost, atomic block-device snapshots
-  <li>Copy-on-write, sharing common data between multiple snapshots
-  <li>Performance does not degrade with multiple snapshots
-  <li>Provided via ddsnap kernel driver and userspace ddsnap_server daemon
- </ul>
- <li>Remote replication
- <ul>
-  <li>Transmits delta between snapshots
-  <li>Optional zlib (gzip) compression
-  <li>Optional xdelta binary difference compression (experimental)
- </ul>
- <li>Simple command line interface - zumastor script
- <li>Integration with kerberized NFS kernel server to support exporting a replicated volume with snapshot rollover.
- </ul>
-</div>
-</div>
-
-<div class="section" id="doc">
- <a name="doc"></a>
- <h2>Documentation</h2>
- <div class="subsection" id="doc.user">
- <h3>User Documentation</h3>
- These are still very much a work in progress.  Please report all documentation bugs! (see <a href="#development">the issue tracker</a> below)
- <ul>
-  <li>A draft Zumastor HOWTO is available in <a href="http://zumastor.googlecode.com/svn/trunk/doc/zumastor-howto.html">HTML</a> and <a href="http://zumastor.googlecode.com/svn/trunk/doc/zumastor-howto.txt">Asciidoc source</a> formats.
-  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html#user">User Guide</a> - How to set up snapshots and replication via the zumastor CLI.  (Will be folded into HOWTO soon.)
- </ul>
- </div>
- <div class="subsection" id="doc.design">
- <h3>Design Documents</h3>
- <ul>
-  <li><a href="http://zumastor.googlecode.com/files/zumastor.whitepaper.pdf">Zumastor Whitepaper</a> - presented at SCaLE '07, 11 Feb 2007 <a href="http://www.socallinuxexpo.org/scale5x/conference+info/speakers/Daniel+Phillips/">link to slides and audio recording</a>
-  <li><a href="http://sourceware.org/cluster/csnap/csnap.ps">Cluster Snapshots Block Device</a> - Linux Kongress, 3 Sep 2004
-  <li><a href="http://sourceware.org/cluster/csnap/cluster.snapshot.design.html">Cluster Snapshot Design</a> - 8 May 2004
-  <li><a href="http://sourceware.org/cluster/ddraid/raid35.pdf">Cluster RAID</a> - Linux Kongress RAID 3.5, 27 Sep 2003
- </ul>
- </div>
- <div class="subsection" id="doc.developer">
- <h3>Developer Documentation</h3>
- <ul>
-  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/desimplnotes.html">Design Notes</a>
- </ul>
- </div>
-</div>
-
-<div class="section" id="downloads">
- <a name="downloads"></a>
- <h2>Downloads</h2>
-<div class="subsection" id="packages">
- Debian packages and source tarballs are available for download via http at <a href="http://zumastor.org/downloads">http://zumastor.org/downloads</a>.  The <a href="http://zumastor.org/downloads/snapshots">snapshots</a> directory contains development snapshots of the trunk and <a href="http://zumastor.org/downloads/releases">releases</a> contains well-tested, stable releases.  The latest is <a href="http://zumastor.org/downloads/releases/0.4-r999/">0.4-r999</a> and individual files are linked below.
- <h3>Debian/Ubuntu Packages</h3>
- <table class="sources">
-  <tr><th>Release date</th><th>Revision</th><th>Debian i386 binary package</th><th>md5 checksum</th></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/kernel-image-2.6.21.1-zumastor-r999_1.0_i386.deb">kernel-image-2.6.21.1-zumastor-r999_1.0_i386.deb</a></td><td>d07f9d805eb98df211a270952ae08bca</td></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/kernel-headers-2.6.21.1-zumastor-r999_1.0_i386.deb">kernel-headers-2.6.21.1-zumastor-r999_1.0_i386.deb</a></td><td>6a6372771bb593964dd340b8c685de6d</td></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/zumastor_0.4-r999_i386.deb">zumastor_0.4-r999_i386.deb</a></td><td>ac76e2d9d994c584f36efa19007b16d4</td></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/ddsnap_0.4-r999_i386.deb">ddsnap_0.4-r999_i386.deb</a></td><td>c5a61dc02356ea75a9602ba674fbc1d1</td></tr>
- </table>
-</div>
-<div class="subsection" id="tarballs">
- <h3>Source Tarballs</h3>
- <table class="sources">
-  <tr><th>Release date</th><th>Revision</th><th>tar.gz</th><th>md5 checksum</th></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/zumastor_0.4-r999.tar.gz">zumastor_0.4-r999.tar.gz</a></td><td>27601cbf64becb67e52d578566b8a083</td></tr>
-  <tr><td>30 Nov 2007</td><td>999</td><td><a href="/downloads/releases/0.4-r999/ddsnap_0.4-r999.tar.gz">ddsnap_0.4-r999.tar.gz</a></td><td>d19e6ea9681a8faac7004a5abd829d35</td></tr>
- </table>
- <p>Downloading <a href="http://code.google.com/p/zumastor/source">via svn</a> is probably easier, as it gets the whole tree.  For stable releases, use the <a href="http://zumastor.googlecode.com/svn/branches/0.4/">0.4 branch</a> rather than the <a href="http://zumastor.googlecode.com/svn/trunk/">trunk</a>.
- </div>
- </div>
-
- <div class="section" id="development">
- <a name="development"></a>
- <h2>Development</h2>
- Zumastor development is hosted at <a href="http://zumastor.googlecode.com">zumastor.googlecode.com</a>.
+You can read all about it in <a href="http://zumastor.googlecode.com/svn/trunk/doc/zumastor-howto.html">the Zumastor Howto</a>.
+<p>
+You can download prebuilt Debian/Ubuntu packages at <a href="http://zumastor.org/downloads/releases">zumastor.org/downloads/releases</a>.
+<p>
+Zumastor development is hosted at <a href="http://zumastor.googlecode.com">zumastor.googlecode.com</a>.
 <ul>
 <li>Subversion repository: see <a href="http://code.google.com/p/zumastor/source">code.google.com/p/zumastor/source</a>
 <li>Issue tracker: see <a href="http://code.google.com/p/zumastor/issues/list">code.google.com/p/zumastor/issues/list</a>
 <li><a href="irc://irc.oftc.net/#zumastor">IRC channel: irc://irc.oftc.net#zumastor</a>
 <li><a href="/irclogs">IRC logs</a>
-<li>Mailing lists
-<ul>
-<li>zumastor@googlegroups.com - General Discussion <a href="http://groups.google.com/group/zumastor">Google Groups Archive</a> <form action="http://groups.google.com/group/zumastor/boxsubscribe">Subscribe Email: <input type=text name=email> <input type=submit name="sub" value="Subscribe"> </form><br>
-<li>zumastor-commits@googlegroups.com - Commit/autobuild messages <a href="http://groups.google.com/group/zumastor-commits/topics?gvc=2">Recent messages (Google Groups link)</a>
- </ul>
+<li><a href="http://groups.google.com/group/zumastor">zumastor mailing list</a>
+<li><a href="http://groups.google.com/group/zumastor-commits">zumastor-commits mailing list</a>
 </ul>
 
- <div class="subsection" id="patches">
- <h3>Kernel Patches</h3>
- Our kernel patches are online at
+<h3>Other documents</h3>
+ <ul>
+  <li><a href="http://zumastor.googlecode.com/svn/trunk/doc/desimplnotes.html">Design Notes</a>
+  <li><a href="http://zumastor.googlecode.com/files/zumastor.whitepaper.pdf">Zumastor Whitepaper</a> - presented at SCaLE '07, 11 Feb 2007 (<a href="http://www.socallinuxexpo.org/scale5x/conference+info/speakers/Daniel+Phillips/">slides and audio recording here</a>)
+  <li><a href="http://sourceware.org/cluster/csnap/csnap.ps">Cluster Snapshots Block Device</a> - Linux Kongress, 3 Sep 2004
+  <li><a href="http://sourceware.org/cluster/csnap/cluster.snapshot.design.html">Cluster Snapshot Design</a> - 8 May 2004
+  <li><a href="http://sourceware.org/cluster/ddraid/raid35.pdf">Cluster RAID</a> - Linux Kongress RAID 3.5, 27 Sep 2003
+ </ul>
+
+
+<h3>Kernel Patches</h3>
+Zumastor requires a few kernel patches.  These are online at
 <a
 href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/">http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/</a> and
 <a
 href="http://zumastor.googlecode.com/svn/trunk/zumastor/patches/">http://zumastor.googlecode.com/svn/trunk/zumastor/patches/</a>.
-Look at the latest kernel version there.  The most interesting patches are:
+The most interesting patches are:
 <ul>
 <li> <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/2.6.22.10/bio.throttle.patch">Dan Phillips' bio throttling patch</a>,
 part of how we prevent deadlock during memory pressure.  See 
@@ -151,23 +51,17 @@ part of how we prevent deadlock during memory pressure.  See
 <li> <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/patches/2.6.22.10/ddsnap.base.patch">Dan Phillips' PR_SET_MEMALLOC/PR_SET_LESS_THROTTLE patch</a>, other part of how we prevent deadlock during memory pressure.  (Any user app that's in the block writeout path needs to be written very carefully to avoid memory recursion deadlock; in particular, it should probably use mlockall, never allocate any memory while handling a write request (modulo a few KB of Heisenslop), and it should set PF_LESS_THROTTLE|PF_MEMALLOC using prctl, as provided for by this patch.)  (Mixed in with the ddsnap stuff for now, sorry; ignore everything but the changes to include/linux/prctl.h and kernel/sys.c.)
 <li> <a href="http://zumastor.googlecode.com/svn/trunk/zumastor/patches/2.6.22.10/nfs_suspend">NFS suspend patch</a>, part of how we make new snapshots available via the NFS server as they arrive from remote sites
 </ul>
-</div>
 
- <div class="subsection" id="contribute.current">
  <h3>Current contributors</h3>
- Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich, Frank Mayhar, Chris Smith
- </div>
- <div class="subsection" id="contribute.thanks">
+ Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, Dan Kegel, Drake Diedrich,  Chris Smith
  <h3>Previous contributors</h3>
  <ul>
-  <li>Robert Nelson, Jane Chiu, Ross Combs, Alex Polvi, Chuan-kai Lin, Mark Roach
+  <li>Robert Nelson, Jane Chiu, Ross Combs, Alex Polvi, Chuan-kai Lin, Mark Roach, Frank Mayhar
   <li>Phil Dibowitz - ddsnap SIGHUP handling patch
   <li>Jonathan Van Eenwyk - ddloop deltafile mount <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">patch</a> (tarball includes a paper)
  </ul>
- </div>
-</div>
 
 <hr>
-<center>&copy; 2007 Google</center>
+<center>&copy; 2007, 2008 Google</center>
 </body>
 </html>
