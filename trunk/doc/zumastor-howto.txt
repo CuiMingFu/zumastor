@@ -225,7 +225,16 @@ and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
 Directories are named by branch and svn revision.
 e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
 Once you've picked a version, download and install its four .deb
-packages.  (Install dmsetup first.)  For instance:
+packages.  (Install dmsetup first.)  
+
+Installing in Feisty or later requires some work to avoid
+https://bugs.launchpad.net/baltix/+source/ubiquity/+bug/78552[ubuntu bug 78552].
+In particular, 
+you have to run update-grub by hand after installing.
+Alternately, you could instead edit /etc/kernel-img.conf first
+to have an absolute path for update-grub.
+
+For instance:
 
 ....................
 $ sudo apt-get install dmsetup
@@ -233,6 +242,7 @@ $ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
 $ mv zumastor.org/downloads/releases/0.6-r1318 .
 $ rm -rf zumastor.org
 $ sudo dpkg -i 0.6-r1318/*.deb
+$ sudo update-grub
 ....................
 
 Don't forget the trailing slash on wget, else it will download
@@ -241,27 +251,6 @@ all directories, not just the one you want!
 The install takes several minutes.
 Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
 
-On Dapper, everything works great.  When I tried on Jeos, I ran into
-two problems: no /boot/grub/menu.lst entry, and no dm-ddnsap kernel module
-loaded.  This is a bug.
-Here's how to check for and work around those problems for now:
-
-The postinstall script for the kernel module should have run
-update-grub to create an entry in /boot/grub/menu.lst, but
-for some reason, that's not working on Jeos. 
-If /boot/grub/menu.lst doesn't mention Zumastor, run
-update-grub by hand.
-
-Check the Zumastor entry in /boot/grub/menu.lst to see what it
-gives as the root filesystem.  If it's root=/dev/sda1, the Zumastor
-kernel might not be happy; changes this to root=/dev/hda1.
-
-Reboot and choose the Zumastor-enabled kernel, and
-make sure the system comes up ok.
-
-Run `lsmod | grep ddsnap` and make sure you see dm-ddsnap listed.
-This module should be loaded from /lib/modules/2.6.22.10-zumastor-r1306.
-If it's not, try `depmod -a; modprobe dm-ddsnap`
 
 Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -308,11 +297,27 @@ prepared a standard Ubuntu Gutsy Jeos 7.10 vmware image
 that's a svelte 78MB download; you can grab it at
 http://kegel.com/linux/jeos-vmware-player/[].
 The image is several files 7zipped together, so unpack it before trying to 
-use it (e.g. +sudo apt-get install p7zip; p7zip -d ~/ubuntu-7.10-jeos-vmware.7z+).
+use it.  Sadly, there are several versions of 7zip with different
+interfaces.   
+On both dapper and gutsy, +sudo apt-get install p7zip+ installs it.
+The command to decompress is 
++
+................................
+7z e ~/ubuntu-7.10-jeos-vmware.7z 
+................................
++
+on Dapper, and 
++
+................................
+7zr e ~/ubuntu-7.10-jeos-vmware.7z 
+................................
++
+on Gutsy.  Go figure.
 
-3.  Then boot the virtual machine with the command +vmplayer gutsy.vmx+.
+3.  Boot the virtual machine with the command +vmplayer gutsy.vmx+.
 Inside vmware, log in to the virtual ubuntu box 
-(using the username and password from the site where you downloaded the image).
+(using the username and password from the site where you downloaded the image,
+e.g. "notroot", "notpass" if you're using Dan Kegel's image).
 
 4. Inside vmware, download and install dmsetup and the Zumastor packages
 as described above.
@@ -587,8 +592,7 @@ Verify that LVM2 is installed
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Many of these examples require LVM, so install that first if it's not already.
 (This example is for Debian / Ubuntu, but it's similar for Fedora et al.
-If you don't have /etc/init.d/lvm, lvm might be under udev's control;
-on Ubuntu Gutsy Jeos, it's controlled by /etc/udev/rules/85-lvm2.rules.)
+If you don't have /etc/init.d/lvm, don't worry, just skip that command.)
 ........
 $ sudo apt-get install lvm2
 $ sudo /etc/init.d/lvm start
@@ -619,16 +623,18 @@ on some systems it's /dev/loop/0, on others it's /dev/loop0.
 You may need to adjust the path to suit your version of Linux.
 
 ...........
+$ sudo sh
 # dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
 # losetup -d /dev/loop0 || true
 # losetup /dev/loop0 /media/vg.img
 # pvcreate /dev/loop0
 # vgcreate sysvg /dev/loop0
 # lvcreate --name test --size 100MB sysvg
-# mkfs.ext3 /dev/ssvg/test
+# mkfs.ext3 /dev/sysvg/test
 # lvcreate --name test_snap --size 100MB sysvg
 # zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
 # zumastor define master zumatest
+# exit
 ..........
 If this complains 
 ..........
@@ -646,17 +652,17 @@ Is device-mapper driver missing from kernel?
 ............................
 you may be hitting 
 https://bugs.launchpad.net/ubuntu/+source/devmapper/+bug/178889[Ubuntu bug 178889];
-try adding `dm_mod` to `/etc/modules` or do `modprobe dm_mod` manually.
+try adding `dm_mod` to `/etc/modules` or do `sudo modprobe dm_mod` manually.
 
 Verify that zumastor has mounted the volume by doing
 ............................
-# df | grep zumatest
+$ df | grep zumatest
 ............................
 
 What if Zumastor can't mount the devices at boot time?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Starting with the previous example, 
-reboot the virtual machine and log back in as root.  
+reboot the virtual machine and log back in.  
 Notice that +df+ doesn't show any Zumastor volumes mounted.
 That's because when Zumastor started at boot time, it
 couldn't see the loopback device, because we didn't arrange 
@@ -679,6 +685,7 @@ and try again.
 Remove the volume and loopback file created above
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .........
+$ sudo sh
 # zumastor forget volume zumatest
 # lvremove sysvg
 # losetup -d /dev/loop0
@@ -689,9 +696,12 @@ Remove the volume and loopback file created above
 Create a single snapshotted volume on a real device
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Find an big empty partition. Let's say it's a 10GB /dev/hda3.
+(If you're using my gutsy vmware image, the virtual hard drive has lots
+of unpartitioned space, just use fdisk to create a partition.)
 Here's how to use LVM to put a volume and its snapshot store onto it:
 
 ........
+$ sudo sh
 # pvcreate /dev/hda3
   Physical volume "/dev/hda3" successfully created
 # vgcreate sysvg /dev/hda3
@@ -708,6 +718,10 @@ Successfully created and initialized volume 'zumatest'.
 ........
 
 You now have an unmounted filesystem which can be snapshotted.
+
+Note that you can run mkfs either before or after `zumastor define volume`.
+
+The volume won't be mounted until you do `zumastor define master` on it.
 
 Mount a new volume and set up periodic snapshots
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
