@@ -795,6 +795,12 @@ You should see 24 snapshots (the limit set when we did the +zumastor define mast
 plus the origin volume.  Each time you run +zumastor snapshot ...+
 it creates a new snapshot, and deletes any that are 'too old'.
 
+Remote Replication
+~~~~~~~~~~~~~~~~~~
+http://zumastor.googlecode.com/svn/trunk/doc/install.html#user[The old user guide] has a really awful writeup of how to set up remote replication.
+We will have a better one here soon.
+
+
 How can I run the above examples using UML?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First off, cd into test/uml.
