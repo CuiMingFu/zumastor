@@ -1162,16 +1162,161 @@ Run it, then use df to see how many snapshots are around afterwards:</p></div>
 plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
 it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <h3 id="_remote_replication_2">10.9. Remote Replication</h3><div style="clear:left"></div>
-<div class="para"><p><a href="http://zumastor.googlecode.com/svn/trunk/doc/install.html#user">The old user guide</a> has a really awful writeup of how to set up remote replication.
-We will have a better one here soon.</p></div>
-<h3 id="_how_can_i_run_the_above_examples_using_uml">10.10. How can I run the above examples using UML?</h3><div style="clear:left"></div>
-<div class="para"><p>First off, cd into test/uml.</p></div>
-<div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
-and working.</p></div>
-<div class="para"><p>Then you can easily start and log in to a UML instance by running ./xssh.sh.</p></div>
-<div class="para"><p>Rather than using LVM, use the devices created by demo.sh,
-/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".</p></div>
-<h3 id="_exporting_a_zumastor_volume_via_nfs">10.11. Exporting a Zumastor volume via NFS</h3><div style="clear:left"></div>
+<div class="para"><p>In this section, we will be working with two machines, <em>original</em>
+(the main machine) and <em>replica</em> (where data is replicated to).</p></div>
+<h4 id="_enable_root_login">10.9.1. Enable root login</h4>
+<div class="para"><p>As of Zumastor 0.6, remote replication requires that both
+the original and replica machines trust each other, and
+allow root to remotely log in to each other.  This is
+<a href="http://code.google.com/p/zumastor/issues/detail?id=40">bug 40 in the zumastor issue tracker</a>.
+Eventually Zumastor's networking will be redone
+to allow replication without requiring both machines to
+trust each other so strongly.</p></div>
+<div class="para"><p>If you use Ubuntu or any other distribution which disables root login
+by default, set a password for the root user to enable this account:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo passwd root</tt></pre>
+</div></div>
+<div class="para"><p>Make sure the SSH daemon is installed and PermitRootLogin is set to
+<em>yes</em> in your sshd_config.</p></div>
+<h4 id="_ssh_authorization">10.9.2. SSH authorization</h4>
+<div class="para"><p>Please note if you get a root shell by using <em>sudo -s</em>, this step will
+fail because by default preserves your environment (including your home
+directory). Either use <em>su</em> (if you have already set a password for root)
+or <em>sudo -s -H</em>.</p></div>
+<div class="para"><p>On each machine, run ssh-keygen as root and create phraseless keys:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+7a:81:de:d4:71:18:32:f0:4e:2c:ee:7d:e4:33:c1:5d root@original</tt></pre>
+</div></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+4a:fe:e7:39:ec:eb:ab:39:e8:b3:29:09:b7:77:02:02 root@replica</tt></pre>
+</div></div>
+<div class="para"><p>Copy the .ssh/id_dsa.pub file from each account to .ssh/authorized_keys
+on the other. This authorizes root on each machine to connect without
+a password to the other. More restricted access may be used in actual
+deployment:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# cat ~/.ssh/id_dsa | ssh root@replica "cat - &gt;&gt; /root/.ssh/authorized_keys"
+root@replica:~# cat ~/.ssh/id_dsa | ssh root@original "cat - &gt;&gt; /root/.ssh/authorized_keys"</tt></pre>
+</div></div>
+<h4 id="_define_target_on_master">10.9.3. Define target on master</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor define target zumatest replica.example.com:11235 -p 60</tt></pre>
+</div></div>
+<div class="para"><p>This tells <em>original</em> to replicate to port 11235 on <em>replica</em> every minute.
+If the period is omitted, automatic replication will not occur,
+though you can still trigger replication manually with <tt>zumastor snapshot</tt>.</p></div>
+<div class="para"><p>Currently the source and target machines must be specified as a FQDN,
+numerical IP addresses will not work.  This restriction is
+<a href="http://code.google.com/p/zumastor/issues/detail?id=54">bug 54 in our issue tracker</a>,
+and we expect to relax it in a future release.</p></div>
+<div class="para"><p>Please note if your organization uses the .local
+TLD, you might run into some issues with mDNS. See
+<a href="http://avahi.org/wiki/AvahiAndUnicastDotLocal">Avahi and Unicast Domains .local</a>
+for more information.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor status --usage
+...
+`-- targets/
+    `-- replica.example.com/
+        |-- period
+        |-- port
+        `-- trigger|
+...</tt></pre>
+</div></div>
+<h4 id="_define_volume_and_configure_source_on_target">10.9.4. Define volume and configure source on target</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica:~#  zumastor define source zumatest original.example.com --period 600</tt></pre>
+</div></div>
+<div class="para"><p>Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# zumastor status --usage
+VOLUME zumatest:
+Data chunk size: 16384
+Used data: 0
+Free data: 0
+Metadata chunk size: 16384
+Used metadata: 56
+Free metadata: 2621384
+Origin size: 21474836480
+Write density: 0
+Creation time: Wed May 16 10:28:27 2007
+  Snap            Creation time   Chunks Unshared   Shared
+totals                                 0        0        0
+Status: running
+Configuration:
+/var/lib/zumastor/volumes/zumatest
+|-- device/
+|   |-- origin -&gt; /dev/sysvg/test
+|   `-- snapstore -&gt; /dev/sysvg/test_snap
+|-- source/
+|   |-- hostname
+|   `-- period
+`-- targets/</tt></pre>
+</div></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>RUN STATUS:
+/var/run/zumastor
+|-- agents/
+|   `-- zumatest
+|-- cron/
+|-- mount/
+|-- running
+`-- servers/
+    `-- zumatest</tt></pre>
+</div></div>
+<h4 id="_start_replication">10.9.5. Start replication</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# zumastor start source zumatest</tt></pre>
+</div></div>
+<div class="para"><p>Alternatively, you may kick off replication manually each time from the master.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor replicate zumatest replica.example.com</tt></pre>
+</div></div>
+<div class="para"><p>Once initial replication is started, ddsnap processes should begin consuming CPU cycles and moving tens of megabits per second between the nodes. Initially, the entire origin device will need to be moved, so wait 15 minutes before looking on the target for snapshots.</p></div>
+<div class="para"><p>When replication is complete, df on the slave should show the same /var/run/zumastor/mount/zumatest volume locally mounted.</p></div>
+<h4 id="_verify_replication">10.9.6. Verify replication</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  date &gt;&gt; /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>Wait 30-60 seconds for next replication cycle to complete.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~#  cat /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>You may need to leave the current directory to see incoming changes. If the same file is there on the target (replica), replication is working.</p></div>
+<h3 id="_export_a_zumastor_volume_via_nfs">10.10. Export a Zumastor volume via NFS</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1225,7 +1370,7 @@ does this for you:</p></div>
 <div class="para"><p>To export zumastor volumes from a different path, you can either symlink the zumastor volumes
 to that path or use the <tt>&#8212;mountpoint</tt> and <tt>&#8212;snappath</tt> options
 with the command <tt>zumastor define volume</tt> described in section "Origin and Snapshot mount points" above.</p></div>
-<h3 id="_recovering_files_through_nfs_using_a_zumastor_snapshot">10.12. Recovering files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recover_files_through_nfs_using_a_zumastor_snapshot">10.11. Recover files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>&#8212;export</tt> option with the <tt>zumastor define master</tt>
 command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.</p></div>
@@ -1250,7 +1395,7 @@ visible inside each directory, which would let you access them from any
 place under the volume mount point.</td>
 </tr></table>
 </div>
-<h3 id="_exporting_a_zumastor_volume_via_samba">10.13. Exporting a Zumastor volume via Samba</h3><div style="clear:left"></div>
+<h3 id="_export_a_zumastor_volume_via_samba">10.12. Export a Zumastor volume via Samba</h3><div style="clear:left"></div>
 <div class="para"><p>Here is an example of setting up Samba on Zumastor using the USER authentication flavor.</p></div>
 <div class="olist"><ol>
 <li>
@@ -1309,7 +1454,7 @@ the <tt>&#8212;samba</tt> option with the command <tt>zumastor define master</tt
 </div></div>
 </li>
 </ol></div>
-<h3 id="_recovering_files_through_samba_using_a_zumastor_snapshot">10.14. Recovering files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recover_files_through_samba_using_a_zumastor_snapshot">10.13. Recover files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>samba</tt> option with the <tt>zumastor define master</tt>
 command as described in the section "Exporting a Zumastor volume via Samba" above.
 Then you can recover files from a Windows Samba client as follows.</p></div>
@@ -1330,12 +1475,12 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 </p>
 </li>
 </ol></div>
-<h3 id="_resize_a_zumastor_volume">10.15. Resize a Zumastor volume</h3><div style="clear:left"></div>
+<h3 id="_resize_a_zumastor_volume">10.14. Resize a Zumastor volume</h3><div style="clear:left"></div>
 <div class="para"><p>Suppose you have a Zumastor volume <em>testvol</em> that uses <em>/dev/sysvg/test</em> lvm device as the origin and
 <em>/dev/sysvg/test_snap</em> lvm device as the snapshot store.
 Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system
 running on top of it.</p></div>
-<h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.15.1. Enlarge the origin device of a Zumastor volume</h4>
+<h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.14.1. Enlarge the origin device of a Zumastor volume</h4>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1375,7 +1520,7 @@ You will see that the size of the origin volume has changed but the size of
 all the existing snapshots is unchanged.</p></div>
 </li>
 </ol></div>
-<h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.15.2. Shrink the origin device of a Zumastor volume</h4>
+<h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.14.2. Shrink the origin device of a Zumastor volume</h4>
 <div class="para"><p>The steps to shrink the origin device of a Zumastor volume is similar to those for
 enlarging the origin device, but need to be ran in different orders.</p></div>
 <div class="olist"><ol>
@@ -1427,7 +1572,7 @@ Now it is safe to shrink the origin lvm device.
 </div></div>
 </li>
 </ol></div>
-<h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.15.3. Enlarge the snapshot store of a Zumastor volume</h4>
+<h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.14.3. Enlarge the snapshot store of a Zumastor volume</h4>
 <div class="para"><p>Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
 run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the snapshot lvm device.</p></div>
 <div class="listingblock">
@@ -1436,7 +1581,7 @@ run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the sna
 zumastor resize testvol --snapshot newsize</tt></pre>
 </div></div>
 <div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
-<h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.15.4. Shrink the snapshot store of a Zumastor volume</h4>
+<h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.14.4. Shrink the snapshot store of a Zumastor volume</h4>
 <div class="para"><p>The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
 to be run carefully. First, run the <tt>zumastor resize &#8212;snapshot</tt> command to shrink
 the Zumastor snapshot store. The command may fail if the existing snapshot store does
@@ -1463,6 +1608,13 @@ If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize those partitions.</td>
 </tr></table>
 </div>
+<h3 id="_how_can_i_run_the_above_examples_using_uml">10.15. How can I run the above examples using UML?</h3><div style="clear:left"></div>
+<div class="para"><p>First off, cd into test/uml.</p></div>
+<div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.</p></div>
+<div class="para"><p>Then you can easily start and log in to a UML instance by running ./xssh.sh.</p></div>
+<div class="para"><p>Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".</p></div>
 </div>
 <h2 id="_test_and_benchmark_tools">11. Test and Benchmark Tools</h2>
 <div class="sectionbody">
@@ -1503,7 +1655,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-07 04:08:21 PDT
+Last updated 2008-02-07 05:44:35 PDT
 </div>
 </div>
 </body>
