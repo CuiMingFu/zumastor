@@ -800,25 +800,167 @@ it creates a new snapshot, and deletes any that are 'too old'.
 
 Remote Replication
 ~~~~~~~~~~~~~~~~~~
-http://zumastor.googlecode.com/svn/trunk/doc/install.html#user[The old user guide] has a really awful writeup of how to set up remote replication.
-We will have a better one here soon.
+
+In this section, we will be working with two machines, 'original'
+(the main machine) and 'replica' (where data is replicated to).
+
+Enable root login
+^^^^^^^^^^^^^^^^^
+
+As of Zumastor 0.6, remote replication requires that both
+the original and replica machines trust each other, and
+allow root to remotely log in to each other.  This is
+http://code.google.com/p/zumastor/issues/detail?id=40[bug 40 in the zumastor issue tracker].
+Eventually Zumastor's networking will be redone
+to allow replication without requiring both machines to
+trust each other so strongly.
+
+If you use Ubuntu or any other distribution which disables root login
+by default, set a password for the root user to enable this account:
+
+ $ sudo passwd root
+
+Make sure the SSH daemon is installed and PermitRootLogin is set to
+'yes' in your sshd_config.
+
+SSH authorization
+^^^^^^^^^^^^^^^^^
+
+Please note if you get a root shell by using 'sudo -s', this step will
+fail because by default preserves your environment (including your home
+directory). Either use 'su' (if you have already set a password for root)
+or 'sudo -s -H'.
+
+On each machine, run ssh-keygen as root and create phraseless keys:
+
+ root@original:~# ssh-keygen
+ Generating public/private rsa key pair.
+ Enter file in which to save the key (/root/.ssh/id_rsa):
+ Created directory '/root/.ssh'.
+ Enter passphrase (empty for no passphrase):
+ Enter same passphrase again:
+ Your identification has been saved in /root/.ssh/id_rsa.
+ Your public key has been saved in /root/.ssh/id_rsa.pub.
+ The key fingerprint is:
+ 7a:81:de:d4:71:18:32:f0:4e:2c:ee:7d:e4:33:c1:5d root@original
 
 
-How can I run the above examples using UML?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-First off, cd into test/uml.
+ root@replica:~# ssh-keygen
+ Generating public/private rsa key pair.
+ Enter file in which to save the key (/root/.ssh/id_rsa):
+ Created directory '/root/.ssh'.
+ Enter passphrase (empty for no passphrase):
+ Enter same passphrase again:
+ Your identification has been saved in /root/.ssh/id_rsa.
+ Your public key has been saved in /root/.ssh/id_rsa.pub.
+ The key fingerprint is:
+ 4a:fe:e7:39:ec:eb:ab:39:e8:b3:29:09:b7:77:02:02 root@replica
 
-Second, if you haven't already, run demo.sh to make sure UML is set up
-and working.
+Copy the .ssh/id_dsa.pub file from each account to .ssh/authorized_keys
+on the other. This authorizes root on each machine to connect without
+a password to the other. More restricted access may be used in actual
+deployment:
 
-Then you can easily start and log in to a UML instance by running ./xssh.sh.
+ root@original:~# cat ~/.ssh/id_dsa | ssh root@replica "cat - >> /root/.ssh/authorized_keys"
+ root@replica:~# cat ~/.ssh/id_dsa | ssh root@original "cat - >> /root/.ssh/authorized_keys"
 
-Rather than using LVM, use the devices created by demo.sh,
-/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".
+Define target on master
+^^^^^^^^^^^^^^^^^^^^^^^
+
+ root@original:~# zumastor define target zumatest replica.example.com:11235 -p 60
+
+This tells 'original' to replicate to port 11235 on 'replica' every minute.
+If the period is omitted, automatic replication will not occur,
+though you can still trigger replication manually with +zumastor snapshot+.
+
+Currently the source and target machines must be specified as a FQDN,
+numerical IP addresses will not work.  This restriction is 
+http://code.google.com/p/zumastor/issues/detail?id=54[bug 54 in our issue tracker],
+and we expect to relax it in a future release.
+
+Please note if your organization uses the .local
+TLD, you might run into some issues with mDNS. See
+http://avahi.org/wiki/AvahiAndUnicastDotLocal[Avahi and Unicast Domains .local] 
+for more information.
+
+ root@original:~# zumastor status --usage 
+ ...
+ `-- targets/
+     `-- replica.example.com/
+         |-- period
+         |-- port
+         `-- trigger|
+ ...
+    
+Define volume and configure source on target
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize  
+ root@replica:~#  zumastor define source zumatest original.example.com --period 600  
+
+Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.
+
+ root@replica:~# zumastor status --usage 
+ VOLUME zumatest:
+ Data chunk size: 16384
+ Used data: 0
+ Free data: 0
+ Metadata chunk size: 16384
+ Used metadata: 56
+ Free metadata: 2621384
+ Origin size: 21474836480
+ Write density: 0
+ Creation time: Wed May 16 10:28:27 2007
+   Snap            Creation time   Chunks Unshared   Shared
+ totals                                 0        0        0
+ Status: running
+ Configuration:
+ /var/lib/zumastor/volumes/zumatest
+ |-- device/
+ |   |-- origin -> /dev/sysvg/test
+ |   `-- snapstore -> /dev/sysvg/test_snap
+ |-- source/
+ |   |-- hostname
+ |   `-- period
+ `-- targets/
+
+ RUN STATUS:
+ /var/run/zumastor
+ |-- agents/
+ |   `-- zumatest
+ |-- cron/
+ |-- mount/
+ |-- running
+ `-- servers/
+     `-- zumatest
+    
+Start replication
+^^^^^^^^^^^^^^^^^
+
+ root@replica:~# zumastor start source zumatest 
+
+Alternatively, you may kick off replication manually each time from the master. 
+
+ root@original:~# zumastor replicate zumatest replica.example.com 
+
+Once initial replication is started, ddsnap processes should begin consuming CPU cycles and moving tens of megabits per second between the nodes. Initially, the entire origin device will need to be moved, so wait 15 minutes before looking on the target for snapshots. 
+
+When replication is complete, df on the slave should show the same /var/run/zumastor/mount/zumatest volume locally mounted. 
+
+Verify replication
+^^^^^^^^^^^^^^^^^^
+
+ root@original:~#  date >> /var/run/zumastor/mount/zumatest/testfile  
+
+Wait 30-60 seconds for next replication cycle to complete. 
+
+ root@replica:~#  cat /var/run/zumastor/mount/zumatest/testfile  
+
+You may need to leave the current directory to see incoming changes. If the same file is there on the target (replica), replication is working.
 
 
-Exporting a Zumastor volume via NFS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Export a Zumastor volume via NFS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1. Install the NFS server packages:
 +
 --------------------------------------
@@ -865,8 +1007,8 @@ To export zumastor volumes from a different path, you can either symlink the zum
 to that path or use the +--mountpoint+ and +--snappath+ options
 with the command +zumastor define volume+ described in section "Origin and Snapshot mount points" above.
 
-Recovering files through NFS using a Zumastor snapshot
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recover files through NFS using a Zumastor snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First, make sure you have used the +--export+ option with the +zumastor define master+ 
 command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.
@@ -888,8 +1030,8 @@ A future revision of Zumastor may add options to make the snapshots
 visible inside each directory, which would let you access them from any
 place under the volume mount point.
 
-Exporting a Zumastor volume via Samba
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Export a Zumastor volume via Samba
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Here is an example of setting up Samba on Zumastor using the USER authentication flavor.
 
@@ -937,8 +1079,8 @@ the +--samba+ option with the command +zumastor define master+ described in sect
 zumastor define master zumatest --hourly 24 --samba
 --------------------------------------
 
-Recovering files through Samba using a Zumastor snapshot
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Recover files through Samba using a Zumastor snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 First, make sure you have used the +samba+ option with the +zumastor define master+
 command as described in the section "Exporting a Zumastor volume via Samba" above.
 Then you can recover files from a Windows Samba client as follows.
@@ -1064,6 +1206,18 @@ system running on top of it. For example, you can replace the
 +e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/testvol+ to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
+
+How can I run the above examples using UML?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+First off, cd into test/uml.
+
+Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.
+
+Then you can easily start and log in to a UML instance by running ./xssh.sh.
+
+Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".
 
 Test and Benchmark Tools
 ------------------------
