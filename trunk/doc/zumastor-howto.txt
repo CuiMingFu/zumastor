@@ -719,7 +719,10 @@ Successfully created and initialized volume 'zumatest'.
 
 You now have an unmounted filesystem which can be snapshotted.
 
-Note that you can run mkfs either before or after `zumastor define volume`.
+Note that you can run mkfs either before or after `zumastor define volume`,
+i.e. you can zumastor-ize an existing volume if you like,
+or you can mkfs a zumastor-ized volume.    (You can even do silly things
+like taking snapshots during the middle of mkfs.)
 
 The volume won't be mounted until you do `zumastor define master` on it.
 
@@ -746,7 +749,7 @@ script.  We can accelerate this by manually telling zumastor to take an
 
 If you do some IO on the filesystem you should notice only the origin device, mounted on +/var/run/zumastor/mount/zumatest+ changes:
 .....
-# echo "This is the first file!" > /var/run/zumastor/zumatest/foo.txt
+# echo "This is the first file!" > /var/run/zumastor/mount/zumatest/foo.txt
 # df | grep zumatest
 /dev/mapper/zumatest  99150       4128   89902   5% /var/run/zumastor/mount/zumatest
 /dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48

@@ -1083,7 +1083,10 @@ Successfully created and initialized volume 'zumatest'.
 # mkfs.ext3 /dev/mapper/zumatest</tt></pre>
 </div></div>
 <div class="para"><p>You now have an unmounted filesystem which can be snapshotted.</p></div>
-<div class="para"><p>Note that you can run mkfs either before or after <tt>zumastor define volume</tt>.</p></div>
+<div class="para"><p>Note that you can run mkfs either before or after <tt>zumastor define volume</tt>,
+i.e. you can zumastor-ize an existing volume if you like,
+or you can mkfs a zumastor-ized volume.    (You can even do silly things
+like taking snapshots during the middle of mkfs.)</p></div>
 <div class="para"><p>The volume won't be mounted until you do <tt>zumastor define master</tt> on it.</p></div>
 <h3 id="_mount_a_new_volume_and_set_up_periodic_snapshots">10.7. Mount a new volume and set up periodic snapshots</h3><div style="clear:left"></div>
 <div class="para"><p>To mount the new volume you created in the previous example,
@@ -1108,7 +1111,7 @@ script.  We can accelerate this by manually telling zumastor to take an
 <div class="para"><p>If you do some IO on the filesystem you should notice only the origin device, mounted on <tt>/var/run/zumastor/mount/zumatest</tt> changes:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt># echo "This is the first file!" &gt; /var/run/zumastor/zumatest/foo.txt
+<pre><tt># echo "This is the first file!" &gt; /var/run/zumastor/mount/zumatest/foo.txt
 # df | grep zumatest
 /dev/mapper/zumatest  99150       4128   89902   5% /var/run/zumastor/mount/zumatest
 /dev/mapper/zumatest(0)  99150    4127   89903   5% /var/run/zumastor/snapshot/zumatest/2008.01.01-12.17.48</tt></pre>
@@ -1500,7 +1503,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-04 16:51:19 PDT
+Last updated 2008-02-07 04:08:21 PDT
 </div>
 </div>
 </body>
