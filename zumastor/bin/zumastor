@@ -351,7 +351,7 @@ function run_master {
 		# target <hostname> - which triggers a snapshot for replication
 		[[ -r $fifo ]] || { log "pipe $fifo does not exist" $log; exit 1; }
 		read kind <$fifo || { log "error when reading pipe $?" $log; sleep 1; continue; }
-		if [[ $kind =~ "^target/" ]]; then
+		if [[ $kind =~ ^target/ ]]; then
 			new_target_snapshot $vol ${kind/target\//} >> $log 2>&1
 		else
 			new_snapshot $vol $kind >> $log 2>&1
@@ -1484,8 +1484,8 @@ remount)
 	[[ $mountstate = "unmounted" ]] && exit 0
 
 	# Override ro/rw if specified options reverse it.
-	[[ $mountopts =~ "\<ro\>" ]] && mountstate="ro"
-	[[ $mountopts =~ "\<rw\>" ]] && mountstate="rw"
+	[[ $mountopts =~ \<ro\> ]] && mountstate="ro"
+	[[ $mountopts =~ \<rw\> ]] && mountstate="rw"
 
 	# If we're not changing the mountpoint, use remount, else unmount and
 	# remount it.
