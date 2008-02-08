@@ -48,7 +48,7 @@ function log {
         [[ $pid == "" ]] && pid=$$
 
         logmsg="`date` $0[$pid]: $msg"
-        if [ $file == "" ]
+        if [[ $file == "" ]]
         then
           echo $logmsg
         else
