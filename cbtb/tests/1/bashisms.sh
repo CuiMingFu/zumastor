@@ -38,7 +38,7 @@ SLEEP=5
 
 
 mkfs='mkfs.ext3 -F'
-aptitude install e2fsprogs
+aptitude install -y e2fsprogs
 
 lvcreate --size 4m -n test sysvg
 lvcreate --size 4m -n test_snap sysvg
