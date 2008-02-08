@@ -33,5 +33,5 @@ cd ../metapackages
 cd ../zumastor
 dpkg-name -o *
 cd $curdir
-dpkg-scanpackages ./zumastor ./override > Packages
+dpkg-scanpackages -m ./zumastor ./override > Packages
 gzip -qc Packages > Packages.gz

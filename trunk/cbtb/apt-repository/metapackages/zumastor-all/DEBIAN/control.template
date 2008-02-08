@@ -2,7 +2,7 @@ Package: zumastor-all
 Essential: no
 Priority: extra
 Section: metapackages
-Maintainer: Zumastor Autobuild <zumabuild@google.com
+Maintainer: Zumastor Autobuild <zumabuild@google.com>
 Architecture: all
 Version: VERSION
 Depends: kernel-image-zumastor, kernel-headers-zumastor, zumastor, ddsnap, dmsetup, lvm2

@@ -2,7 +2,7 @@ Package: kernel-headers-zumastor
 Essential: no
 Priority: extra
 Section: metapackages
-Maintainer: Zumastor Autobuild <zumabuild@google.com
+Maintainer: Zumastor Autobuild <zumabuild@google.com>
 Architecture: i386
 Version: VERSION
 Depends: KERNEL_PACKAGE
