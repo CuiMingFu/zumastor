@@ -46,9 +46,14 @@ function log {
         local msg=$1 file=$2
 
         [[ $pid == "" ]] && pid=$$
-        [[ $file == "" ]]  && file=/dev/stdout
 
-        echo "`date` $0[$pid]: $msg" >> $file
+        logmsg="`date` $0[$pid]: $msg"
+        if [ $file == "" ]
+        then
+          echo $logmsg
+        else
+          echo $logmsg >> $file
+        fi
 }
 
 function find_in {
