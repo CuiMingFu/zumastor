@@ -18,6 +18,10 @@ TIMEOUT=1200
 HDBSIZE=4
 HDCSIZE=8
 
+# currently fails on the distribution zumastor kernel running dapper.
+# nfs4 not supported.  Works under the UML harness using etch.
+EXPECT_FAIL=1
+
 slave=${IPADDR2}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
