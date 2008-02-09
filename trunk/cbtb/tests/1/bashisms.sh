@@ -16,6 +16,29 @@ set -e
 # no kidding
 EXPECT_FAIL=1
 
+# Terminate test in 10 minutes.  Read by test harness.
+TIMEOUT=600
+
+# The required sizes of the sdb and sdc devices in M.
+# Read only by the test harness.
+HDBSIZE=4
+HDCSIZE=8
+
+# wait for file.  The first argument is the timeout, the second the file.
+timeout_file_wait() {
+  local max=$1
+  local file=$2
+  local count=0
+  while [ ! -e $file ] && [ $count -lt $max ]
+  do
+    let "count = count + 1"
+    sleep 1
+  done
+  [ -e $file ]
+  return $?
+}
+                        
+
 # install dash and replace /bin/sh
 apt-get update
 aptitude install -y dash && update-alternatives --install /bin/sh sh /bin/dash 1
@@ -28,45 +51,36 @@ do
 done
 
 
-# Terminate test in 10 minutes.  Read by test harness.
-TIMEOUT=600
-
-# necessary at the moment, looks like a zumastor bug
-SLEEP=5
-
-
 
 
 mkfs='mkfs.ext3 -F'
 aptitude install -y e2fsprogs
 
-lvcreate --size 4m -n test sysvg
-lvcreate --size 4m -n test_snap sysvg
 
   echo "1..6"
 
-  zumastor define volume testvol /dev/sysvg/test /dev/sysvg/test_snap --initialize
+  zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 
   $mkfs /dev/mapper/testvol
   zumastor define master testvol -h 24 -d 7 -s
 
   echo ok 1 - testvol set up
 
-  sync ; zumastor snapshot testvol hourly 
-  sleep $SLEEP
+  sync
+  zumastor snapshot testvol hourly 
  
-  date >> /var/run/zumastor/mount/testvol/testfile
-  sleep $SLEEP
 
-  if [ -d /var/run/zumastor/mount/testvol/.snapshot/hourly.0/ ] ; then
+  if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
     echo "ok 2 - first snapshot mounted"
   else
-    ls -laR /var/run/zumastor/mount
+    ls -lR /var/run/zumastor/
     echo "not ok 2 - first snapshot mounted"
     exit 2
   fi
+        
+  date >> /var/run/zumastor/mount/testvol/testfile
 
-  if [ ! -f /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile ] ; then
+  if [ ! -f /var/run/zumastor/mount/testvol/hourly.0/testfile ] ; then
     echo "ok 3 - testfile not present in first snapshot"
   else
     ls -laR /var/run/zumastor/mount
@@ -74,22 +88,20 @@ lvcreate --size 4m -n test_snap sysvg
     exit 3
   fi
 
-  sleep $SLEEP
   sync
-  sleep $SLEEP
   zumastor snapshot testvol hourly 
-  sleep $SLEEP
 
-  if [ -d /var/run/zumastor/mount/testvol/.snapshot/hourly.1/ ] ; then
-    echo "ok 4 - second snapshot mounted"
+  if [ ! -f /var/run/zumastor/mount/testvol/hourly.1/testfile ] ; then
+    echo "ok 4 - testfile not present in first snapshot"
   else
     ls -laR /var/run/zumastor/mount
-    echo "not ok 4 - second snapshot mounted"
+    echo "not ok 4 - testfile not present in first snapshot"
     exit 4
   fi
 
+
   if diff -q /var/run/zumastor/mount/testvol/testfile \
-      /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile 2>&1 >/dev/null ; then
+      /var/run/zumastor/mount/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
     echo "ok 5 - identical testfile immediately after second snapshot"
   else
     ls -lR /var/run/zumastor/mount
@@ -100,7 +112,7 @@ lvcreate --size 4m -n test_snap sysvg
   date >> /var/run/zumastor/mount/testvol/testfile
 
   if ! diff -q /var/run/zumastor/mount/testvol/testfile \
-      /var/run/zumastor/mount/.snapshot/hourly.0/testfile 2>&1 >/dev/null ; then
+      /var/run/zumastor/mount/hourly.0/testfile 2>&1 >/dev/null ; then
     echo "ok 6 - testfile changed between origin and second snapshot"
   else
     ls -lR /var/run/zumastor/mount
@@ -110,7 +122,5 @@ lvcreate --size 4m -n test_snap sysvg
 
   zumastor forget volume testvol
 
-lvremove -f /dev/sysvg/test
-lvremove -f /dev/sysvg/test_snap
 
 exit 0
