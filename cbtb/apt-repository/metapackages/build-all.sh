@@ -13,6 +13,7 @@ sed -e "s/KERNEL_PACKAGE/$KERNEL_IMAGE/" -e "s/VERSION/$REV/" kernel-image-zumas
 
 sed -e "s/VERSION/$REV/" zumastor-all/DEBIAN/control.template > zumastor-all/DEBIAN/control
 
-dpkg-deb -b kernel-headers-zumastor ../zumastor/kernel-headers-zumastor.deb
-dpkg-deb -b kernel-image-zumastor ../zumastor/kernel-image-zumastor.deb
-dpkg-deb -b zumastor-all ../zumastor/zumastor-all.deb
+dpkg-deb -b kernel-headers-zumastor kernel-headers-zumastor.deb
+dpkg-deb -b kernel-image-zumastor kernel-image-zumastor.deb
+dpkg-deb -b zumastor-all zumastor-all.deb
+dpkg-name -s ../zumastor -o ./*.deb
