@@ -1052,7 +1052,7 @@ define)
 		exit 0 ;;
 	source)
 		declare period args cmd="$0 $1 $2"
-		declare usage="usage: $cmd <vol> <host> [-p|--period <period>] [-y|--yes]"
+		declare usage="usage: $cmd <vol> <host> [-p|--period <period>] [-n|--name] [-y|--yes]"
 		shift 2
 		args=`getopt -op:yn: -l help,period:,yes,name: -n"$cmd" -- "$@"` || \
 			{ echo $usage; exit 2; }
