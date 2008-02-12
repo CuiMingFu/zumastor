@@ -17,6 +17,11 @@ HDBSIZE=1024
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
 
+slave=${IPADDR2}
+
+SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
+SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
+
 function file_check {
   hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 
