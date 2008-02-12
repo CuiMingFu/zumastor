@@ -1,5 +1,5 @@
 Source: ddsnap
-Section: unknown
+Section: utils
 Priority: optional
 Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
 Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev
