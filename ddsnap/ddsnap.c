@@ -708,7 +708,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 
 	u64 dev2_gzip_size;
 	struct delta_extent_header deh = { .magic_num = MAGIC_NUM };
-	u64 extent_addr, chunk_num, num_of_chunks, volume_size;
+	u64 extent_addr, chunk_num, num_of_chunks, source_volume_size, target_volume_size;
 	u64 extent_size, delta_size, gzip_size = MAX_MEM_SIZE, bytes_total = 0, bytes_sent = 0;
 	u32 chunk_size = 1 << cl->chunksize_bits;
 	struct delta_extent_header deh2 = { .magic_num = MAGIC_NUM, .mode = RAW };
@@ -717,8 +717,14 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	trace_off(printf("level: %d, chunksize bits: %Lu, chunk_count: %Lu\n", level, (llu_t) cl->chunksize_bits, (llu_t) cl->count););
 	trace_off(printf("starting delta generation, mode %u, chunksize %u\n", mode, chunk_size););
 
-	if (fd_size(snapdev2, &volume_size) < 0)
-		goto failed_fdsize;
+	if (!fullvolume && fd_size(snapdev1, &source_volume_size) < 0) {
+		warn("unable to determine volume size for %s", dev1name);
+		goto out;
+	}
+	if (fd_size(snapdev2, &target_volume_size) < 0) {
+		warn("unable to determine volume size for %s", dev2name);
+		goto out;
+	}
 	if (progress_file && (err = generate_progress_file(progress_file, &progress_tmpfile)))
 		goto out;
 
@@ -737,31 +743,35 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 				num_of_chunks = chunks_in_extent(cl, chunk_num, chunk_size);
 			extent_size = chunk_size * num_of_chunks;
 		}
-		if (extent_addr > volume_size - extent_size)
-			extent_size = volume_size - extent_addr;
+		if (extent_addr > target_volume_size - extent_size)
+			extent_size = target_volume_size - extent_addr;
 		bytes_total += extent_size;
-
-		/* read in extents from dev1 & dev2 */
-		if (!fullvolume && (err = diskread(snapdev1, dev1_extent, extent_size, extent_addr)) < 0) {
-			warn("read from snapshot device \"%s\" failed ", dev1name);
-			goto error_source;
-		}
-		if ((err = diskread(snapdev2, dev2_extent, extent_size, extent_addr)) < 0) {
-			warn("read from snapshot device \"%s\" failed ", dev2name);
-			goto error_source;
-		}
 
 		/* delta extent header set-up*/
 		deh.gzip_on = FALSE;
 		deh.extent_addr = extent_addr;
 		deh.num_of_chunks = num_of_chunks;
-		deh.ext1_chksum = checksum((const unsigned char *) dev1_extent, extent_size);
+
+		/* read in extents from dev1 & dev2 */
+		if (!fullvolume && source_volume_size > extent_addr) {
+			/* deal with the last extent of the source snapshot */
+			u64 source_extent_size = (extent_addr > source_volume_size - extent_size) ? (source_volume_size - extent_addr) : extent_size;
+			if ((err = diskread(snapdev1, dev1_extent, source_extent_size, extent_addr)) < 0) {
+				warn("read from snapshot device \"%s\" failed ", dev1name);
+				goto error_source;
+			}
+			deh.ext1_chksum = checksum((const unsigned char *) dev1_extent, source_extent_size);
+		}
+		if ((err = diskread(snapdev2, dev2_extent, extent_size, extent_addr)) < 0) {
+			warn("read from snapshot device \"%s\" failed ", dev2name);
+			goto error_source;
+		}
 		deh.ext2_chksum = checksum((const unsigned char *) dev2_extent, extent_size);
 
-		if (fullvolume) {
+		if (fullvolume || (extent_addr > source_volume_size - extent_size)) {
+			/* copy RAW data of snap2 if it is fullvolume or if snap2 is larger than snap1 */
 			deh.extents_delta_length = extent_size;
 			deh.mode = RAW;
-			//memcpy(gzip_delta, dev2_extent, extent_size);
 			if ((err = gzip_on_delta(&deh, dev2_extent, gzip_delta, extent_size, &gzip_size, level)) < 0)
 				goto error_source;
 		} else {
@@ -818,9 +828,6 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 		warn("Total chunks %Lu (%Lu bytes), wrote %Lu bytes in %i seconds", chunk_num, bytes_total, bytes_sent, current_time - start_time);
 		err = progress_file ? write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) : 0;
 	}
-	goto out;
-failed_fdsize:
-	warn("unable to determine volume size for %s", dev2name);
 	goto out;
 error_source:
 	warn("for "U64FMT" chunk extent starting at offset "U64FMT": %s", num_of_chunks, extent_addr, strerror(-err));
@@ -1149,12 +1156,18 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	}
 
 	struct delta_extent_header deh;
-	u64 uncomp_size, extent_size, volume_size;
+	u64 uncomp_size, extent_size, source_volume_size, target_volume_size;
 	u64 extent_addr = 0, chunk_num;
 	int current_time, last_update = 0;
 
-	if (fd_size(snapdev2, &volume_size) < 0)
-		goto failed_fdsize;
+	if (!fullvolume && fd_size(snapdev1, &source_volume_size) < 0) {
+		warn("unable to determine volume size for %s", dev1name);
+		goto out;
+	}
+	if (fd_size(snapdev2, &target_volume_size) < 0) {
+		warn("unable to determine volume size for %s", dev2name);
+		goto out;
+	}
 
 	for (chunk_num = 0; chunk_num < chunk_count;) {
 		trace_off(printf("reading chunk "U64FMT" header\n", chunk_num););
@@ -1165,16 +1178,19 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 
 		extent_addr = deh.extent_addr;
 		extent_size = deh.num_of_chunks * chunk_size;
-		if (extent_addr > volume_size - extent_size) /* end chunk and volume not a multiple of chunksize */
-			extent_size = volume_size - extent_addr;
+		if (extent_addr > target_volume_size - extent_size) /* end chunk and volume not a multiple of extent_size */
+			extent_size = target_volume_size - extent_addr;
 		uncomp_size = extent_size;
 
-		if (!fullvolume && ((err = diskread(snapdev1, extent_data, extent_size, extent_addr)) < 0))
-			goto apply_devread_error;
-		/* check to see if the checksum of snap0 is the same on upstream and downstream */
-		if (!fullvolume && deh.ext1_chksum != checksum((const unsigned char *)extent_data, extent_size)) {
-			warn("delta header checksum '%lld', actual checksum '%lld'", deh.ext1_chksum, checksum((const unsigned char *)extent_data, extent_size));
-			goto apply_checksum_error_snap0;
+		if (!fullvolume && source_volume_size > extent_addr) {
+			u64 source_extent_size = (extent_addr > source_volume_size - extent_size) ? (source_volume_size - extent_addr) : extent_size;
+			if ((err = diskread(snapdev1, extent_data, source_extent_size, extent_addr)) < 0)
+				goto apply_devread_error;
+			/* check to see if the checksum of snap0 is the same on upstream and downstream */
+			if (deh.ext1_chksum != checksum((const unsigned char *)extent_data, source_extent_size)) {
+				warn("delta header checksum '%lld', actual checksum '%lld'", deh.ext1_chksum, checksum((const unsigned char *)extent_data, source_extent_size));
+				goto apply_checksum_error_snap0;
+			}
 		}
 
 		/* gzip compression was used on extent */
@@ -1232,9 +1248,6 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	goto out;
 
 	/* error messages */
-failed_fdsize:
-	warn("unable to determine volume size for %s", dev2name);
-	goto out;
 apply_headerread_error:
 	warn("could not read header for extent starting at chunk "U64FMT" of "U64FMT" total chunks: %s", chunk_num, chunk_count, strerror(-err));
 	goto out;
