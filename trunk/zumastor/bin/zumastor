@@ -1520,8 +1520,8 @@ resize)
 	done
 	shift # remove --
 	[[ $# -eq 1 ]] || { echo $usage; exit 2; }
-	declare -r vol=$1
-	declare -r server=$SERVERS/$vol
+	declare vol=$1
+	declare server=$SERVERS/$vol
 	ddsnap resize $server -o $orgsize -s $snapsize -m $metasize
 	[[ $? -eq 0 ]] || { echo "ddsnap resizing request failed"; exit 1; }
 	if [[ $orgsize != 0 ]]; then
