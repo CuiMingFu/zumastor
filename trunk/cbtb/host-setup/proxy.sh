@@ -13,11 +13,12 @@ VIRTHOST="192.168.23.1"
 # if apache2 was already installed and the default VirtualHost is already
 # enabled, leave it alone.  Else install and disable the default VirtualHost
 if [ ! -f /etc/apache2/sites-enabled/000-default ] ; then
-  apt-get install -y apache2
+  aptitude install -y apache2
   rm -f /etc/apache2/sites-enabled/000-default
 else
-  apt-get install -y apache2
+  aptitude install -y apache2
 fi
+
 
 cat <<EOF >/etc/apache2/sites-available/proxy
 #
@@ -37,12 +38,24 @@ NameVirtualHost $VIRTHOST
   ProxyPreserveHost Off
 
   CacheRoot "/var/www/proxy"
+EOF
+
+if apache2 -v | grep '2\.0' ; then
+  cat <<EOF >>/etc/apache2/sites-available/proxy
   CacheSize 1024000
   CacheMaxExpire 24
   CacheLastModifiedFactor 0.1
   CacheDefaultExpire 1
+EOF
+elif apache2 -v | grep '2\.2' ; then
+  cat <<EOF >>/etc/apache2/sites-available/proxy
+  # TODO: cache configuration options here
+EOF
+else
+  echo "# TODO: cache configuration options here" | tee -a /etc/apache2/sites-available/proxy
+fi  
 
-
+cat <<EOF >>/etc/apache2/sites-available/proxy
   <Proxy *>
     Order deny,allow
     Allow from $VIRTNET
