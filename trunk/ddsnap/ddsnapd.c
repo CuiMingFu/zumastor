@@ -2002,11 +2002,25 @@ static void gen_changelist_leaf(struct superblock *sb, struct eleaf *leaf, void 
 	struct exception const *p;
 	u64 newchunk;
 	int i;
+	u32 snap = cl->tgt_snap;
+	struct snapshot const *snaplist = sb->image.snaplist;
+	u64 snap_sectors = 0;
 
+	for (i = 0; i < sb->image.snapshots; i++)
+		if (snaplist[i].tag == snap)
+			snap_sectors = snaplist[i].sectors;
+	if (snap_sectors == 0) {
+		warn("unable to get snapshot sectors");
+		return;
+	}
 	for (i = 0; i < leaf->count; i++)
 		for (p = emap(leaf, i); p < emap(leaf, i+1); p++) {
 			if ( ((p->share & mask2) == mask2) != ((p->share & mask1) == mask1) ) {
 				newchunk = leaf->base_chunk + leaf->map[i].rchunk;
+				/* check if the chunk is within the size of the target snapshot
+				 * to deal with origin device shrinking */
+				if ((newchunk << sb->snapdata.chunk_sectors_bits) >= snap_sectors)
+					continue;
 				if (append_change_list(cl, newchunk) < 0)
 					warn("unable to write chunk %Li to changelist", newchunk);
 				break;
