@@ -18,7 +18,7 @@ EXPECT_FAIL=1
 
 
 slave1=${IPADDR2}
-slave1=${IPADDR3}
+slave2=${IPADDR3}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
