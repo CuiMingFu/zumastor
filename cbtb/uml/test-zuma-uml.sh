@@ -87,12 +87,17 @@ done
 
 hd=""
 hd2=""
+hd3=""
 if [ $largest_hdbsize -gt 0 ] ; then
   dd of=${tmpdir}/hdb.img bs=1M seek=${largest_hdbsize} count=0 if=/dev/zero
   hd="ubd1=${tmpdir}/hdb.img"
   if [ "x$MACADDR2" != "x" ] ; then
     dd of=${tmpdir}/hdb2.img bs=1M seek=${largest_hdbsize} count=0 if=/dev/zero
     hd2="ubd1=${tmpdir}/hdb2.img"
+  fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    dd of=${tmpdir}/hdb3.img bs=1M seek=${largest_hdbsize} count=0 if=/dev/zero
+    hd3="ubd1=${tmpdir}/hdb3.img"
   fi
 fi
 if [ $largest_hdcsize -gt 0 ] ; then
@@ -102,6 +107,10 @@ if [ $largest_hdcsize -gt 0 ] ; then
     dd of=${tmpdir}/hdc2.img bs=1M seek=${largest_hdcsize} count=0 if=/dev/zero
     hd2="${hd2} ubd2=${tmpdir}/hdc2.img"
   fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    dd of=${tmpdir}/hdc3.img bs=1M seek=${largest_hdcsize} count=0 if=/dev/zero
+    hd3="${hd3} ubd2=${tmpdir}/hdc3.img"
+  fi
 fi
 if [ $largest_hddsize -gt 0 ] ; then
   dd of=${tmpdir}/hdd.img bs=1M seek=${largest_hddsize} count=0 if=/dev/zero
@@ -109,6 +118,10 @@ if [ $largest_hddsize -gt 0 ] ; then
   if [ "x$MACADDR2" != "x" ] ; then
     dd of=${tmpdir}/hdd2.img bs=1M seek=${largest_hddsize} count=0 if=/dev/zero
     hd2="${hd2} ubd3=${tmpdir}/hdd2.img"
+  fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    dd of=${tmpdir}/hdd3.img bs=1M seek=${largest_hddsize} count=0 if=/dev/zero
+    hd3="${hd3} ubd3=${tmpdir}/hdd3.img"
   fi
 fi
 
@@ -128,9 +141,18 @@ if [ "x$MACADDR2" != "x" ] ; then
     & uml2_pid=$!
 fi
 
+if [ "x$MACADDR3" != "x" ] ; then
+  $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
+    ubd0=${tmpdir}/hda3.img,$templateimg $hd3 \
+    mem=512M \
+    eth0=tuntap,$IFACE3,$MACADDR3,$VIRTHOST \
+    con=null \
+    & uml3_pid=$!
+fi
+
 
 # kill the emulator if any abort-like signal is received
-trap "kill ${uml_pid} ${uml2_pid} ; exit 1" 1 2 3 6 14 15
+trap "kill ${uml_pid} ${uml2_pid} ${uml3_pid} ; exit 1" 1 2 3 6 14 15
 
 count=0
 while kill -0 ${uml_pid} && [ $count -lt 30 ] && \
@@ -163,9 +185,29 @@ if [ "x$MACADDR2" != "x" ] ; then
   fi
 fi
 
+if [ "x$MACADDR3" != "x" ] ; then
+  count=0
+  while kill -0 ${uml3_pid} && [ $count -lt 30 ] && \
+    ! ${SSH} root@${IPADDR3} hostname 2>/dev/null
+  do
+    count=$(( count + 1 ))
+    sleep 1
+  done
+
+  if [ $count -ge 30 ] 
+  then
+    kill $uml3_pid
+    retval=64
+    unset uml3_pid
+  fi
+fi
+
 params="IPADDR=${IPADDR}"
 if [ "x$IPADDR2" != "x" ] ; then
   params="${params} IPADDR2=${IPADDR2}"
+fi
+if [ "x$IPADDR3" != "x" ] ; then
+  params="${params} IPADDR3=${IPADDR3}"
 fi
 
 
@@ -203,6 +245,9 @@ fi
 if [ "x$uml2_pid" != "x" ] ; then
   ( sleep 600 ; kill $uml2_pid ) & killer2=$!
 fi
+if [ "x$uml3_pid" != "x" ] ; then
+  ( sleep 600 ; kill $uml3_pid ) & killer3=$!
+fi
 
 if [ "x$uml_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
@@ -212,10 +257,17 @@ if [ "x$uml2_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR2} poweroff
 fi
 
+if [ "x$uml3_pid" != "x" ] ; then
+  ${CMDTIMEOUT} ${SSH} root@${IPADDR3} poweroff
+fi
+
 
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
 if [ "x$IPADDR2" != "x" ] ; then
   sed -i /^${IPADDR2}\ .*\$/d ~/.ssh/known_hosts || true
+fi
+if [ "x$IPADDR3" != "x" ] ; then
+  sed -i /^${IPADDR3}\ .*\$/d ~/.ssh/known_hosts || true
 fi
 
 if [ "x$uml_pid" != "x" ] ; then
@@ -228,13 +280,21 @@ if [ "x$uml2_pid" != "x" ] ; then
   kill -0 ${uml2_pid} && kill ${uml2_pid}
 fi
 
+if [ "x$uml3_pid" != "x" ] ; then
+  time wait ${uml3_pid} || retval=$?
+  kill -0 ${uml3_pid} && kill ${uml3_pid}
+fi
+
 
 # clean up the 10 minute shutdown killers
-if [ "x$killer2" != "x" ] ; then
+if [ "x$killer" != "x" ] ; then
   kill -0 $killer && kill $killer
 fi
 if [ "x$killer2" != "x" ] ; then
   kill -0 $killer2 && kill $killer2
+fi
+if [ "x$killer3" != "x" ] ; then
+  kill -0 $killer3 && kill $killer3
 fi
 
 rm -rf ${tmpdir}
