@@ -47,6 +47,7 @@ export EMAIL="zuambuild@gmail.com"
 export VISUAL=/bin/true
 export EDITOR=/bin/true
 export NAME="Zumastor Builder"
+[ -f debian/changelog.template ] && cp -f debian/changelog
 dch -u low -D $DIST --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
@@ -56,6 +57,7 @@ echo -e "done.\n"
 echo -n Building ddsnap Debian package...
 pushd ${SRC}/ddsnap >> $LOG || exit 1
 echo ${SVNREV} >SVNREV
+[ -f debian/changelog.template ] && cp -f debian/changelog
 dch -u low --no-query -D $DIST -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 make genpatches
