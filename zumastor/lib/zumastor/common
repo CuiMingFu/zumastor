@@ -202,7 +202,7 @@ function stop_volume {
 	read cachesize 2>/dev/null <$cachesizefile
 	[[ -z $cachesize ]] || cacheopt=" --cachesize $cachesize"
 
-	for id in $(ddsnap status $server --list) $(get_managed_snapshots $vol); do
+	for id in $(ddsnap status $server --list 2>/dev/null) $(get_managed_snapshots $vol); do
 		umount_remove_device $vol $id || return 1
 	done
 	umount_remove_device $vol -1 || return 1
@@ -212,7 +212,7 @@ function stop_volume {
 
 	pkill -f "ddsnap server -p $pidfile -l $serverlog$cacheopt $sdev $odev ${mdev}$agent $server$"
 	pkill -f "ddsnap agent -l $agentlog $agent$"
-	rm $agent $server $pidfile
+	rm -f $agent $server $pidfile
 	return 0
 }
 
