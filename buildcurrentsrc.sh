@@ -33,7 +33,7 @@ SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
-DIST="dapper"
+DIST="gutsy"
 
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
@@ -48,7 +48,7 @@ export EMAIL="zuambuild@gmail.com"
 export VISUAL=/bin/true
 export EDITOR=/bin/true
 export NAME="Zumastor Builder"
-dch --create --package zumastor -u low -D $DIST --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dch -i --package zumastor -u low -D $DIST --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
 mv ${SRC}/*.changes ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
@@ -58,7 +58,7 @@ echo -n Building ddsnap Debian package...
 pushd ${SRC}/ddsnap >> $LOG || exit 1
 echo ${SVNREV} >SVNREV
 [ -f debian/changelog ] && rm debian/changelog
-dch --create --package ddsnap -u low --no-query -D $DIST -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dch -i --package ddsnap -u low --no-query -D $DIST -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 make genpatches
 popd >> $LOG
