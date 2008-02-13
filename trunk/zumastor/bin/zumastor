@@ -837,6 +837,7 @@ function usage {
 [[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
 [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
 [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ $1 == "replicate" ]] || [[ ! -e $LOCKFILE ]] || { echo "$0: $LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
+[[ -n $1 ]] && [[ `whoami` != "root" ]] && ( [[ $1 == "define" ]] || [[ $1 == "forget" ]] || [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "snapshot" ]] || [[ $1 == "replicate" ]] ) && { echo "Error: this command requires root privileges"; exit 1; }
 
 case $1 in
 define)
