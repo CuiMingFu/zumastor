@@ -170,10 +170,10 @@ function run_remote  {
 	# FIXME TODO input checking
 
 	if [[ $host = "localhost" ]]; then
-		echo $command | sh
+		echo $command | bash
 	else
 		# run "sh" to prevent "stdin: is not a tty" stderr output
-		echo $command | $SSH_COMMAND $host sh
+		echo $command | $SSH_COMMAND $host bash
 	fi
 }
 
