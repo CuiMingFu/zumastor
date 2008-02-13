@@ -15,6 +15,9 @@ VIRTHOST="192.168.23.1"
 # directory.
 [ -e /tftpboot ] || mkdir /tftpboot
 
+# tunbr is happier when this directory exists, and atftpd serves it.
+[ -e /tftpboot/pxelinux.0 ] || mkdir /tftpboot/pxelinux.0
+
 # Some scripts users run may also need a subdirectory of /tftpboot
 # owned by the unprivileged user.  Check if running under sudo and
 # create a directory for that user.
