@@ -1,0 +1,13 @@
+diff -ru linux-2.6.24.2/fs/nfsd/nfssvc.c linux-2.6.24.2-remove.nfsd.less.throttle/fs/nfsd/nfssvc.c
+--- linux-2.6.24.2/fs/nfsd/nfssvc.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-remove.nfsd.less.throttle/fs/nfsd/nfssvc.c	2008-02-13 12:46:14.000000000 -0800
+@@ -430,7 +430,7 @@
+ 	 * localhost doesn't cause nfsd to lock up due to all the client's
+ 	 * dirty pages.
+ 	 */
+-	current->flags |= PF_LESS_THROTTLE;
++	//current->flags |= PF_LESS_THROTTLE;
+ 	set_freezable();
+ 
+ 	/*
+Only in linux-2.6.24.2-remove.nfsd.less.throttle/fs/nfsd: nfssvc.c.orig
