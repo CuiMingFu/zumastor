@@ -27,7 +27,7 @@ if ! egrep "^iface br1" /etc/network/interfaces
 then
   if [ -f /etc/network/interfaces ]
   then
-    cp interfaces-bridge.sh $stagefile
+    cp ../host-setup/interfaces-bridge.sh $stagefile
     sudo $stagefile
   fi
 fi
