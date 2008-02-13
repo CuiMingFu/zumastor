@@ -44,6 +44,7 @@ case $1 in
 --all)
   tests1=`cd $testparent/1 && echo *.sh`
   tests2=`cd $testparent/2 && echo *.sh`
+  tests3=`cd $testparent/3 && echo *.sh`
   shift
   ;;
 
@@ -68,6 +69,16 @@ done
 for test in $tests2
 do
   if  DIST=$DIST ARCH=$ARCH time tunbr tunbr ./test-zuma-uml.sh $testparent/2/$test
+  then
+    echo PASS $test >>$summary
+  else
+    echo FAIL $test >>$summary
+  fi
+done
+
+for test in $tests3
+do
+  if  DIST=$DIST ARCH=$ARCH time tunbr tunbr tunbr ./test-zuma-uml.sh $testparent/3/$test
   then
     echo PASS $test >>$summary
   else
