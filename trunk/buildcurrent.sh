@@ -75,7 +75,10 @@ pushd $BUILD_DIR >> $LOG || exit 1
 
 echo -n Building zumastor Debian package...
 pushd ${SRC}/zumastor >> $LOG || exit 1
+
 echo ${SVNREV} >SVNREV
+echo ${VERSION} >SVNVERSION
+
 [ -f debian/changelog ] && rm debian/changelog
 EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
