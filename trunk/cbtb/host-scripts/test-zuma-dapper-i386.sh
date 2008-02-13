@@ -65,9 +65,11 @@ VNC=${tmpdir}/vnc
 if [ "x$LOGDIR" != "x" ] ; then
   SERIAL=${LOGDIR}/${LOGPREFIX}serial
   SERIAL2=${LOGDIR}/${LOGPREFIX}serial2
+  SERIAL3=${LOGDIR}/${LOGPREFIX}serial3
 else
   SERIAL=${tmpdir}/serial
   SERIAL2=${tmpdir}/serial2
+  SERIAL3=${tmpdir}/serial3
 fi
 
 
@@ -110,12 +112,17 @@ do
 done
 qemu_hd=""
 qemu2_hd=""
+qemu3_hd=""
 if [ $largest_hdbsize -gt 0 ] ; then
   qemu-img create ${tmpdir}/hdb.img ${largest_hdbsize}M
   qemu_hd="-hdb ${tmpdir}/hdb.img"
   if [ "x$MACADDR2" != "x" ] ; then
     qemu-img create ${tmpdir}/hdb2.img ${largest_hdbsize}M
     qemu2_hd="-hdb ${tmpdir}/hdb2.img"
+  fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdb3.img ${largest_hdbsize}M
+    qemu3_hd="-hdb ${tmpdir}/hdb3.img"
   fi
 fi
 if [ $largest_hdcsize -gt 0 ] ; then
@@ -125,6 +132,10 @@ if [ $largest_hdcsize -gt 0 ] ; then
     qemu-img create ${tmpdir}/hdc2.img ${largest_hdcsize}M
     qemu2_hd="${qemu2_hd} -hdc ${tmpdir}/hdc2.img"
   fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdc3.img ${largest_hdcsize}M
+    qemu3_hd="${qemu3_hd} -hdc ${tmpdir}/hdc3.img"
+  fi
 fi
 if [ $largest_hddsize -gt 0 ] ; then
   qemu-img create ${tmpdir}/hdd.img ${largest_hddsize}M
@@ -132,6 +143,10 @@ if [ $largest_hddsize -gt 0 ] ; then
   if [ "x$MACADDR2" != "x" ] ; then
     qemu-img create ${tmpdir}/hdd2.img ${largest_hddsize}M
     qemu2_hd="${qemu2_hd} -hdd ${tmpdir}/hdd2.img"
+  fi
+  if [ "x$MACADDR3" != "x" ] ; then
+    qemu-img create ${tmpdir}/hdd3.img ${largest_hddsize}M
+    qemu3_hd="${qemu3_hd} -hdd ${tmpdir}/hdd3.img"
   fi
 fi
 
@@ -149,9 +164,6 @@ if ! timeout_file_wait 30 ${MONITOR}
 then
   echo First qemu instance never started, test harness problem.  Aborting.
   kill -0 $qemu_pid && kill $qemu_pid
-  if [ "x$MACADDR2" != "x" ] ; then
-    kill -0 $qemu2_pid && kill $qemu2_pid
-  fi
   exit 2
 fi
 
@@ -173,24 +185,40 @@ if [ "x$MACADDR2" != "x" ] ; then
     -net tap,ifname=${IFACE2},script=no \
     -snapshot -hda ${diskimg} ${qemu2_hd} \
     -boot c -no-reboot & qemu2_pid=$!
-if ! timeout_file_wait 30 ${MONITOR2}
-then
-  echo Second qemu instance never started, test harness problem.  Aborting.
-  kill -0 $qemu_pid && kill $qemu_pid
-  kill -0 $qemu2_pid && kill $qemu2_pid
-  exit 2
+  if ! timeout_file_wait 30 ${MONITOR2}
+  then
+    echo Second qemu instance never started, test harness problem.  Aborting.
+    kill -0 $qemu_pid && kill $qemu_pid
+    kill -0 $qemu2_pid && kill $qemu2_pid
+    exit 2
+  fi
 fi
 
-  socat - unix:${MONITOR2} <<EOF
-info network
-info snapshots
-EOF
-
+if [ "x$MACADDR3" != "x" ] ; then
+  MONITOR3=${tmpdir}/monitor3
+  VNC3=${tmpdir}/vnc3
+  # TODO(dld): See above.  -loadvm running
+  ${rqemu_i386} -m 512 \
+    -serial file:${SERIAL3} \
+    -monitor unix:${MONITOR3},server,nowait \
+    -vnc unix:${VNC3} \
+    -net nic,macaddr=${MACADDR3},model=ne2k_pci \
+    -net tap,ifname=${IFACE3},script=no \
+    -snapshot -hda ${diskimg} ${qemu3_hd} \
+    -boot c -no-reboot & qemu3_pid=$!
+  if ! timeout_file_wait 30 ${MONITOR3}
+  then
+    echo Third qemu instance never started, test harness problem.  Aborting.
+    kill -0 $qemu_pid && kill $qemu_pid
+    kill -0 $qemu2_pid && kill $qemu2_pid
+    kill -0 $qemu3_pid && kill $qemu3_pid
+    exit 2
+  fi
 fi
 
 
 # kill the emulator if any abort-like signal is received
-trap "kill -9 ${qemu_pid} ${qemu2_pid} ; exit 1" 1 2 3 6 14 15
+trap "kill -9 ${qemu_pid} ${qemu2_pid} ${qemu3_pid} ; exit 1" 1 2 3 6 14 15
 
 count=0
 while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR} hostname 2>/dev/null
@@ -237,9 +265,36 @@ EOF
   fi
 fi
 
+if [ "x$MACADDR3" != "x" ] ; then
+  count=0
+  while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR3} hostname 2>/dev/null
+  do
+    count=$(( count + 1 ))
+    echo -n .
+    sleep 10
+  done
+
+  if [ $count -ge 30 ] 
+  then
+    if [ "x$LOGDIR" != "x" ] ; then
+      socat - unix:${MONITOR3} <<EOF
+screendump $LOGDIR/${LOGPREFIX}screen3.ppm
+EOF
+      convert $LOGDIR/${LOGPREFIX}screen3.ppm $LOGDIR/${LOGPREFIX}screen3.png
+      rm $LOGDIR/${LOGPREFIX}screen3.ppm
+    fi
+    kill -9 $qemu3_pid
+    retval=66
+    unset qemu3_pid
+  fi
+fi
+
 params="IPADDR=${IPADDR}"
 if [ "x$IPADDR2" != "x" ] ; then
   params="${params} IPADDR2=${IPADDR2}"
+fi
+if [ "x$IPADDR3" != "x" ] ; then
+  params="${params} IPADDR3=${IPADDR3}"
 fi
 
 
@@ -276,6 +331,9 @@ fi
 if [ "x$qemu2_pid" != "x" ] ; then
   ( sleep 600 ; kill -9 $qemu2_pid ) & killer2=$!
 fi
+if [ "x$qemu3_pid" != "x" ] ; then
+  ( sleep 600 ; kill -9 $qemu3_pid ) & killer3=$!
+fi
 
 if [ "x$qemu_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff
@@ -285,9 +343,16 @@ if [ "x$qemu2_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR2} poweroff
 fi
 
+if [ "x$qemu3_pid" != "x" ] ; then
+  ${CMDTIMEOUT} ${SSH} root@${IPADDR3} poweroff
+fi
+
 sed -i /^${IPADDR}\ .*\$/d ~/.ssh/known_hosts || true
 if [ "x$IPADDR2" != "x" ] ; then
   sed -i /^${IPADDR2}\ .*\$/d ~/.ssh/known_hosts || true
+fi
+if [ "x$IPADDR3" != "x" ] ; then
+  sed -i /^${IPADDR3}\ .*\$/d ~/.ssh/known_hosts || true
 fi
 
 if [ "x$qemu_pid" != "x" ] ; then
@@ -300,13 +365,21 @@ if [ "x$qemu2_pid" != "x" ] ; then
   kill -0 ${qemu2_pid} && kill -9 ${qemu2_pid}
 fi
 
+if [ "x$qemu3_pid" != "x" ] ; then
+  time wait ${qemu3_pid} || retval=$?
+  kill -0 ${qemu3_pid} && kill -9 ${qemu3_pid}
+fi
+
 
 # clean up the 10 minute shutdown killers
-if [ "x$killer2" != "x" ] ; then
+if [ "x$killer" != "x" ] ; then
   kill -0 $killer && kill -9 $killer
 fi
 if [ "x$killer2" != "x" ] ; then
   kill -0 $killer2 && kill -9 $killer2
+fi
+if [ "x$killer3" != "x" ] ; then
+  kill -0 $killer3 && kill -9 $killer3
 fi
 
 rm -rf ${tmpdir}

@@ -92,6 +92,39 @@ for f in *.sh
 do
   export LOGPREFIX="$f."
   testlog="${LOGDIR}/${LOGPREFIX}log"
+  MACADDR=$MACADDR IPADDR=$IPADDR IFACE=$IFACE \
+    MACADDR2=$MACADDR2 IPADDR2=$IPADDR2 IFACE2=$IFACE2 \
+    MACADDR3= IPADDR3= IFACE3= \
+    timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
+  testrc=$?
+  files="$testlog $files"
+  if  [ $testrc -eq 0 ]
+  then
+    echo PASS $f >>$summary
+  else
+    if egrep '^EXPECT_FAIL=1' ./${f} ; then
+      echo FAIL "$f*" >>$summary
+    else
+      testret=$testrc
+      echo FAIL $f >>$summary
+    fi
+
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen.png $files"
+    fi
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen2.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen2.png $files"
+    fi
+
+  fi
+done
+popd
+
+pushd 3
+for f in *.sh
+do
+  export LOGPREFIX="$f."
+  testlog="${LOGDIR}/${LOGPREFIX}log"
   timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
@@ -111,6 +144,9 @@ do
     fi
     if [ -f "${LOGDIR}/$LOGPREFIX}screen2.png" ] ; then
       files="${LOGDIR}/$LOGPREFIX}screen2.png $files"
+    fi
+    if [ -f "${LOGDIR}/$LOGPREFIX}screen3.png" ] ; then
+      files="${LOGDIR}/$LOGPREFIX}screen3.png $files"
     fi
 
   fi

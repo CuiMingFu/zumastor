@@ -43,7 +43,7 @@ repo="${top}/zumastor-tests"
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
 
-if $TUNBR $TUNBR ./runtests.sh
+if $TUNBR $TUNBR $TUNBR ./runtests.sh
 then
   export FAILED_TEST_REV=
 else
