@@ -494,7 +494,8 @@ function stop_target {
 	log "stopping target" $log
 	pkill -f "zumastor replicate $vol $host --delay"
 	pkill -f "zumastor start target $vol $host$" || return 1
-	pkill -f "ddsnap transmit $SERVERS/$vol $host:" || return 1
+	pkill -f "ddsnap transmit $SERVERS/$vol $host:"
+	return 0
 }
 
 function define_volume {
