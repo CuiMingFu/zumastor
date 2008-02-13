@@ -41,7 +41,9 @@ DIST="gutsy"
 
 echo -n Building zumastor Debian package...
 pushd ${SRC}/zumastor >> $LOG || exit 1
+
 echo ${SVNREV} >SVNREV
+echo ${VERSION} >SVNVERSION
 
 export EMAIL="zuambuild@gmail.com"
 export VISUAL=/bin/true
