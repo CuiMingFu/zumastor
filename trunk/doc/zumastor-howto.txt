@@ -804,6 +804,8 @@ Remote Replication
 In this section, we will be working with two machines, 'original'
 (the main machine) and 'replica' (where data is replicated to).
 
+Please note in Zumastor 0.6 replication will fail if you are using Bash 3.2.x. This was fixed in http://code.google.com/p/zumastor/source/diff?old=1320&r=1337&format=unidiff&path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor[svn revision 1337].
+
 Enable root login
 ^^^^^^^^^^^^^^^^^
 
@@ -873,10 +875,12 @@ This tells 'original' to replicate to port 11235 on 'replica' every minute.
 If the period is omitted, automatic replication will not occur,
 though you can still trigger replication manually with +zumastor snapshot+.
 
-Currently the source and target machines must be specified as a FQDN,
-numerical IP addresses will not work.  This restriction is 
-http://code.google.com/p/zumastor/issues/detail?id=54[bug 54 in our issue tracker],
-and we expect to relax it in a future release.
+Please note http://code.google.com/p/zumastor/issues/detail?id=54[Bug 54 in our issue tracker], describes some limitations on how to specify the names of the source and target machines. We expect to relax these limitations in a future release but for now you must know:
+- Numerical IP addresses will not work,
+- The machine name must be specified as the value returned by `uname -n`,
+- FQDNs will only work if `uname -n` returns the FQDN
+
+For example, if in DNS your machines are original.example.com and replica.example.com but `uname -n` returns only `original` and `replica`, you must tell Zumastor the hosts are 'original' and 'replica', not the FQDNs of the machines. If this is your case, make sure `ping original` and `ping replica` resolve correctly, and 'ssh root@original' and 'ssh root@replica' log without any interaction from the user.
 
 Please note if your organization uses the .local
 TLD, you might run into some issues with mDNS. See
@@ -968,11 +972,11 @@ Export a Zumastor volume via NFS
 --------------------------------------
 +
 2. Add the following lines to the NFS exports file `/etc/exports`
-(where 'testvol' is the Zumastor volume to be exported):
+(where 'zumatest' is the Zumastor volume to be exported):
 +
 --------------------------------------
-/var/run/zumastor/mount/testvol *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
-/var/run/zumastor/snapshot/testvol *(ro,fsid=1,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/mount/zumatest *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/snapshot/zumatest *(ro,fsid=1,nohide,no_subtree_check,crossmnt)
 --------------------------------------
 +
 The ``fsid=xxx'' option is required to ensure that the NFS server uses the same
@@ -1015,7 +1019,7 @@ as described in the section "Exporting a Zumastor volume via NFS" above.
 
 Then mount the Zumastor volume as normal on an NFS client, for instance:
 --------------------------------------
-mount -tnfs nfs-server:/var/run/zumastor/snapshot/testvol /mnt
+mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
 ls /mnt
 --------------------------------------
 
@@ -1043,13 +1047,13 @@ Here is an example of setting up Samba on Zumastor using the USER authentication
 +
 2. Edit file `/etc/samba/smb.conf`, configuring the ``workgroup'' option according to your domain setup, 
 commenting out the ``obey pam restrictions = yes'' option, and adding the following lines 
-(where 'testvol' is the Zumastor volume to be exported and 'homevol' is the name of 
+(where 'zumatest' is the Zumastor volume to be exported and 'homevol' is the name of 
 the exported Samba volume):
 +
 --------------------------------------
 [homevol]
 
-path = /var/run/zumastor/mount/testvol
+path = /var/run/zumastor/mount/zumatest
 comment = test volume
 browseable = yes
 case sensitive = no
@@ -1096,18 +1100,22 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 
 Resize a Zumastor volume
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose you have a Zumastor volume 'testvol' that uses '/dev/sysvg/test' lvm device as the origin and
-'/dev/sysvg/test_snap' lvm device as the snapshot store.
+Suppose you have a Zumastor volume 'zumatest' that uses the '/dev/sysvg/test' LVM device as the origin and
+'/dev/sysvg/test_snap' LVM device as the snapshot store.
 Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system 
 running on top of it.
 
 Enlarge the origin device of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-1. First, make sure you have shut down all of the services running on top of the Zumastor volume,
-such as NFS or Samba.
+Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
 
-2. Resize the lvm device of the origin volume with the 'newsize'. Here 'newsize' may be suffixed 
+1. First, make sure you have shut down all of the services running on top of the Zumastor volume,
+such as NFS or Samba. You can use 'lsof' to check if any file in /var/run/zumastor/mount/zumatest is still open:
+# sync
+# lsof | grep /var/run/zumastor/mount/zumatest
+
+2. Resize the LVMm device of the origin volume with the 'newsize'. Here 'newsize' may be suffixed 
 by unit designator such as K, M, or G.
 +
 --------------------------------------
@@ -1118,23 +1126,30 @@ lvresize /dev/sysvg/test -L newsize
 Then resize the EXT3 file system with the +e2fsck/resize2fs+ utilities from the
 +e2fsprogs+ debian package (you need to install the package first if it is not already installed).
 Here, we need to first stop +zumastor master+, which will umount the
-origin volume as well as all of the existing snapshots. After the EXT3 resizing, we restart
+origin volume as well as all of the existing snapshots. If the volume is being replicated to another server, you need to stop replication (both in the origin and in the replica host). After the EXT3 resizing, we restart
 +zumastor master+, which will mount the origin volume with the new size.
 +
 --------------------------------------
-zumastor stop master testvol
-zumastor resize testvol --origin newsize
-e2fsck -f /dev/mapper/testvol
-resize2fs /dev/mapper/testvol newsize
-zumastor start master testvol
+root@replica:~# zumastor stop source zumatest
+root@original:~# zumastor stop target zumatest replica
+root@original:~# zumastor stop master zumatest
+root@original:~# zumastor resize zumatest --origin newsize
+root@original:~# e2fsck -f /dev/mapper/zumatest
+root@original:~# resize2fs /dev/mapper/zumatest newsize
+root@original:~# zumastor start master zumatest
+root@original:~# zumastor start target zumatest replica
+root@replica:~# zumastor start source zumatest
 --------------------------------------
 +
-Now check the size of the Zumastor volume with +df | grep testvol+.
+Now check the size of the Zumastor volume with +df | grep zumatest+.
 You will see that the size of the origin volume has changed but the size of
 all the existing snapshots is unchanged.
  
 Shrink the origin device of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
+
 The steps to shrink the origin device of a Zumastor volume is similar to those for
 enlarging the origin device, but need to be ran in different orders.
 
@@ -1143,9 +1158,9 @@ enlarging the origin device, but need to be ran in different orders.
 2. Stop +zumastor master+. Then shrink the EXT3 file system.
 +
 --------------------------------------
-zumastor stop master testvol
-e2fsck -f /dev/mapper/testvol
-resize2fs /dev/mapper/testvol newsize
+zumastor stop master zumatest
+e2fsck -f /dev/mapper/zumatest
+resize2fs /dev/mapper/zumatest newsize
 --------------------------------------
 +
 3. Shrink the zumastor origin device. Before running the +zumastor resize --origin+
@@ -1153,22 +1168,22 @@ command, we need to first have all of the data on the shrinked space to be copie
 snapshot store. Otherwise, you may get access error when reading/writing an existing snapshot.
 The copyout can be executed by overwriting the shrinked space with the +dd+ command.
 E.g., when shrinking the origin device from 4G to 1G, you can use
-+dd if=/dev/zero of=/dev/mapper/testvol bs=64k seek=16k count=48k+.
++dd if=/dev/zero of=/dev/mapper/zumatest bs=64k seek=16k count=48k+.
 Depends on the old size of your origin device, this step may take a long time.
 After that, restart +zumastor master+.
 +
 --------------------------------------
-dd if=/dev/zero of=/dev/mapper/testvol bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
+dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
 sync
-zumastor resize testvol --origin newsize
-zumastor start master testvol
+zumastor resize zumatest --origin newsize
+zumastor start master zumatest
 --------------------------------------
 +
-Now check the size of the Zumastor volume with +df | grep testvol+.
+Now check the size of the Zumastor volume with +df | grep zumatest+.
 You should see that the size of the origin volume has changed but the size of
 all the existing snapshots is unchanged.
 
-4. Now it is safe to shrink the origin lvm device.
+4. Now it is safe to shrink the origin LVM device.
 +
 --------------------------------------
 lvresize /dev/sysvg/test -L newsize
@@ -1176,16 +1191,22 @@ lvresize /dev/sysvg/test -L newsize
 
 Enlarge the snapshot store of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
+
 Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
 run the +zumastor resize --snapshot+ command after enlarging the snapshot lvm device.
 --------------------------------------
 lvresize /dev/sysvg/test_snap -L newsize
-zumastor resize testvol --snapshot newsize
+zumastor resize zumatest --snapshot newsize
 --------------------------------------
 After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
 
 Shrink the snapshot store of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
+
 The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
 to be run carefully. First, run the +zumastor resize --snapshot+ command to shrink
 the Zumastor snapshot store. The command may fail if the existing snapshot store does
@@ -1195,7 +1216,7 @@ command to shrink the snapshot lvm device.
 Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
 may damage the whole Zumastor volume.
 --------------------------------------
-zumastor resize testvol --snapshot newsize
+zumastor resize zumatest --snapshot newsize
 lvresize /dev/sysvg/test_snap -L newsize
 --------------------------------------
 After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
@@ -1203,7 +1224,7 @@ After this, check the new size of the Zumastor snapshot store with the +zumastor
 [NOTE]
 You can follow the similar procedures when resizing a Zumastor volume with a different file 
 system running on top of it. For example, you can replace the
-+e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/testvol+ to resize a reiserfs file system.
++e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/zumatest+ to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
 
