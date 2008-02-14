@@ -102,9 +102,9 @@ ${SSH} root@${slave} zumastor define volume testvol /dev/testvg/test /dev/testvg
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
 
-zumastor define target testvol ${slave}:11235
+zumastor define target testvol slave:11235
 ${SSH} root@${slave} zumastor define source testvol master
-zumastor replicate testvol --wait $slave
+zumastor replicate testvol --wait slave
 zumastor status --usage
 
 # reasonable wait for these small volumes to finish the initial replication
@@ -125,7 +125,7 @@ date >>/var/run/zumastor/mount/testvol/testfile
 sync
 
 # stop master and replication
-zumastor stop target testvol $slave
+zumastor stop target testvol slave
 zumastor stop master testvol
 ${SSH} root@${slave} zumastor stop source testvol
 
@@ -139,10 +139,10 @@ $SSH root@${slave} zumastor resize testvol --origin 20M
 
 # restart master and replication
 zumastor start master testvol
-zumastor start target testvol $slave
+zumastor start target testvol slave
 $SSH root@${slave} zumastor start source testvol
 
-zumastor replicate testvol $slave --wait
+zumastor replicate testvol slave --wait
 zumastor status --usage
 file_check 4 "origin and slave testfiles are in sync after origin enlarging"
 
@@ -150,7 +150,7 @@ date >>/var/run/zumastor/mount/testvol/testfile
 sync
 
 # stop master and replication
-zumastor stop target testvol $slave
+zumastor stop target testvol slave
 zumastor stop master testvol
 ${SSH} root@${slave} zumastor stop source testvol
 
@@ -167,10 +167,10 @@ $SSH root@${slave} "echo y | lvresize /dev/testvg/test -L 12M"
 
 # restart master and replication
 zumastor start master testvol
-zumastor start target testvol $slave
+zumastor start target testvol slave
 $SSH root@${slave} zumastor start source testvol
 
-zumastor replicate testvol $slave --wait
+zumastor replicate testvol slave --wait
 zumastor status --usage
 file_check 5 "origin and slave testfiles are in sync after origin shrinking"
 
@@ -178,7 +178,7 @@ date >>/var/run/zumastor/mount/testvol/testfile
 sync
 lvresize /dev/testvg/test_snap -L 40M
 zumastor resize testvol --snapshot 40M
-zumastor replicate testvol $slave --wait
+zumastor replicate testvol slave --wait
 zumastor status --usage
 file_check 6 "origin and slave testfiles are in sync after snapshot enlarging"
 
@@ -186,7 +186,7 @@ date >>/var/run/zumastor/mount/testvol/testfile
 sync
 zumastor resize testvol --snapshot 12M
 echo y | lvresize /dev/testvg/test_snap -L 12M
-zumastor replicate testvol $slave --wait
+zumastor replicate testvol slave --wait
 zumastor status --usage
 file_check 7 "origin and slave testfiles are in sync after snapshot shrinking"
 
