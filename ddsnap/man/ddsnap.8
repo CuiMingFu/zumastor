@@ -17,29 +17,29 @@ ddsnap \- block device snapshot and replication
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fIdev/meta\fP] \fIagent_socket\fP \fIserver_socket\fP
 .br
 .B ddsnap create
-.I socket_name snapshot
+.I server_socket snapshot
 .br
 .B ddsnap delete
-.I socket_name snapshot
+.I server_socket snapshot
 .br
 .B ddsnap list
-.I socket_name
+.I server_socket
 .br
 .B ddsnap priority
-.I socket_name snap_tag new_priority_value
+.I server_socket snap_tag new_priority_value
 .br
 .B ddsnap usecount
-.I socket_name snap_tag \fP[\fIdiff_amount\fP]
+.I server_socket snap_tag \fP[\fIdiff_amount\fP]
 .br
 .B ddsnap resize
-.I socket_name [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
 .br
 .B ddsnap status
-[\-v|--verbose] \fIsocket_name\fP [\fIsnapshot\fP]
+[\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
 .br
 
 .B ddsnap delta changelist
-.I socket_name changelist_name snapshot1 snapshot2
+.I server_socket changelist_name snapshot1 snapshot2
 .br
 .B ddsnap delta create
 [-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] 
@@ -50,7 +50,7 @@ ddsnap \- block device snapshot and replication
 .br
 .B ddsnap transmit
 [-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP]
-\fIsocket_name host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
+\fIserver_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
 .br
 .B ddsnap delta listen
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
@@ -72,8 +72,11 @@ Answers yes to all prompts.
 Specifies the journal size, i.e. 200k. Defaults to 400k.
 .IP \fB\-b\ \fIblocksize\fB|--blocksize=\fIblocksize
 .br
-Specifies the block size. Input has to be a power of two, i.e. 8k. Defaults to chunksize.
-.IP \fB\-b\ \fIcachesize\fB|--cachesize=\fIcachesize
+Specifies the block size. Input has to be a power of two, i.e. 8k, and must be larger than 512 bytes. Defaults to chunksize.
+.IP \fB\-c\ \fIchunksize\fB|--chunksize=\fIchunksize
+.br
+Specifies the snapshot chunk size. Input has to be a power of two and must be larger than 512 bytes.
+.IP \fB\-k\ \fIcachesize\fB|--cachesize=\fIcachesize
 .br
 Specifies the amount of RAM to dedicate to the snapshot btree cache.  If not specified or
 if specified as 0 (zero), defaults to min(128MB, system ram size/4).
@@ -132,35 +135,35 @@ Starts the snapshot agent.
 .br
 Starts the snapshot server.
 .IP \fBcreate
-.I socket_name snapshot
+.I server_socket snapshot
 .br
 Creates a snapshot with the given sockname and snapshot.
 .IP \fBdelete
-.I socket_name snapshot
+.I server_socket snapshot
 .br
 Deletes a snapshot with the given sockname and snapshot.
 .IP \fBlist
-.I socket_name
+.I server_socket
 .br
 Returns a list of snapshots currently held.
 .IP \fBpriority
-.I socket_name snap_tag new_priority_value
+.I server_socket snap_tag new_priority_value
 .br
 Sets the priority of the snapshot with the given sockname and snap_tag to the given priority_value.
 .IP \fBusecount
-.I socket_name snap_tag [diff_amount]
+.I server_socket snap_tag [diff_amount]
 .br
 Changes the use count of the snapshot with the given sockname and snap_tag by adding diff_amount to current snapshot usecount.  If diff_amount is omitted, 0 is assumed.
 .IP \fBresize
-.I socket_name [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
 .br
 Resize the origin/snapshot/metadata device of an existing ddsnap volume.
 .IP \fBstatus
-[\-v|--verbose] \fIsocket_name\fP [\fIsnapshot\fP]
+[\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
 .br
 Reports snapshot usage statistics.
 .IP \fBdelta\ \fBchangelist\fP
-.I socket_name changelist_name snapshot1 snapshot2
+.I server_socket changelist_name snapshot1 snapshot2
 .br
 Creates a changelist from snapshot1 and snapshot2 with the given changelist_name.
 .IP \fBdelta\ \fBcreate\fP 
@@ -174,7 +177,7 @@ Creates a deltafile from the given \fIchangelist\fP and snapshot device stem wit
 Applies the deltafile to the given device.
 .IP \fBtransmit\fP 
 [-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] 
-.I socket_name host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
+.I server_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
 .br
 Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data.
 .IP \fBdelta\ \fBlisten\fP 
