@@ -2362,7 +2362,7 @@ int main(int argc, char *argv[])
 
 		if (bs_str != NULL) {
 			bs_bits = strtobits(bs_str);
-			if (bs_bits == INPUT_ERROR) {
+			if (bs_bits == INPUT_ERROR || bs_bits < SECTOR_BITS) {
 				poptPrintUsage(initCon, stderr, 0);
 				fprintf(stderr, "Invalid block size input. Try 64k\n");
 				exit(1);
@@ -2373,7 +2373,7 @@ int main(int argc, char *argv[])
 
 		if (cs_str != NULL) {
 			cs_bits = strtobits(cs_str);
-			if (cs_bits == INPUT_ERROR) {
+			if (cs_bits == INPUT_ERROR || cs_bits < SECTOR_BITS) {
 				poptPrintUsage(initCon, stderr, 0);
 				fprintf(stderr, "Invalid chunk size input. Try 64k\n");
 				exit(1);
@@ -2384,7 +2384,7 @@ int main(int argc, char *argv[])
 
 		if (js_str != NULL) {
 			js_bytes = strtobytes(js_str);
-			if (js_bytes == INPUT_ERROR) {
+			if (js_bytes == INPUT_ERROR || js_bytes < SECTOR_BITS) {
 				poptPrintUsage(initCon, stderr, 0);
 				fprintf(stderr, "Invalid journal size input. Try 400k\n");
 				exit(1);
