@@ -16,12 +16,17 @@
 
 set -e
 
-ve=$1
+VEID=$1
 vgname=$2
 originsize=$3
 snapsize=$4
 
-debarchive=ftp.us.debian.org
+# may be specified on command launch
+[ "x$debarchive" = "x" ] && debarchive=ftp.us.debian.org
+
+
+[ -f /etc/vz/vz.conf ] && . /etc/vz/vz.conf
+
 
 if ! which lvcreate ; then
   echo "Install lvm2 utilities"
@@ -44,14 +49,14 @@ EOF
 fi
 
 # create a directory for socket control of ddsnap
-sockdir=`mktemp -d ve${ve}zuma.XXXX`
+sockdir=`mktemp -d ve${VEID}zuma.XXXX`
 echo "socket directory: $sockdir"
 
 # create the backing block devices for the ddsnap volume
-lvcreate --size $originsize -n ${ve}origin $vgname
-lvcreate --size $snapsize -n ${ve}snap $vgname
-origin=/dev/$vgname/${ve}origin
-snap=/dev/$vgname/${ve}snap
+lvcreate --size $originsize -n ${VEID}origin $vgname
+lvcreate --size $snapsize -n ${VEID}snap $vgname
+origin=/dev/$vgname/${VEID}origin
+snap=/dev/$vgname/${VEID}snap
 
 # initialize the snapstore with the basic ddsnap bitmaps and metadata
 # start the control and server daemons
@@ -64,28 +69,23 @@ ddsnap server $snap $origin $control $server
 # get the size and use dmsetup to map the origin device using dmsetup
 size=`ddsnap status $server --size`
 echo 0 $size ddsnap $snap $origin $control -1 | \
-  dmsetup create ${ve}vol
+  dmsetup create ${VEID}vol
 
 # create a filesystem on the new ddsnap block device and mount
 # where OpenVZ expects it
-mkfs.ext3 /dev/mapper/${ve}vol
-VZ=''
-for vz in /var/lib/vz /vz ; do
-  if [ -d $vz ] ; then
-    VZ=$vz
-  fi
-done
-if [ ! -d $VZ/private/$ve ] ; then
-  echo "VE $ve not defined"
+mkfs.ext3 /dev/mapper/${VEID}vol
+
+if [ ! -d $VE_PRIVATE ] ; then
+  echo "VE $VEID's $VE_PRIVATE not a directory"
   exit 1
 fi
-mount /dev/mapper/${ve}vol $VZ/private/$ve
+mount /dev/mapper/${VEID}vol $VE_PRIVATE
 
 # create an etch instance using debootstrap if available
 if which debootstrap ; then
   arch=i386
   if which dpkg ; then arch=`dpkg --print-architecture` ; fi
-  debootstrap --arch $arch etch /var/lib/vz/private/$VE http://$debarchive/debian/
+  debootstrap --arch $arch etch $VE_PRIVATE http://$debarchive/debian/
 fi
 
 #
@@ -93,7 +93,7 @@ fi
 #
 # num=0
 # ddsnap create $server $num
-# echo 0 $size ddsnap $snap $origin $control $num | dmsetup create ${ve}snap-$num
+# echo 0 $size ddsnap $snap $origin $control $num | dmsetup create ${VEID}snap-$num
 
  # rmdir $sockdir
 
