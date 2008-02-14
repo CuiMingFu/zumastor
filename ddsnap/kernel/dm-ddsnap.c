@@ -29,9 +29,9 @@
 #define trace trace_off
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-#       define compat_bio_error(bio, done)  bio_io_error(bio, done);
+#       define compat_bio_io_error(bio, done)  bio_io_error(bio, done);
 #else
-#       define compat_bio_error(bio, done)  bio_io_error(bio);
+#       define compat_bio_io_error(bio, done)  bio_io_error(bio);
 #endif
 
 /*
