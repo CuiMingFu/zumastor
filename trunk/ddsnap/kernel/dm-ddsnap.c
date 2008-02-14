@@ -28,6 +28,12 @@
 
 #define trace trace_off
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#       define compat_bio_error(bio, done)  bio_io_error(bio, done);
+#else
+#       define compat_bio_error(bio, done)  bio_io_error(bio);
+#endif
+
 /*
  * To do:
  *
@@ -318,7 +324,11 @@ struct hook {
 	struct list_head list;
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+static void snapshot_read_end_io(struct bio *bio, int error)
+#else
 static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
+#endif
 {
 	struct hook *hook = bio->bi_private;
 	struct devinfo *info = hook->info;
@@ -336,7 +346,11 @@ static int snapshot_read_end_io(struct bio *bio, unsigned int done, int error)
 	spin_unlock_irqrestore(&info->end_io_lock, irqflags);
 	up(&info->more_work_sem);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+	bio->bi_end_io(bio, error);
+#else
 	return bio->bi_end_io(bio, done, error);
+#endif
 }
 
 static void show_lock_requests(struct list_head *hlist)
@@ -409,7 +423,7 @@ found:
 		if(failed_io) {
 			warn("Unable to handle pending IO server %Lx", (long long)bio->bi_sector);
 			kmem_cache_free(pending_cache, pending);
-			bio_io_error(bio, bio->bi_size);
+			compat_bio_io_error(bio, bio->bi_size);
 			/* we need to call bio_io_error to release the bio buffer for all bio requests */
 			continue;
 		}
@@ -417,7 +431,7 @@ found:
 		if (chunks != pending->chunks) {
 			warn("Message mismatch, expected %x got %x", chunks, chunks);
 			kmem_cache_free(pending_cache, pending);
-			bio_io_error(bio, bio->bi_size);
+			compat_bio_io_error(bio, bio->bi_size);
 			return -1;
 		}
 
@@ -905,7 +919,7 @@ static void flush_list(struct devinfo *info, struct list_head *flush_list)
 		struct bio *bio=pending->bio;
 		list_del(entry);
 		kmem_cache_free(pending_cache, pending);
-		bio_io_error(bio, bio->bi_size);
+		compat_bio_io_error(bio, bio->bi_size);
 	}
 }
 
