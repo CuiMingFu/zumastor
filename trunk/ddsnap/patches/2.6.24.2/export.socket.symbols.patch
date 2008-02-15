@@ -1,0 +1,29 @@
+--- linux-2.6.24.2/net/socket.c.orig	2008-02-15 04:10:53.000000000 -0800
++++ linux-2.6.24.2/net/socket.c	2008-02-15 04:16:11.000000000 -0800
+@@ -1221,6 +1221,8 @@
+ 	return retval;
+ }
+ 
++EXPORT_SYMBOL_GPL(sys_socket);
++
+ /*
+  *	Create a pair of connected sockets.
+  */
+@@ -1503,6 +1505,8 @@
+ 	return err;
+ }
+ 
++EXPORT_SYMBOL_GPL(sys_connect);
++
+ /*
+  *	Get the local address ('name') of a socket object. Move the obtained
+  *	name to user space.
+@@ -1981,6 +1985,8 @@
+ 	return err;
+ }
+ 
++EXPORT_SYMBOL_GPL(sys_recvmsg);
++
+ #ifdef __ARCH_WANT_SYS_SOCKETCALL
+ 
+ /* Argument list sizes for sys_socketcall */
