@@ -15,6 +15,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sysrq.h>
 #include <linux/jiffies.h>
+#include <linux/vmalloc.h>
 #include "dm.h"
 #include "dm-ddsnap.h"
 

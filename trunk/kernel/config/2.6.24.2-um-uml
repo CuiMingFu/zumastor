@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.24.2
-# Wed Feb 13 17:36:52 2008
+# Fri Feb 15 10:15:28 2008
 #
 CONFIG_DEFCONFIG_LIST="arch/$ARCH/defconfig"
 CONFIG_GENERIC_HARDIRQS=y
@@ -320,7 +320,7 @@ CONFIG_UML_NET_ETHERTAP=y
 CONFIG_UML_NET_TUNTAP=y
 CONFIG_UML_NET_SLIP=y
 CONFIG_UML_NET_DAEMON=y
-CONFIG_UML_NET_VDE=y
+# CONFIG_UML_NET_VDE is not set
 CONFIG_UML_NET_MCAST=y
 # CONFIG_UML_NET_PCAP is not set
 CONFIG_UML_NET_SLIRP=y
