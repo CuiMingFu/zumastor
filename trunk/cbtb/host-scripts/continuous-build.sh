@@ -80,6 +80,10 @@ then
     fi
     popd
   done
+  if [ `svn diff -r$oldrevision KernelVersion | wc -c` -ne 0 ]
+  then
+    nobuild=
+  fi
 fi
 
 
