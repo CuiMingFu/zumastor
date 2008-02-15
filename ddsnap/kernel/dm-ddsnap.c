@@ -6,6 +6,7 @@
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/syscalls.h> // recvmsg
+#include <linux/compat.h> // recvmsg
 #include <linux/socket.h>
 #include <linux/un.h>
 #include <net/sock.h>
@@ -121,9 +122,10 @@ static inline int writepipe(struct file *file, void *buffer, unsigned int count)
  * and breaking out the part that actually does the work, to be a usable
  * internal interface.  Put it on the list of things to do.
  */
-static int recv_fd(int sock, char *bogus, unsigned *len)
+static int recv_fd(struct file *file, char *bogus, unsigned *len)
 {
 	char payload[CMSG_SPACE(sizeof(int))];
+	struct socket *sock = file->private_data;
 	struct msghdr msg = {
 		.msg_control = payload,
 		.msg_controllen = sizeof(payload),
@@ -135,11 +137,15 @@ static int recv_fd(int sock, char *bogus, unsigned *len)
 	int result;
 
 	set_fs(get_ds());
-	result = sys_recvmsg(sock, &msg, 0);
+	result = sock_recvmsg(sock, &msg, *len, 0);
 	set_fs(oldseg);
 
 	if (result <= 0)
 		return result;
+	msg.msg_controllen = (unsigned long)msg.msg_control -
+	                     (unsigned long)payload;
+	msg.msg_control = payload;
+
 	if (!(cmsg = CMSG_FIRSTHDR(&msg)))
 		return -ENODATA;
 	if (cmsg->cmsg_len != CMSG_LEN(sizeof(int)) ||
@@ -1003,24 +1009,16 @@ static int control(struct dm_target *target)
 		case CONNECT_SERVER: {
 			unsigned len = 4;
 			char bogus[len];
-			int sock_fd = get_unused_fd(), fd;
+			int fd;
 
-			if (sock_fd < 0) {
-				warn("Can't get fd, error %i", sock_fd);
-				break;
-			}
-			fd_install(sock_fd, sock);
-			if ((fd = recv_fd(sock_fd, bogus, &len)) < 0) {
+			if ((fd = recv_fd(sock, bogus, &len)) < 0) {
 				warn("recv_fd failed, error %i", fd);
-				put_unused_fd(sock_fd);
 				break;
 			}
 			trace(warn("Received socket %i", fd);)
 			info->sock = fget(fd);
 			/* we have two counts on the file, one from recv_fd and the other from fget */
 			sys_close(fd); /* drop one count here */
-			current->files->fd_array[sock_fd] = NULL; // should we grab file_lock?
-			put_unused_fd(sock_fd);
 			up(&info->server_in_sem);
 			if (outbead(info->sock, IDENTIFY, struct identify, 
 						.id = info->id, .snap = info->snap, 
@@ -1349,27 +1347,39 @@ static void ddsnap_destroy(struct dm_target *target)
  * Woohoo, we are going to instantiate a new cluster snapshot virtual
  * device, what fun.
  */
-static int get_control_socket(char *sockname)
+static int get_control_socket(char *sockname, struct file **control_socket)
 {
-	mm_segment_t oldseg = get_fs();
 	struct sockaddr_un addr = { .sun_family = AF_UNIX };
 	int addr_len = sizeof(addr) - sizeof(addr.sun_path) + strlen(sockname); // !!! check too long
-	int sock = sys_socket(AF_UNIX, SOCK_STREAM, 0), err = 0;
+	struct socket *sock;
+	struct file *file;
+	int err = sock_create(AF_UNIX, SOCK_STREAM, 0, &sock);
 
 	trace(warn("Connect to control socket %s", sockname);)
-	if (sock <= 0)
-		return sock;
+	if (err < 0)
+		return err;
+	err = sock_map_fd(sock);
+	if (err < 0)
+		goto out_release;
+	file = fget(err);
+        sys_close(err);
 	strncpy(addr.sun_path, sockname, sizeof(addr.sun_path));
 	if (sockname[0] == '@')
 		addr.sun_path[0] = 0;
-
-	set_fs(get_ds());
-	while ((err = sys_connect(sock, (struct sockaddr *)&addr, addr_len)) == -ECONNREFUSED)
+	while ((err = sock->ops->connect(sock, (struct sockaddr *)&addr,
+	                                 addr_len, sock->file->f_flags)) ==
+	       -ECONNREFUSED)
 		break;
 //		yield();
-	set_fs(oldseg);
-
-	return err? err: sock;
+	if (err)
+		goto out_put;
+	*control_socket = file;
+	return 0;
+out_put:
+	fput(file);
+out_release:
+	sock_release(sock);
+	return err;
 }
 
 /*
@@ -1438,10 +1448,8 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 		goto eek;
 
 	error = "Can't connect control socket";
-	if ((err = get_control_socket(argv[2])) < 0)
+	if ((err = get_control_socket(argv[2], &info->control_socket)) < 0)
 		goto eek;
-	info->control_socket = fget(err);
-	sys_close(err);
 
 	error = "Can't start daemon";
 	if ((err = kernel_thread((void *)incoming, target, CLONE_FILES)) < 0)
