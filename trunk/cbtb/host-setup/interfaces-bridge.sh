@@ -26,7 +26,7 @@ if egrep "iface +${VIRTBR}" /etc/network/interfaces; then
   echo "Modify by hand if necessary."
   exit 1
 else
-  aptitude install bridge-utils
+  aptitude install -y bridge-utils
   cat >>/etc/network/interfaces <<EOF
 
 auto ${VIRTBR}

@@ -62,4 +62,4 @@ fi
 # Install and configure debootstrap
 ../host-setup/debootstrap.sh
 
-sudo aptitude install libvdeplug2-dev gcc make 
+sudo aptitude install -y libvdeplug2-dev gcc make

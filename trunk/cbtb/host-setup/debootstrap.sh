@@ -16,7 +16,7 @@ then
   if [ -f /etc/debian_version ]
   then
     sudo apt-get update
-    sudo aptitude install debootstrap
+    sudo aptitude install -y debootstrap
   fi
 fi
 
