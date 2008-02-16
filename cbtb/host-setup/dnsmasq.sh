@@ -28,7 +28,7 @@ else
 fi
         
 
-aptitude install dnsmasq
+aptitude install -y dnsmasq
 
 # only divert /etc/dnsmasq.conf once
 if [ ! -f /etc/dnsmasq.conf.distrib ] ; then
