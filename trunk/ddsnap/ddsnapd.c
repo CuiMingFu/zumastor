@@ -4474,7 +4474,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	 * swapped out, so lock everything into RAM.
 	 */
 	if (mlockall(MCL_CURRENT|MCL_FUTURE))
-		error("Unable to lock self into RAM: %s", strerror(errno));
+		warn("Unable to lock self into RAM: %s", strerror(errno));
 
 #ifdef DDSNAP_MEM_MONITOR
 	ddsnap_mem_monitor();
