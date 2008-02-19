@@ -302,7 +302,7 @@ function mount_name {
 
 	[[ -f $mountpoint ]] && read mpoint <$mountpoint
 	if [[ $id != -1 ]]; then
-		ctime=`ddsnap status $server $id | tail -n 1 | cut -b 8-31`
+		ctime=`ddsnap list $server | awk '($2=="'$id'") { print $11,$12,$13,$14 }'`
 		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
 		mpoint=$(snap_path $vol)/$stime
 	fi
