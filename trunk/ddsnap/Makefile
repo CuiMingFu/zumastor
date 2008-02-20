@@ -1,22 +1,19 @@
-ifndef prefix
-prefix=
-endif
-
-ifndef bindir
-bindir=sbin
-endif
-
-ifndef mandir
-mandir=usr/share/man
-endif
+PREFIX ?=
+BINDIR ?=sbin
+MANDIR ?=usr/share/man
 
 kernel=./kernel
-instdir=$(prefix)/$(bindir)
+INSTDIR=$(PREFIX)/$(BINDIR)
+INCLUDES +=-I$(kernel)
+CPPFLAGS +=-D_FILE_OFFSET_BITS=64 -DDSNAP_MEM_MONITOR=30 $(INCLUDES)
+CFLAGS +=-g -Wall -std=gnu99
+
 deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
-ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h
-ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h
+ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
+ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h daemonize.h ddsnap.h
 ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
 ddraid_deps = $(deps) ddraid.h $(kernel)/dm-ddraid.h
+testdir =tests
 
 ddraid_binaries = mkddraid ddraidd ddraid-agent
 ddsnap_binaries = ddsnap
@@ -24,56 +21,11 @@ ddsnap_binaries = ddsnap
 #binaries =  $(ddraid_binaries) $(ddsnap_binaries) devspam
 binaries =  $(ddsnap_binaries) devspam
 
-includes = $(kernel)
-flags = -g -Wall -std=gnu99 -D_FILE_OFFSET_BITS=64
-#flags = -g -Wall -Wno-parentheses -Wbad-function-cast -Wcast-align -Wwrite-strings -Wstrict-prototypes -Wnested-externs -Wredundant-decls -Wendif-labels -Wcast-qual -D_FILE_OFFSET_BITS=64
-
 all: $(binaries) ddsnap.8.gz
 .PHONY: all
 
-xdelta/xdelta3.o:
-	cd xdelta && cc xdelta3.c -c $(flags)
-
-delta.o: delta.c
-	cc delta.c -c $(flags)
-
-ddsnap.agent.o: ddsnap.agent.c $(ddsnap_agent_deps)
-	cc ddsnap.agent.c -I$(includes) -c $(flags)
-
-ddsnapd.o: ddsnapd.c $(ddsnapd_deps)
-	cc ddsnapd.c -I$(includes) -c $(flags)
-
-diskio.o: diskio.c $(deps)
-	cc diskio.c -c $(flags)
-
-buffer.o: buffer.c $(deps)
-	cc buffer.c -c $(flags)
-
-event.o: event.c
-	cc event.c -c $(flags) -I$(includes)
-
-daemonize.o: daemonize.c $(deps)
-	cc daemonize.c -c $(flags)
-
-mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	cc -DCREATE ddraid.c $(flags) -I$(includes) diskio.o buffer.o -o mkddraid
-
-ddraidd: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	cc -DSERVER ddraid.c $(flags) -I$(includes) diskio.o buffer.o -o ddraidd
-
-ddraid-agent: ddraid.agent.c $(ddraid_deps)
-	cc ddraid.agent.c $(flags) -I$(includes) -lpthread -o ddraid-agent -lpopt
-
-ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
-	cc ddsnap.c $(flags) -I$(includes) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
-
-devspam: tests/devspam.c trace.h
-	cd tests && cc devspam.c $(flags) -I$(includes) -o ../devspam
-
-ddsnap.8.gz: ./man/ddsnap.8
-	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
-
 clean:
+	$(MAKE) -C $(testdir) clean
 	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/AUTO.*
 .PHONY: clean
 
@@ -85,6 +37,50 @@ install:
 
 genpatches:
 	./scripts/genallpatches.sh
+
+.PHONY: check-coverage check quickcheck check-leaks
+check-coverage: all
+	$(MAKE) -C $(testdir) check-coverage
+check: all
+	$(MAKE) -C $(testdir) check
+quickcheck: all
+	$(MAKE) -C $(testdir) quickcheck
+check-leaks: all
+	$(MAKE) -C $(testdir) check-leaks
+
+xdelta/xdelta3.o: xdelta/xdelta3.c Makefile xdelta/xdelta3.h xdelta/xdelta3-list.h xdelta/xdelta3-cfgs.h
+
+delta.o: delta.c Makefile delta.h xdelta/xdelta3.h
+
+ddsnap.agent.o: ddsnap.agent.c $(ddsnap_agent_deps)
+
+ddsnapd.o: ddsnapd.c $(ddsnapd_deps)
+
+diskio.o: diskio.c Makefile trace.h diskio.h
+
+buffer.o: buffer.c $(deps)
+
+event.o: event.c $(kernel)/dm-ddsnap.h event.h trace.h Makefile
+
+daemonize.o: daemonize.c $(deps)
+
+mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
+	$(CC) -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
+
+ddraidd: ddraid.c diskio.o buffer.o $(ddraid_deps)
+	$(CC) -DSERVER ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o ddraidd
+
+ddraid-agent: ddraid.agent.c $(ddraid_deps)
+	$(CC) ddraid.agent.c $(CFLAGS) $(CPPFLAGS) -lpthread -o ddraid-agent -lpopt
+
+ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
+	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
+
+devspam: tests/devspam.c trace.h
+	$(CC) $< $(CFLAGS) $(CPPFLAGS) -o $@
+
+ddsnap.8.gz: ./man/ddsnap.8
+	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
 
 build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps) 
 	rm -f $@

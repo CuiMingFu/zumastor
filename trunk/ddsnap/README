@@ -3,6 +3,14 @@ A few main points:
   * The main Makefile has some tests in it, but they are old and crufty. Check
     out the documentation below on how to get things running.
 
+  * New unit tests are being added in to the tests directory. You can
+    invoke them using a variety of make targets:
+
+   	   quickcheck:	   run the unit tests
+	   check:      	   run the unit tests under valgrind (slower)
+	   check-leaks:	   run them undervalgrind with leakcheck (way slower)
+	   check-coverage: run the unit tests and generate a coverage report
+
   * The scripts/ directory offers some helpful tools for using ddsnap.
 
   * Join the zumastor irc channel for support:
