@@ -879,15 +879,15 @@ define)
 	case $2 in
 	volume)
 		declare name="$0 $1 $2"
-		declare args metadev init
+		declare args metadev init zero
 		declare blocksize=4k
 		declare chunksize=16k
 		declare cachesize
 		declare mountpoint snappath
-		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [-h|--help]"
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-z|--zero] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [-h|--help]"
 
 		shift 2
-		args=`getopt -ob:c:m:hik:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
+		args=`getopt -ob:c:m:hizk:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,zero,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
@@ -897,6 +897,7 @@ define)
 				echo "$usage"
 				echo "  -h, --help              show this help"
 				echo "  -i, --initialize        initialize the snapstore (will overwrite data on snapstore)"
+				echo "  -z, --zero              initialize the origin (will overwrite data on origin with zeros!!!)"
 				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
@@ -907,6 +908,7 @@ define)
 				exit;;
 
 			-i|--initialize) init="yes";;
+			-z|--zero) zero="yes";;
 			-m|--metadev) metadev=$2; shift 1;;
 			-b|--blocksize) blocksize=$2; shift 1;;
 			-c|--chunksize) chunksize=$2; shift 1;;
@@ -948,6 +950,7 @@ define)
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $cachesize ]] || echo $cachesize >$path/cachesize
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || { echo "$0: initialize volume '$vol' failed"; exit 1; }
+		[[ -z $zero ]] || dd if=/dev/zero of=$origin bs=1M || { echo "$0: zero volume '$vol' failed"; exit 1; }
 
 		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
