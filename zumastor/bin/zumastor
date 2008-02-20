@@ -896,7 +896,7 @@ define)
 			-h|--help)
 				echo "$usage"
 				echo "  -h, --help              show this help"
-				echo "  -i, --initialize        initialize the volume with zeros (will destroy data)"
+				echo "  -i, --initialize        initialize the snapstore (will overwrite data on snapstore)"
 				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
 				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
 				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
