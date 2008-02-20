@@ -67,7 +67,7 @@ that volume via NFS see the new snapshot contents as expected.
 
 .SH COMMANDS
 .IP \fBdefine\ \fBvolume
-\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-k\fP|\fB--cachesize\fP \fIcachesize\fP] [\fB-o\fP|\fB--mountopts\fP \fImount options\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP] [\fB-s\fP|\fB--snappath\fP \fIsnapshout path\fP]
+\fIvolume snapdev orgdev [\fB-i\fP|\fB--initialize\fP] [\fB-z\fP|\fB--zero\fP] \fP[\fB-m\fP|\fB--metadev\fP \fImetadev\fP] [\fB-b\fP|\fB--blocksize\fP \fIblocksize\fP] [\fB-c\fP|\fB--chunksize\fP \fIchunksize\fP] [\fB-k\fP|\fB--cachesize\fP \fIcachesize\fP] [\fB-o\fP|\fB--mountopts\fP \fImount options\fP] [\fB-p\fP|\fB--mountpoint\fP \fImountpoint\fP] [\fB-s\fP|\fB--snappath\fP \fIsnapshout path\fP]
 \fR
 
 Define a new zumastor volume named \fIvolume\fP based on the underlying volumes \fIorgdev\fP and \fIsnapdev\fP.  If specified, the \fImetadev\fP will be used for snapshot metadata storage (especially useful for NVRAM acceleration). If the \fBinitialize\fP option is used, the snapshot storage will be initialized, overwriting all data on the snapshot device.
