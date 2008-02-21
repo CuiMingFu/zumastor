@@ -121,8 +121,9 @@ then
   exit 6
 else
   echo ok 6 - written file replicated to the second target
+fi
 
-hash=`md5sum /var/run/zumastor/mount/testvol/testfile|cut -f1 -d\ `
+hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 
 rhash=`${SSH} root@${slave1} md5sum /var/run/zumastor/mount/testvol/testfile` || \
   ${SSH} root@${slave1} <<EOF
