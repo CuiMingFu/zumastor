@@ -326,6 +326,62 @@ as described above.
 
 Congratulations, you now have a virtual system with Zumastor installed!
 
+Example: Setting up multiple instances of Zumastor on vmware
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you want to test replication virtually, you'll need to create at 
+least one more virtual machine.   The only trick here is getting
+the network addressing straight.  Here's what to do (assuming you're
+using the gutsy jeos image from the previous example):
+
+1. For each virtual machine, create a new directory (say, vm1, vm2, etc.),
+and unzip ubuntu-7.10-jeos-vmware.7z into each new directory.
+
+2. Set up different uuids and ethernet addresses for each virtual machine
+by editing that machine's copy of gutsy.vmx.
+When creating my 1st, 2nd, 3rd, ... nth etc. virtual machine,
+I like to change the last byte of the uuid and ethernet address to n.
+For instance, when I create my 2nd virtual machine, I change the original
++
+........................................
+ethernet0.address = "00:50:56:3F:12:00"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"
+........................................
++
+to
++
+........................................
+ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+........................................
+
+3. Boot each new virtual machine.  
+Networking won't work yet because the system is only
+set up to use the first ethernet device, and the new ethernet
+address is assigned to the second ethernet device.  Inside the
+new virtual machine, remove
+the old eth0 and rename the new eth1 to eth0 by editing 
++
+........................................
+/etc/udev/rules.d/70-persistent-net.rules 
+........................................
++
+Then restart each new virtual machine's network by running
++
+........................................
+sudo /etc/init.d/udev restart
+........................................
++
+or rebooting it, and verify that networking works.  You'll probably
+want to install an ssh server, too, e.g.
++
+........................................
+sudo apt-get install openssh-server
+........................................
+
+
 Example: installing Zumastor on Ubuntu inside a QEMU virtual machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1. Install qemu on your machine.  (If you're using Ubuntu,
