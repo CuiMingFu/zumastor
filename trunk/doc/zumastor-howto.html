@@ -692,7 +692,67 @@ as described above.
 </li>
 </ol></div>
 <div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
-<h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.5. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
+<h3 id="_example_setting_up_multiple_instances_of_zumastor_on_vmware">8.5. Example: Setting up multiple instances of Zumastor on vmware</h3><div style="clear:left"></div>
+<div class="para"><p>If you want to test replication virtually, you'll need to create at
+least one more virtual machine.   The only trick here is getting
+the network addressing straight.  Here's what to do (assuming you're
+using the gutsy jeos image from the previous example):</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+For each virtual machine, create a new directory (say, vm1, vm2, etc.),
+and unzip ubuntu-7.10-jeos-vmware.7z into each new directory.
+</p>
+</li>
+<li>
+<p>
+Set up different uuids and ethernet addresses for each virtual machine
+by editing that machine's copy of gutsy.vmx.
+When creating my 1st, 2nd, 3rd, &#8230; nth etc. virtual machine,
+I like to change the last byte of the uuid and ethernet address to n.
+For instance, when I create my 2nd virtual machine, I change the original
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:00"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Boot each new virtual machine.
+Networking won't work yet because the system is only
+set up to use the first ethernet device, and the new ethernet
+address is assigned to the second ethernet device.  Inside the
+new virtual machine, remove
+the old eth0 and rename the new eth1 to eth0 by editing
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/etc/udev/rules.d/70-persistent-net.rules</tt></pre>
+</div></div>
+<div class="para"><p>Then restart each new virtual machine's network by running</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo /etc/init.d/udev restart</tt></pre>
+</div></div>
+<div class="para"><p>or rebooting it, and verify that networking works.  You'll probably
+want to install an ssh server, too, e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo apt-get install openssh-server</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.6. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -720,7 +780,7 @@ Create an empty file to become the image's block device using either dd or qemu-
 <li>
 <p>
 Start qemu, booting from CD the first time to install a base system:
-<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -sda zqemu.raw -boot d</tt>
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot d</tt>
 </p>
 </li>
 <li>
@@ -734,7 +794,7 @@ Create any user you wish and remember the password.
 <p>
 Boot again off the newly install disk image, this time with userspace
 networking enabled:
-<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -sda zqemu.raw -boot c -net user -net nic</tt>
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot c -net user -net nic</tt>
 </p>
 </li>
 <li>
@@ -750,7 +810,7 @@ Boot the virtual machine again.
 </li>
 </ol></div>
 <div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
-<h3 id="_debian_ubuntu_packages_from_source">8.6. Debian/Ubuntu packages from source</h3><div style="clear:left"></div>
+<h3 id="_debian_ubuntu_packages_from_source">8.7. Debian/Ubuntu packages from source</h3><div style="clear:left"></div>
 <div class="para"><p>Most people won't need to do this, but just in case, here's how to build
 our .deb packages.  Zumastor is currently built as three packages:
 a patched kernel package, a ddsnap (snapshot device userspace) package,
@@ -786,7 +846,7 @@ There is distribution-like config in the repository in
 If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP</tt>.</p></div>
 <div class="para"><p>(Note: see also the debian build files pgquiles has written; see
 "Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles" above.)</p></div>
-<h3 id="_gentoo">8.7. Gentoo</h3><div style="clear:left"></div>
+<h3 id="_gentoo">8.8. Gentoo</h3><div style="clear:left"></div>
 <div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
 Zumastor using Gentoo's Portage package system. To use the overlay in
 an automated fashion you'll want to make sure you have the Gentoo
@@ -833,7 +893,7 @@ Snapshot target".</p></div>
 <div class="para"><p>The Zumastor project also recommends a few options be enabled to
 assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
 CONFIG_DEBUG_INFO.</p></div>
-<h4 id="_example_installing_zumastor_on_gentoo_inside_a_vmware_player">8.7.1. Example: installing Zumastor on Gentoo inside a VMWare player</h4>
+<h4 id="_example_installing_zumastor_on_gentoo_inside_a_vmware_player">8.8.1. Example: installing Zumastor on Gentoo inside a VMWare player</h4>
 <div class="para"><p>We have a prebuilt Gentoo vmware image at
 <a href="http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z">http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z</a>.  You'll
 need to unpack that image with 7zip (believe it or not, compressing
@@ -863,7 +923,7 @@ physical volume and volume group:</p></div>
 # lvcreate --size 1500MB -n test sysvg</tt></pre>
 </div></div>
 <div class="para"><p>Your Gentoo image is now ready for Zumastor.</p></div>
-<h3 id="_uml">8.8. UML</h3><div style="clear:left"></div>
+<h3 id="_uml">8.9. UML</h3><div style="clear:left"></div>
 <div class="para"><p>UML is potentially the fastest and easiest way to try out Zumastor,
 at least if you're a developer who likes working with the commandline.</p></div>
 <div class="para"><p>There is a simple shell script,
@@ -941,7 +1001,7 @@ the uml instance set up by demo.sh.
 These are handy for poking at things manually.</p></div>
 <div class="para"><p>Note that these tests are not the ones run by our continuous
 build and test system; see below for those.</p></div>
-<h3 id="_cbtb_uml">8.9. CBTB UML</h3><div style="clear:left"></div>
+<h3 id="_cbtb_uml">8.10. CBTB UML</h3><div style="clear:left"></div>
 <div class="para"><p>There is experimental support for using UML on Debian / Ubuntu systems
 to run the same tests that our continuous build and test system runs; see
 <a href="http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README">http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README</a>.
@@ -1706,7 +1766,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-18 17:00:54 PDT
+Last updated 2008-02-21 16:40:17 PDT
 </div>
 </div>
 </body>
