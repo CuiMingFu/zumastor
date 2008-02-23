@@ -747,25 +747,45 @@ uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
 Boot each new virtual machine.
 Networking won't work yet because the system is only
 set up to use the first ethernet device, and the new ethernet
-address is assigned to the second ethernet device.  Inside the
-new virtual machine, remove
-the old eth0 and rename the new eth1 to eth0 by editing
+address is assigned to the second ethernet device.
+Inside the new virtual machine, fix the ethernet
+address of eth0 and remove any extra ethernet devices by editing
+`/etc/udev/rules.d/70-persistent-net.rules'.
+Then restart each new virtual machine's network by running
 </p>
-<div class="literalblock">
-<div class="content">
-<pre><tt>/etc/udev/rules.d/70-persistent-net.rules</tt></pre>
-</div></div>
-<div class="para"><p>Then restart each new virtual machine's network by running</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>sudo /etc/init.d/udev restart</tt></pre>
 </div></div>
-<div class="para"><p>or rebooting it, and verify that networking works.  You'll probably
-want to install an ssh server, too, e.g.</p></div>
+<div class="para"><p>or rebooting it, and verify that networking works.</p></div>
+</li>
+<li>
+<p>
+Configure the hostname to be <em>vm1</em>, <em>vm2</em>, etc. by editing <tt>/etc/hostname</tt>.
+</p>
+</li>
+<li>
+<p>
+Edit /etc/hosts to use the real hostname rather than <em>ubuntu</em>,
+and add a line for the virtual machine's IP address, with its real hostname.
+Also do this on the other virtual machine so they all know each others' hostname
+and IP address.
+</p>
+</li>
+<li>
+<p>
+Install an ssh server, e.g.
+</p>
 <div class="literalblock">
 <div class="content">
 <pre><tt>sudo apt-get install openssh-server</tt></pre>
 </div></div>
+</li>
+<li>
+<p>
+Set up ssh authorization as described in the section
+"Try Remote Replication" below.
+</p>
 </li>
 </ol></div>
 <h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.6. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
@@ -1276,7 +1296,7 @@ Run it, then use df to see how many snapshots are around afterwards:</p></div>
 <div class="para"><p>You should see 24 snapshots (the limit set when we did the <tt>zumastor define master</tt>)
 plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
 it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
-<h3 id="_remote_replication_2">10.9. Remote Replication</h3><div style="clear:left"></div>
+<h3 id="_try_remote_replication">10.9. Try Remote Replication</h3><div style="clear:left"></div>
 <div class="para"><p>In this section, we will be working with two machines, <em>original</em>
 (the main machine) and <em>replica</em> (where data is replicated to).</p></div>
 <div class="para"><p>Please note in Zumastor 0.6 replication will fail if you are using Bash 3.2.x. This was fixed in <a href="http://code.google.com/p/zumastor/source/diff?old=1320&amp;r=1337&amp;format=unidiff&amp;path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor">svn revision 1337</a>.</p></div>
@@ -1782,7 +1802,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-22 18:06:40 PDT
+Last updated 2008-02-22 21:46:03 PDT
 </div>
 </div>
 </body>
