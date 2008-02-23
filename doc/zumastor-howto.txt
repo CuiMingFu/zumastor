@@ -370,30 +370,37 @@ ethernet0.address = "00:50:56:3F:12:02"
 uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
 uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
 ........................................
-
++
 3. Boot each new virtual machine.  
 Networking won't work yet because the system is only
 set up to use the first ethernet device, and the new ethernet
-address is assigned to the second ethernet device.  Inside the
-new virtual machine, remove
-the old eth0 and rename the new eth1 to eth0 by editing 
-+
-........................................
-/etc/udev/rules.d/70-persistent-net.rules 
-........................................
-+
+address is assigned to the second ethernet device.  
+Inside the new virtual machine, fix the ethernet
+address of eth0 and remove any extra ethernet devices by editing 
+`/etc/udev/rules.d/70-persistent-net.rules'.
 Then restart each new virtual machine's network by running
 +
 ........................................
 sudo /etc/init.d/udev restart
 ........................................
 +
-or rebooting it, and verify that networking works.  You'll probably
-want to install an ssh server, too, e.g.
+or rebooting it, and verify that networking works.  
++
+4. Configure the hostname to be 'vm1', 'vm2', etc. by editing +/etc/hostname+.
++
+5. Edit /etc/hosts to use the real hostname rather than 'ubuntu', 
+and add a line for the virtual machine's IP address, with its real hostname.
+Also do this on the other virtual machine so they all know each others' hostname
+and IP address.
++
+6. Install an ssh server, e.g.
 +
 ........................................
 sudo apt-get install openssh-server
 ........................................
++
+7. Set up ssh authorization as described in the section 
+"Try Remote Replication" below.
 
 
 Example: installing Zumastor on Ubuntu inside a QEMU virtual machine
@@ -914,8 +921,8 @@ You should see 24 snapshots (the limit set when we did the +zumastor define mast
 plus the origin volume.  Each time you run +zumastor snapshot ...+
 it creates a new snapshot, and deletes any that are 'too old'.
 
-Remote Replication
-~~~~~~~~~~~~~~~~~~
+Try Remote Replication
+~~~~~~~~~~~~~~~~~~~~~~
 
 In this section, we will be working with two machines, 'original'
 (the main machine) and 'replica' (where data is replicated to).
