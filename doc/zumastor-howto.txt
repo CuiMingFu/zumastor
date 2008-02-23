@@ -926,8 +926,24 @@ Try Remote Replication
 
 In this section, we will be working with two machines, 'original'
 (the main machine) and 'replica' (where data is replicated to).
+You should have set up a volume 'zumatest' on the 'original' machine
+already, per the previous examples.
 
-Please note in Zumastor 0.6 replication will fail if you are using Bash 3.2.x. This was fixed in http://code.google.com/p/zumastor/source/diff?old=1320&r=1337&format=unidiff&path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor[svn revision 1337].
+Note: in Zumastor 0.6, replication will fail if you are using Bash 3.2.x. This was fixed in http://code.google.com/p/zumastor/source/diff?old=1320&r=1337&format=unidiff&path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor[svn revision 1337].
+
+Note: zumastor requires you to refer to each machine 
+by the string returned by `uname -n`.  You can't use numerical
+IP addresses!  This is http://code.google.com/p/zumastor/issues/detail?id=54[bug 54].
+
+For example, if in DNS your machines are original.example.com and
+replica.example.com but `uname -n` returns only `original` and `replica`,
+you must tell Zumastor the hosts are 'original' and 'replica', not the
+FQDNs of the machines. 
+
+If your organization uses the .local
+TLD, you might run into some issues with mDNS. See
+http://avahi.org/wiki/AvahiAndUnicastDotLocal[Avahi and Unicast Domains .local] 
+for more information.
 
 Enable root login
 ^^^^^^^^^^^^^^^^^
@@ -956,7 +972,8 @@ fail because by default preserves your environment (including your home
 directory). Either use 'su' (if you have already set a password for root)
 or 'sudo -s -H'.
 
-On each machine, run ssh-keygen as root and create phraseless keys:
+On each machine, run ssh-keygen as root and hit enter to all three
+questions, creating phraseless keys:
 
  root@original:~# ssh-keygen
  Generating public/private rsa key pair.
@@ -981,34 +998,33 @@ On each machine, run ssh-keygen as root and create phraseless keys:
  The key fingerprint is:
  4a:fe:e7:39:ec:eb:ab:39:e8:b3:29:09:b7:77:02:02 root@replica
 
-Copy the .ssh/id_dsa.pub file from each account to .ssh/authorized_keys
-on the other. This authorizes root on each machine to connect without
-a password to the other. More restricted access may be used in actual
-deployment:
+Append root's .ssh/id_rsa.pub file from each machine to .ssh/authorized_keys
+on the other.  This authorizes root on each machine to connect without
+a password to the other. For instance:
 
- root@original:~# cat ~/.ssh/id_dsa | ssh root@replica "cat - >> /root/.ssh/authorized_keys"
- root@replica:~# cat ~/.ssh/id_dsa | ssh root@original "cat - >> /root/.ssh/authorized_keys"
+ root@original:~# cat /root/.ssh/id_rsa.pub | ssh root@replica "cat >> /root/.ssh/authorized_keys"
+ root@replica:~# cat /root/.ssh/id_rsa.pub | ssh root@original "cat >> /root/.ssh/authorized_keys"
+
+Using ssh to do this copy also happens to put each machine in the other's 
+/root/.ssh/known_hosts file.  This is important for later; without it, replication will fail.
+
+Finally, verify that root can ssh from replica to original, and vice versa,
+without any prompting.
+
+(Bidirectional root trust between machines is scary, isn't it?  As mentioned above,
+http://code.google.com/p/zumastor/issues/detail?id=40[we'll get rid of this eventually]).
 
 Define target on master
 ^^^^^^^^^^^^^^^^^^^^^^^
 
+Tell 'original' to replicate to port 11235 on 'replica' every minute:
+
  root@original:~# zumastor define target zumatest replica.example.com:11235 -p 60
 
-This tells 'original' to replicate to port 11235 on 'replica' every minute.
-If the period is omitted, automatic replication will not occur,
-though you can still trigger replication manually with +zumastor snapshot+.
+(If the period is omitted, automatic replication will not occur,
+though you can still trigger replication manually with +zumastor snapshot+.)
 
-Please note http://code.google.com/p/zumastor/issues/detail?id=54[Bug 54 in our issue tracker], describes some limitations on how to specify the names of the source and target machines. We expect to relax these limitations in a future release but for now you must know:
-- Numerical IP addresses will not work,
-- The machine name must be specified as the value returned by `uname -n`,
-- FQDNs will only work if `uname -n` returns the FQDN
-
-For example, if in DNS your machines are original.example.com and replica.example.com but `uname -n` returns only `original` and `replica`, you must tell Zumastor the hosts are 'original' and 'replica', not the FQDNs of the machines. If this is your case, make sure `ping original` and `ping replica` resolve correctly, and 'ssh root@original' and 'ssh root@replica' log without any interaction from the user.
-
-Please note if your organization uses the .local
-TLD, you might run into some issues with mDNS. See
-http://avahi.org/wiki/AvahiAndUnicastDotLocal[Avahi and Unicast Domains .local] 
-for more information.
+Now make sure the new relationship is reflected in `zumastor status`:
 
  root@original:~# zumastor status --usage 
  ...
