@@ -686,6 +686,22 @@ e.g. "notroot", "notpass" if you're using Dan Kegel's image).
 </li>
 <li>
 <p>
+Verify that you can ping the outside world.  If you can't, you may
+need to make minor adjustments to the gutsy.vmx file's networking.
+On one system, I had to change the line
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.connectionType = "nat"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.connectionType = "bridged"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
 Inside vmware, download and install dmsetup and the Zumastor packages
 as described above.
 </p>
@@ -1766,7 +1782,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-21 16:40:17 PDT
+Last updated 2008-02-22 18:06:40 PDT
 </div>
 </div>
 </body>

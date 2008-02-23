@@ -321,7 +321,21 @@ Inside vmware, log in to the virtual ubuntu box
 (using the username and password from the site where you downloaded the image,
 e.g. "notroot", "notpass" if you're using Dan Kegel's image).
 
-4. Inside vmware, download and install dmsetup and the Zumastor packages
+4. Verify that you can ping the outside world.  If you can't, you may 
+need to make minor adjustments to the gutsy.vmx file's networking.
+On one system, I had to change the line
++
+................................
+ethernet0.connectionType = "nat"
+................................
++
+to
++
+................................
+ethernet0.connectionType = "bridged"
+................................
+
+5. Inside vmware, download and install dmsetup and the Zumastor packages
 as described above.
 
 Congratulations, you now have a virtual system with Zumastor installed!
