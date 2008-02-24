@@ -1298,9 +1298,7 @@ plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
 it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <h3 id="_try_remote_replication">10.9. Try Remote Replication</h3><div style="clear:left"></div>
 <div class="para"><p>In this section, we will be working with two machines, <em>original</em>
-(the main machine) and <em>replica</em> (where data is replicated to).
-You should have set up a volume <em>zumatest</em> on the <em>original</em> machine
-already, per the previous examples.</p></div>
+(the main machine) and <em>replica</em> (where data is replicated to).</p></div>
 <div class="para"><p>Note: in Zumastor 0.6, replication will fail if you are using Bash 3.2.x. This was fixed in <a href="http://code.google.com/p/zumastor/source/diff?old=1320&amp;r=1337&amp;format=unidiff&amp;path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor">svn revision 1337</a>.</p></div>
 <div class="para"><p>Note: zumastor requires you to refer to each machine
 by the string returned by <tt>uname -n</tt>.  You can't use numerical
@@ -1376,14 +1374,50 @@ root@replica:~# cat /root/.ssh/id_rsa.pub | ssh root@original "cat &gt;&gt; /roo
 without any prompting.</p></div>
 <div class="para"><p>(Bidirectional root trust between machines is scary, isn't it?  As mentioned above,
 <a href="http://code.google.com/p/zumastor/issues/detail?id=40">we'll get rid of this eventually</a>).</p></div>
-<h4 id="_define_target_on_master">10.9.3. Define target on master</h4>
-<div class="para"><p>Tell <em>original</em> to replicate to port 11235 on <em>replica</em> every minute:</p></div>
+<h4 id="_create_volume_on_master">10.9.3. Create volume on master</h4>
+<div class="para"><p>This example uses volume <em>zumatest</em> just like the previous examples,
+with one minor difference: to make the first replication efficient,
+one should zero the partition before creating the filesystem.
+You can do this with /bin/dd; zumastor 0.7 also has a handy &#8212;zero option that does this.
+(Yes, this can be slow on a large volume, but it can save
+time when you don't have an infinitely fast network.)</p></div>
+<div class="para"><p>When following this example on vmware, you probably want to use
+small volumes, e.g. 500M rather than 5G, unless you have lots of time to kill.</p></div>
+<div class="para"><p>For instance:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>root@original:~# zumastor define target zumatest replica.example.com:11235 -p 60</tt></pre>
+<pre><tt># pvcreate /dev/sda3
+# vgcreate sysvg /dev/sda3
+# lvcreate --name test --size 5G sysvg
+# lvcreate --name test_snap --size 4G sysvg
+# dd if=/dev/zero of=/dev/sysvg/test bs=1024k count=5120
+# mkfs.ext3 /dev/sysvg/test
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize</tt></pre>
 </div></div>
-<div class="para"><p>(If the period is omitted, automatic replication will not occur,
-though you can still trigger replication manually with <tt>zumastor snapshot</tt>.)</p></div>
+<h4 id="_define_target_on_master">10.9.4. Define target on master</h4>
+<div class="para"><p>Tell <em>original</em> to be ready to replicate to port 11235 on <em>replica</em>:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor define target zumatest replica.example.com:11235</tt></pre>
+</div></div>
+<div class="para"><p>Replications have to be triggered somehow.  There are three ways to do this:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+automatically, with a &#8212;period NUMSECONDS option on `zumastor define target' on <em>original</em>
+</p>
+</li>
+<li>
+<p>
+automatically, with a &#8212;period NUMSECONDS option on `zumastor define source' on <em>replica</em>
+</p>
+</li>
+<li>
+<p>
+manually, with `zumastor replicate'
+</p>
+</li>
+</ol></div>
 <div class="para"><p>Now make sure the new relationship is reflected in <tt>zumastor status</tt>:</p></div>
 <div class="literalblock">
 <div class="content">
@@ -1396,52 +1430,28 @@ though you can still trigger replication manually with <tt>zumastor snapshot</tt
         `-- trigger|
 ...</tt></pre>
 </div></div>
-<h4 id="_define_volume_and_configure_source_on_target">10.9.4. Define volume and configure source on target</h4>
+<h4 id="_create_volume_on_target">10.9.5. Create volume on target</h4>
+<div class="para"><p>Zumastor doesn't create volumes for you, so you have to do it.
+The volumes should be exactly the same size on the target as on the master.
+e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># pvcreate /dev/sda3
+# vgcreate sysvg /dev/sda3
+# lvcreate --name test --size 5G sysvg
+# lvcreate --name test_snap --size 4G sysvg</tt></pre>
+</div></div>
+<h4 id="_define_volume_and_configure_source_on_target">10.9.6. Define volume and configure source on target</h4>
 <div class="literalblock">
 <div class="content">
 <pre><tt>root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
 root@replica:~#  zumastor define source zumatest original.example.com --period 600</tt></pre>
 </div></div>
 <div class="para"><p>Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.</p></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>root@replica:~# zumastor status --usage
-VOLUME zumatest:
-Data chunk size: 16384
-Used data: 0
-Free data: 0
-Metadata chunk size: 16384
-Used metadata: 56
-Free metadata: 2621384
-Origin size: 21474836480
-Write density: 0
-Creation time: Wed May 16 10:28:27 2007
-  Snap            Creation time   Chunks Unshared   Shared
-totals                                 0        0        0
-Status: running
-Configuration:
-/var/lib/zumastor/volumes/zumatest
-|-- device/
-|   |-- origin -&gt; /dev/sysvg/test
-|   `-- snapstore -&gt; /dev/sysvg/test_snap
-|-- source/
-|   |-- hostname
-|   `-- period
-`-- targets/</tt></pre>
-</div></div>
-<div class="literalblock">
-<div class="content">
-<pre><tt>RUN STATUS:
-/var/run/zumastor
-|-- agents/
-|   `-- zumatest
-|-- cron/
-|-- mount/
-|-- running
-`-- servers/
-    `-- zumatest</tt></pre>
-</div></div>
-<h4 id="_start_replication">10.9.5. Start replication</h4>
+<div class="para"><p>Running <tt>zumastor status &#8212;usage</tt> on the target should show a hostname and period entry
+under source for volume zumatest.</p></div>
+<h4 id="_start_replication">10.9.7. Start replication</h4>
+<div class="para"><p>This is important; without it, no automatic replication happens:</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>root@replica:~# zumastor start source zumatest</tt></pre>
@@ -1451,9 +1461,13 @@ Configuration:
 <div class="content">
 <pre><tt>root@original:~# zumastor replicate zumatest replica.example.com</tt></pre>
 </div></div>
-<div class="para"><p>Once initial replication is started, ddsnap processes should begin consuming CPU cycles and moving tens of megabits per second between the nodes. Initially, the entire origin device will need to be moved, so wait 15 minutes before looking on the target for snapshots.</p></div>
+<div class="para"><p>Once initial replication is started, ddsnap processes should begin
+consuming CPU cycles and moving tens of megabits per second between
+the nodes. Initially, the entire origin device will need to be moved,
+which can take several minutes.  (5 minutes for a 500MB volume on vmware,
+less on real hardware.)</p></div>
 <div class="para"><p>When replication is complete, df on the slave should show the same /var/run/zumastor/mount/zumatest volume locally mounted.</p></div>
-<h4 id="_verify_replication">10.9.6. Verify replication</h4>
+<h4 id="_verify_replication">10.9.8. Verify replication</h4>
 <div class="literalblock">
 <div class="content">
 <pre><tt>root@original:~#  date &gt;&gt; /var/run/zumastor/mount/zumatest/testfile</tt></pre>
@@ -1463,7 +1477,53 @@ Configuration:
 <div class="content">
 <pre><tt>root@replica:~#  cat /var/run/zumastor/mount/zumatest/testfile</tt></pre>
 </div></div>
-<div class="para"><p>You may need to leave the current directory to see incoming changes. If the same file is there on the target (replica), replication is working.</p></div>
+<div class="para"><p>If your current directory is inside the volume in question,
+you won't see any new snapshots; you should watch from outside
+the volume if you want to see incoming snapshots.</p></div>
+<div class="para"><p>If the same file is there on the target (replica), replication is working.</p></div>
+<h4 id="_automated_demo_script">10.9.9. Automated demo script</h4>
+<div class="para"><p>Here's a handy script that illustrates all the commands needed to set up
+small test volumes and kick off rapid replication between two machines
+named vm1 and vm2.
+(It also rather rudely resets zumastor and clears its logs,
+but that's handy when you're trying to learn how things work.)
+It assumes you've already set up a volume group named sysvg.
+On my 1GHz system, it takes about five minutes to do the initial
+replication, but seems to replicate quickly after that.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>#!/bin/sh
+cat &gt; restart-test.sh &lt;&lt;_EOF_
+set -x
+# Clean up after last run, if any.
+zumastor forget volume zumatest &gt; /dev/null 2&gt;&amp;1
+lvremove -f sysvg/test &gt; /dev/null 2&gt;&amp;1
+lvremove -f sysvg/test_snap &gt; /dev/null 2&gt;&amp;1
+# Clear logs.  Wouldn't do this in production!  Just for testing.
+/etc/init.d/zumastor stop
+rm -rf /var/log/zumastor /var/run/zumastor
+/etc/init.d/zumastor start
+lvcreate --name test --size 500M sysvg
+lvcreate --name test_snap --size 400M sysvg
+dd if=/dev/zero of=/dev/sysvg/test bs=500k count=1024
+_EOF_
+set -x
+for host in vm1 vm2
+do
+    scp restart-test.sh root@${host}:
+    ssh root@${host} sh restart-test.sh
+done
+ssh root@vm1 "mkfs.ext3 /dev/sysvg/test ;
+ zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
+ zumastor define master zumatest ;
+ zumastor define target zumatest vm2:11235"
+ssh root@vm2 "
+zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
+zumastor define source zumatest vm1 --period 5;
+zumastor start source zumatest"</tt></pre>
+</div></div>
+<div class="para"><p>Release 0.6 doesn't support saving old snapshots downstream;
+this is <a href="http://code.google.com/p/zumastor/issues/detail?id=26">bug 26</a>.</p></div>
 <h3 id="_export_a_zumastor_volume_via_nfs">10.10. Export a Zumastor volume via NFS</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
@@ -1813,7 +1873,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-23 06:49:17 PDT
+Last updated 2008-02-23 17:21:48 PDT
 </div>
 </div>
 </body>
