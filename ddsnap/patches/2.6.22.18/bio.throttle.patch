@@ -1,6 +1,7 @@
---- 2.6.22.10.clean/block/ll_rw_blk.c	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/block/ll_rw_blk.c	2007-11-19 10:18:26.000000000 -0800
-@@ -3128,12 +3128,19 @@ static inline int should_fail_request(st
+diff -ur linux-2.6.22.18.clean/block/ll_rw_blk.c linux-2.6.22.18/block/ll_rw_blk.c
+--- linux-2.6.22.18.clean/block/ll_rw_blk.c	2008-02-25 13:30:56.000000000 -0800
++++ linux-2.6.22.18/block/ll_rw_blk.c	2008-02-25 13:37:57.000000000 -0800
+@@ -3128,12 +3128,19 @@
   */
  static inline void __generic_make_request(struct bio *bio)
  {
@@ -8,7 +9,8 @@
 +	request_queue_t *q = bdev_get_queue(bio->bi_bdev);
  	sector_t maxsector;
  	sector_t old_sector;
- 	int ret, nr_sectors = bio_sectors(bio);
+-	int ret, nr_sectors = bio_sectors(bio);
++	int nr_sectors = bio_sectors(bio);
  	dev_t old_dev;
  
 +	if (q && q->metric && !bio->bi_queue) {
@@ -21,17 +23,35 @@
  	might_sleep();
  	/* Test device or partition size, when known. */
  	maxsector = bio->bi_bdev->bd_inode->i_size >> 9;
-@@ -3164,7 +3171,6 @@ static inline void __generic_make_reques
- 	do {
+@@ -3161,10 +3168,9 @@
+ 	 */
+ 	old_sector = -1;
+ 	old_dev = 0;
+-	do {
++	while (1) {
  		char b[BDEVNAME_SIZE];
  
 -		q = bdev_get_queue(bio->bi_bdev);
  		if (!q) {
  			printk(KERN_ERR
  			       "generic_make_request: Trying to access "
---- 2.6.22.10.clean/drivers/md/dm.c	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/drivers/md/dm.c	2007-11-19 10:25:51.000000000 -0800
-@@ -889,6 +889,22 @@ static int dm_any_congested(void *conges
+@@ -3221,8 +3227,10 @@
+ 			}
+ 		}
+ 
+-		ret = q->make_request_fn(q, bio);
+-	} while (ret);
++		if (!q->make_request_fn(q, bio))
++			return;
++		q = bdev_get_queue(bio->bi_bdev);
++	}
+ }
+ 
+ /*
+diff -ur linux-2.6.22.18.clean/drivers/md/dm.c linux-2.6.22.18/drivers/md/dm.c
+--- linux-2.6.22.18.clean/drivers/md/dm.c	2008-02-25 13:33:50.000000000 -0800
++++ linux-2.6.22.18/drivers/md/dm.c	2008-02-25 13:34:18.000000000 -0800
+@@ -889,6 +889,22 @@
  	return r;
  }
  
@@ -54,7 +74,7 @@
  /*-----------------------------------------------------------------
   * An IDR is used to keep track of allocated minor numbers.
   *---------------------------------------------------------------*/
-@@ -967,6 +983,7 @@ out:
+@@ -967,6 +983,7 @@
  
  static struct block_device_operations dm_blk_dops;
  
@@ -62,7 +82,7 @@
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -1006,6 +1023,11 @@ static struct mapped_device *alloc_dev(i
+@@ -1006,6 +1023,11 @@
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
@@ -74,7 +94,7 @@
  	md->queue->backing_dev_info.congested_fn = dm_any_congested;
  	md->queue->backing_dev_info.congested_data = md;
  	blk_queue_make_request(md->queue, dm_request);
-@@ -1539,6 +1561,7 @@ int dm_suspended(struct mapped_device *m
+@@ -1539,6 +1561,7 @@
  {
  	return test_bit(DMF_SUSPENDED, &md->flags);
  }
@@ -82,9 +102,10 @@
  
  int dm_noflush_suspending(struct dm_target *ti)
  {
---- 2.6.22.10.clean/fs/bio.c	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/fs/bio.c	2007-11-19 10:18:26.000000000 -0800
-@@ -142,6 +142,8 @@ void bio_init(struct bio *bio)
+diff -ur linux-2.6.22.18.clean/fs/bio.c linux-2.6.22.18/fs/bio.c
+--- linux-2.6.22.18.clean/fs/bio.c	2008-02-25 13:53:46.000000000 -0800
++++ linux-2.6.22.18/fs/bio.c	2008-02-25 13:34:18.000000000 -0800
+@@ -142,6 +142,8 @@
  	bio->bi_end_io = NULL;
  	atomic_set(&bio->bi_cnt, 1);
  	bio->bi_private = NULL;
@@ -93,7 +114,7 @@
  }
  
  /**
-@@ -1025,7 +1027,12 @@ void bio_endio(struct bio *bio, unsigned
+@@ -1025,7 +1027,12 @@
  		bytes_done = bio->bi_size;
  	}
  
@@ -107,9 +128,10 @@
  	bio->bi_sector += (bytes_done >> 9);
  
  	if (bio->bi_end_io)
---- 2.6.22.10.clean/include/linux/bio.h	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/include/linux/bio.h	2007-11-19 10:18:26.000000000 -0800
-@@ -109,6 +109,9 @@ struct bio {
+diff -ur linux-2.6.22.18.clean/include/linux/bio.h linux-2.6.22.18/include/linux/bio.h
+--- linux-2.6.22.18.clean/include/linux/bio.h	2008-02-25 13:33:05.000000000 -0800
++++ linux-2.6.22.18/include/linux/bio.h	2008-02-25 13:34:18.000000000 -0800
+@@ -109,6 +109,9 @@
  	bio_end_io_t		*bi_end_io;
  	atomic_t		bi_cnt;		/* pin count */
  
@@ -119,9 +141,10 @@
  	void			*bi_private;
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
---- 2.6.22.10.clean/include/linux/blkdev.h	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/include/linux/blkdev.h	2007-11-19 10:18:26.000000000 -0800
-@@ -395,6 +395,10 @@ struct request_queue
+diff -ur linux-2.6.22.18.clean/include/linux/blkdev.h linux-2.6.22.18/include/linux/blkdev.h
+--- linux-2.6.22.18.clean/include/linux/blkdev.h	2008-02-25 13:33:17.000000000 -0800
++++ linux-2.6.22.18/include/linux/blkdev.h	2008-02-25 13:34:18.000000000 -0800
+@@ -395,6 +395,10 @@
  	struct work_struct	unplug_work;
  
  	struct backing_dev_info	backing_dev_info;
@@ -132,9 +155,10 @@
  
  	/*
  	 * The queue owner gets to use this for whatever they like.
---- 2.6.22.10.clean/include/linux/device-mapper.h	2007-10-10 10:50:35.000000000 -0700
-+++ 2.6.22.10/include/linux/device-mapper.h	2007-11-19 10:18:26.000000000 -0800
-@@ -191,6 +191,7 @@ const char *dm_device_name(struct mapped
+diff -ur linux-2.6.22.18.clean/include/linux/device-mapper.h linux-2.6.22.18/include/linux/device-mapper.h
+--- linux-2.6.22.18.clean/include/linux/device-mapper.h	2008-02-25 13:33:29.000000000 -0800
++++ linux-2.6.22.18/include/linux/device-mapper.h	2008-02-25 13:34:18.000000000 -0800
+@@ -191,6 +191,7 @@
  struct gendisk *dm_disk(struct mapped_device *md);
  int dm_suspended(struct mapped_device *md);
  int dm_noflush_suspending(struct dm_target *ti);
