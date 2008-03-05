@@ -30,9 +30,9 @@ clean:
 .PHONY: clean
 
 install:
-	mkdir -p $(instdir) || true
-	cp $(binaries) $(instdir)
-	gzip -c ./man/ddsnap.8 > $(prefix)/$(mandir)/man8/ddsnap.8.gz
+	mkdir -p $(INSTDIR) || true
+	cp $(binaries) $(INSTDIR)
+	gzip -c ./man/ddsnap.8 > $(PREFIX)/$(MANDIR)/man8/ddsnap.8.gz
 .PHONY: install
 
 genpatches:
