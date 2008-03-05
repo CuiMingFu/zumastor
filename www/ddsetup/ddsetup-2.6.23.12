@@ -1,0 +1,1362 @@
+--- 2.6.23.12.base/block/ll_rw_blk.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/block/ll_rw_blk.c	2008-02-13 02:13:13.000000000 -0800
+@@ -606,7 +606,7 @@ void blk_queue_bounce_limit(struct reque
+ 		dma = 1;
+ 	q->bounce_pfn = bounce_pfn;
+ #endif
+-	if (dma) {
++	if (0 && dma) { // !!! level violation !!! (generic block layer should not know about isa)
+ 		init_emergency_isa_pool();
+ 		q->bounce_gfp = GFP_NOIO | GFP_DMA;
+ 		q->bounce_pfn = bounce_pfn;
+--- 2.6.23.12.base/Documentation/ioctl-number.txt	2007-12-18 13:55:57.000000000 -0800
++++ 2.6.23.12/Documentation/ioctl-number.txt	2008-02-17 00:07:52.000000000 -0800
+@@ -65,6 +65,7 @@ Code	Seq#	Include File		Comments
+ 0x00	00-1F	scsi/scsi_ioctl.h	conflict!
+ 0x00	00-1F	linux/fb.h		conflict!
+ 0x00	00-1F	linux/wavefront.h	conflict!
++0x00	DD-DD   linux/ddlink.h		Device driver link
+ 0x02	all	linux/fd.h
+ 0x03	all	linux/hdreg.h
+ 0x04	D2-DC	linux/umsdos_fs.h	Dead since 2.6.11, but don't reuse these.
+--- 2.6.23.12.base/drivers/md/ddlink.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/ddlink.c	2008-02-17 00:11:48.000000000 -0800
+@@ -0,0 +1,294 @@
++#include <linux/file.h>
++#include <linux/poll.h>
++#include <linux/mount.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/ddlink.h>
++
++/*
++ * ddlink: Device Driver link.  A userspace to kernel device control
++ * interface useful for virtual block devices and other fancy things.
++ * (c) 2007 Daniel Phillips <daniel@phlyps.net>
++ */
++
++// To do:
++//  * need spinlocks on push, pop, queue, ready and ???
++
++int ddlink_ready(struct ddinode *dd)
++{
++	return !list_empty(&dd->list);
++}
++EXPORT_SYMBOL_GPL(ddlink_ready);
++
++struct dditem *ddlink_pop(struct ddinode *dd)
++{
++	struct dditem *item;
++	BUG_ON(!ddlink_ready(dd));
++	item = list_entry(dd->list.next, struct dditem, link);
++	list_del(&item->link);
++	return item;
++}
++EXPORT_SYMBOL_GPL(ddlink_pop);
++
++void ddlink_clear(struct ddinode *dd)
++{
++	while (ddlink_ready(dd))
++		dd->destroy_item(ddlink_pop(dd));
++}
++EXPORT_SYMBOL_GPL(ddlink_clear);
++
++static struct inode *ddlink_alloc_inode(struct super_block *sb)
++{
++	struct ddinode *dd = kmalloc(sizeof(struct ddinode), GFP_KERNEL);
++	if (!dd)
++		return NULL;
++	*dd = (typeof(*dd)){
++		.wait = __WAIT_QUEUE_HEAD_INITIALIZER(dd->wait),
++		.list = LIST_HEAD_INIT(dd->list) };
++	inode_init_once(&dd->inode);
++	return &dd->inode;
++}
++
++static void ddlink_free_inode(struct inode *inode)
++{
++	struct ddinode *dd = ddinode(inode);
++	ddlink_clear(dd);
++	if (ddinfo(inode))
++		dd->destroy_info(ddinfo(inode));
++	kfree(ddinode(inode));
++}
++
++static struct super_operations ddlink_sops = {
++	.alloc_inode = ddlink_alloc_inode,
++	.destroy_inode = ddlink_free_inode
++};
++
++static struct vfsmount *ddlink_mnt;
++
++static int ddlink_get_sb(struct file_system_type *fs_type, int flags, const char *dev_name, void *data, struct vfsmount *mnt)
++{
++	return get_sb_pseudo(fs_type, "ddlink", &ddlink_sops, 0x20070318, mnt);
++}
++
++static struct file_system_type ddlink_type = {
++	.name = "ddlink",
++	.get_sb = ddlink_get_sb,
++	.kill_sb = kill_anon_super };
++
++static int ddlink_delete_dentry(struct dentry *dentry) { return 1; } // vfs bogon
++static struct dentry_operations ddlink_dops = { .d_delete = ddlink_delete_dentry };
++
++int ddlink(struct file_operations *fops, void *(*create)(struct ddinode *dd, void *info), void *info)
++{
++	int err = -ENFILE, fd;
++	struct file *file = get_empty_filp();
++	struct inode *inode;
++	struct dentry *dentry;
++	void *private;
++
++	if (!file)
++		goto no_file;
++	inode = new_inode(ddlink_mnt->mnt_sb);
++	if (!inode)
++		goto no_inode;
++	ddinode(inode)->destroy_info = kfree;
++	ddinode(inode)->create_item = kmalloc;
++	ddinode(inode)->destroy_item = kfree;
++	if (IS_ERR(private = create(ddinode(inode), info))) {
++		err = PTR_ERR(private);
++		goto no_inode;
++	}
++	inode->i_private = private;
++
++	dentry = d_alloc(ddlink_mnt->mnt_sb->s_root, &(struct qstr){ });
++	if (!dentry)
++		goto no_dentry;
++	if ((fd = err = get_unused_fd()) < 0)
++		goto no_fd;
++	/*
++	 * Mark the inode dirty from the very beginning,
++	 * that way it will never be moved to the dirty
++	 * list because "mark_inode_dirty()" will think
++	 * that it already _is_ on the dirty list (gag)
++	 */
++	inode->i_state = I_DIRTY;
++	inode->i_mode = S_IFCHR|S_IRWXUGO;
++	inode->i_uid = current->fsuid;
++	inode->i_gid = current->fsgid;
++	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
++	inode->i_fop = fops;
++	dentry->d_op = &ddlink_dops;
++	d_instantiate(dentry, inode); // d_add?
++
++	file->f_dentry = dentry;
++	file->f_vfsmnt = mntget(ddlink_mnt);
++	file->f_mapping = inode->i_mapping;
++	file->f_mode = FMODE_READ|FMODE_WRITE;
++//	file->f_flags = O_RDWR; // what is this for?
++	file->f_op = inode->i_fop;
++	fd_install(fd, file);
++	return fd;
++no_fd:
++	dput(dentry);
++no_dentry:
++	iput(inode);
++no_inode:
++	put_filp(file);
++no_file:
++	return err;
++}
++EXPORT_SYMBOL_GPL(ddlink);
++
++static int __init ddlink_init(void)
++{
++	struct vfsmount *mnt;
++	register_filesystem(&ddlink_type);
++	mnt = kern_mount(&ddlink_type);
++	if (IS_ERR(mnt))
++		return PTR_ERR(mnt);
++	ddlink_mnt = mnt;
++	return 0;
++}
++
++static void __exit ddlink_exit(void)
++{
++	mntput(ddlink_mnt);
++	unregister_filesystem(&ddlink_type);
++}
++
++module_init(ddlink_init);
++module_exit(ddlink_exit);
++
++/* library methods */
++
++void ddlink_push(struct ddinode *dd, struct dditem *item)
++{
++	list_add(&item->link, &dd->list);
++	wake_up_interruptible(&dd->wait);
++}
++EXPORT_SYMBOL_GPL(ddlink_push);
++
++void ddlink_queue(struct ddinode *dd, struct dditem *item)
++{
++	list_add_tail(&item->link, &dd->list);
++	wake_up_interruptible(&dd->wait);
++}
++EXPORT_SYMBOL_GPL(ddlink_queue);
++
++struct dditem *dditem_new(struct ddinode *dd, size_t size)
++{
++	struct dditem *item;
++	if (!(item = dd->create_item(sizeof(*item) + size, __GFP_NOFAIL))) // NOFAIL??
++		return NULL;
++	*item = (typeof(*item)){ .size = size };
++	return item;
++}
++EXPORT_SYMBOL_GPL(dditem_new);
++
++struct dditem *dditem_in(struct ddinode *dd, const void *buf, size_t len, int z)
++{
++	struct dditem *item = dditem_new(dd, len + z);
++
++	if (!item)
++		return ERR_PTR(-ENOMEM);
++	if (copy_from_user(item->data, buf, len)) {
++		dd->destroy_item(item);
++		return ERR_PTR(-EFAULT);
++	}
++	if (z) {
++		item->size -= z;
++		item->data[len] = 0;
++	}
++	return item;
++}
++EXPORT_SYMBOL_GPL(dditem_in);
++
++int dditem_out(struct ddinode *dd, void *buf, size_t len, struct dditem *item) // !!! not tested
++{
++	if (len < item->size)
++		return -EINVAL;
++	if (copy_to_user(buf, item->data, len = item->size))
++		return -EFAULT;
++	dd->destroy_item(item);
++	return len;
++}
++EXPORT_SYMBOL_GPL(dditem_out);
++
++int ddlink_post(struct ddinode *dd, void *data, unsigned len)
++{
++	struct dditem *item = dditem_new(dd, len);
++	if (!item)
++		return -ENOMEM;
++	memcpy(item->data, data, len);
++	ddlink_push(dd, item);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ddlink_post);
++
++int ddlink_error(struct ddinode *dd, int err, const char *fmt, ...)
++{
++	int size = 200; /* enough for any error? */
++	struct dditem *item, *work;
++	va_list args;
++	if (err >= 0)
++		return err;
++	if (!(work = dditem_new(dd, size)))
++		return -ENOMEM;
++	va_start(args, fmt);
++	size = vsnprintf(work->data, size, fmt, args);
++	va_end(args);
++	if (!(item = dditem_new(dd, size))) {
++		err = -ENOMEM;
++		goto fail;
++	}
++	memcpy(item->data, work->data, size);
++	ddlink_push(dd, item);
++fail:
++	dd->destroy_item(work);
++	return err;
++}
++EXPORT_SYMBOL_GPL(ddlink_error);
++
++unsigned ddlink_poll(struct file *file, poll_table *table)
++{
++	struct ddinode *dd = ddinode(file->f_dentry->d_inode);
++	poll_wait(file, &dd->wait, table);
++	return ddlink_ready(dd) ? POLLIN : 0;
++}
++EXPORT_SYMBOL_GPL(ddlink_poll);
++
++#if 0
++/* ddlink example */
++
++static int ddlink_example_ioctl(struct inode *inode, struct file *file, unsigned cmd, unsigned long ptr)
++{
++	struct ddinode *dd = ddinode(inode);
++	printk(">>> ddlink_ioctl %i (%lx) on %p <<<\n", cmd, ptr, dd);
++	return 0;
++}
++
++static ssize_t ddlink_example_write(struct file *file, const char *buf, size_t len, loff_t *offset)
++{
++	struct ddinode *dd = ddinode(file->f_dentry->d_inode);
++	struct dditem *item;
++
++	if (IS_ERR(item = dditem_in(dd, buf, len, 1)))
++		return PTR_ERR(item);
++	ddlink_queue(dd, item);
++	return len;
++}
++
++static ssize_t ddlink_example_read(struct file *file, char *buf, size_t len, loff_t *offset)
++{
++	struct ddinode *dd = ddinode(file->f_dentry->d_inode);
++	if (!dd->head)
++		return EFAULT;
++	return dditem_out(dd, buf, len, ddlink_pop(dd));
++}
++
++static struct file_operations ddlink_example_fops = {
++	.read = ddlink_example_read,
++	.write = ddlink_example_write,
++	.ioctl = ddlink_example_ioctl,
++	.poll = ddlink_poll };
++#endif
+--- 2.6.23.12.base/drivers/md/dm.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/dm.c	2008-02-13 02:13:13.000000000 -0800
+@@ -70,59 +70,6 @@ union map_info *dm_get_mapinfo(struct bi
+ #define DMF_DELETING 4
+ #define DMF_NOFLUSH_SUSPENDING 5
+ 
+-struct mapped_device {
+-	struct rw_semaphore io_lock;
+-	struct semaphore suspend_lock;
+-	spinlock_t pushback_lock;
+-	rwlock_t map_lock;
+-	atomic_t holders;
+-	atomic_t open_count;
+-
+-	unsigned long flags;
+-
+-	struct request_queue *queue;
+-	struct gendisk *disk;
+-	char name[16];
+-
+-	void *interface_ptr;
+-
+-	/*
+-	 * A list of ios that arrived while we were suspended.
+-	 */
+-	atomic_t pending;
+-	wait_queue_head_t wait;
+-	struct bio_list deferred;
+-	struct bio_list pushback;
+-
+-	/*
+-	 * The current mapping.
+-	 */
+-	struct dm_table *map;
+-
+-	/*
+-	 * io objects are allocated from here.
+-	 */
+-	mempool_t *io_pool;
+-	mempool_t *tio_pool;
+-
+-	struct bio_set *bs;
+-
+-	/*
+-	 * Event handling.
+-	 */
+-	atomic_t event_nr;
+-	wait_queue_head_t eventq;
+-
+-	/*
+-	 * freeze/thaw support require holding onto a super block
+-	 */
+-	struct super_block *frozen_sb;
+-	struct block_device *suspended_bdev;
+-
+-	/* forced geometry settings */
+-	struct hd_geometry geometry;
+-};
+-
+ #define MIN_IOS 256
+ static struct kmem_cache *_io_cache;
+ static struct kmem_cache *_tio_cache;
+--- 2.6.23.12.base/drivers/md/dm.h	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/dm.h	2008-02-13 02:13:13.000000000 -0800
+@@ -95,7 +95,83 @@ struct dm_dev {
+ 	char name[16];
+ };
+ 
+-struct dm_table;
++#include <linux/blkpg.h>
++#include <linux/bio.h>
++#include "dm-bio-list.h"
++#include <linux/buffer_head.h>
++#include <linux/mempool.h>
++#include <linux/slab.h>
++#include <linux/idr.h>
++#include <linux/hdreg.h>
++#include <linux/blktrace_api.h>
++#include <linux/smp_lock.h>
++
++struct mapped_device {
++	struct rw_semaphore io_lock;
++	struct semaphore suspend_lock;
++	spinlock_t pushback_lock;
++	rwlock_t map_lock;
++	atomic_t holders;
++	atomic_t open_count;
++
++	unsigned long flags;
++
++	struct request_queue *queue;
++	struct gendisk *disk;
++	char name[16];
++
++	void *interface_ptr;
++
++	/*
++	 * A list of ios that arrived while we were suspended.
++	 */
++	atomic_t pending;
++	wait_queue_head_t wait;
++	struct bio_list deferred;
++	struct bio_list pushback;
++
++	/*
++	 * The current mapping.
++	 */
++	struct dm_table *map;
++
++	/*
++	 * io objects are allocated from here.
++	 */
++	mempool_t *io_pool;
++	mempool_t *tio_pool;
++
++	struct bio_set *bs;
++
++	/*
++	 * Event handling.
++	 */
++	atomic_t event_nr;
++	wait_queue_head_t eventq;
++
++	/*
++	 * freeze/thaw support require holding onto a super block
++	 */
++	struct super_block *frozen_sb;
++	struct block_device *suspended_bdev;
++
++	/* forced geometry settings */
++	struct hd_geometry geometry;
++};
++
++int adjoin(struct dm_table *table, struct dm_target *ti);
++void combine_restrictions_low(struct io_restrictions *lhs, struct io_restrictions *rhs);
++int alloc_targets(struct dm_table *t, unsigned int num);
++/*
++ * Checks to see if we need to extend highs or targets.
++ */
++static inline int check_space(struct dm_table *t)
++{
++	if (t->num_targets >= t->num_allocated)
++		return alloc_targets(t, t->num_allocated * 2);
++
++	return 0;
++}
+ 
+ /*-----------------------------------------------------------------
+  * Internal table functions.
+--- 2.6.23.12.base/drivers/md/dm-ioctl.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/dm-ioctl.c	2008-02-17 03:05:51.000000000 -0800
+@@ -275,11 +275,25 @@ retry:
+ 	up_write(&_hash_lock);
+ }
+ 
++static int check_name(const char *name)
++{
++	if (strchr(name, '/')) {
++		DMWARN("invalid device name");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int dm_hash_rename(const char *old, const char *new)
+ {
+ 	char *new_name, *old_name;
+-	struct hash_cell *hc;
++	struct hash_cell *hc, *nh;
+ 	struct dm_table *table;
++	int err;
++
++	if ((err = check_name(new)))
++		return err;
+ 
+ 	/*
+ 	 * duplicate new.
+@@ -291,28 +305,28 @@ static int dm_hash_rename(const char *ol
+ 	down_write(&_hash_lock);
+ 
+ 	/*
+-	 * Is new free ?
++	 * Is there such a device as 'old' ?
+ 	 */
+-	hc = __get_name_cell(new);
+-	if (hc) {
+-		DMWARN("asked to rename to an already existing name %s -> %s",
++	hc = __get_name_cell(old);
++	if (!hc) {
++		DMWARN("asked to rename a non existent device %s -> %s",
+ 		       old, new);
+-		dm_put(hc->md);
+ 		up_write(&_hash_lock);
+ 		kfree(new_name);
+-		return -EBUSY;
++		return -ENXIO;
+ 	}
+ 
+ 	/*
+-	 * Is there such a device as 'old' ?
++	 * Is new free ?
+ 	 */
+-	hc = __get_name_cell(old);
+-	if (!hc) {
+-		DMWARN("asked to rename a non existent device %s -> %s",
++	nh = __get_name_cell(new);
++	if (nh) {
++		DMWARN("asked to rename to an already existing name %s -> %s",
+ 		       old, new);
++		dm_put(nh->md);
+ 		up_write(&_hash_lock);
+ 		kfree(new_name);
+-		return -ENXIO;
++		return -EBUSY;
+ 	}
+ 
+ 	/*
+@@ -509,18 +523,6 @@ static int list_versions(struct dm_ioctl
+ 	return 0;
+ }
+ 
+-
+-
+-static int check_name(const char *name)
+-{
+-	if (strchr(name, '/')) {
+-		DMWARN("invalid device name");
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+ /*
+  * Fills in a dm_ioctl structure, ready for sending back to
+  * userland.
+@@ -697,7 +699,6 @@ static int invalid_str(char *str, void *
+ 
+ static int dev_rename(struct dm_ioctl *param, size_t param_size)
+ {
+-	int r;
+ 	char *new_name = (char *) param + param->data_start;
+ 
+ 	if (new_name < (char *) (param + 1) ||
+@@ -706,10 +707,6 @@ static int dev_rename(struct dm_ioctl *p
+ 		return -EINVAL;
+ 	}
+ 
+-	r = check_name(new_name);
+-	if (r)
+-		return r;
+-
+ 	param->data_size = 0;
+ 	return dm_hash_rename(param->name, new_name);
+ }
+@@ -1399,6 +1396,541 @@ static int validate_params(uint cmd, str
+ 	return 0;
+ }
+ 
++static int get_devnums(struct gendisk *disk, unsigned *major, unsigned *minor)
++{
++	struct block_device *bdev;
++	if (!(bdev = bdget_disk(disk, 0)))
++		return -ENXIO;
++	*major = disk->major;
++	*minor = disk->first_minor;
++	bdput(bdev);
++	return 0;
++}
++
++static void destroy_table(struct dm_table *table)
++{
++	struct mapped_device *md = table->md;
++	/* handle dm object count madness */
++	if (atomic_read(&table->holders) != 1)
++		printk("table %p not destroyed!\n", table);
++	dm_table_put(table);
++	if (atomic_read(&md->holders) != 1)
++		printk("md %p not destroyed!\n", md);
++	dm_put(md); /* does dm_table_put on final */
++}
++
++/* alternative devmapper interface using ddlink */
++
++#include <linux/ddlink.h>
++#include <linux/ddsetup.h>
++#include <linux/err.h>
++
++struct ddmap {
++	unsigned depth, state;
++	struct list_head stack;
++	struct ddinode *ddi;
++	struct dm_table *dmt;
++};
++
++static inline struct ddmap *ddmap(struct inode *inode)
++{
++	return ddinfo(inode);
++}
++
++static struct dditem *dditem_from_list(struct list_head *head)
++{
++	return list_entry(head, struct dditem, link);
++}
++
++static char *ddtop(struct ddmap *ddm)
++{
++	BUG_ON(!ddm->depth);
++	return dditem_from_list(ddm->stack.next)->data;
++}
++
++static int ddmap_drop(struct ddmap *ddm, int n)
++{
++	BUG_ON(n > ddm->depth);
++	while (n--) {
++		struct dditem *item; // seen this code before... (ddlink_pop)
++		BUG_ON(list_empty(&ddm->stack));
++		item = dditem_from_list(ddm->stack.next);
++		list_del(&item->link);
++		ddm->ddi->destroy_item(item);
++		ddm->depth--;
++	}
++	return 0;
++}
++
++static int create(struct ddmap *ddm, int targets, int ddmode)
++{
++	struct dm_table *table;
++	struct mapped_device *md;
++	int err, mode;
++	mode = (ddmode & DMREAD) ? FMODE_READ : 0;
++	mode |= (ddmode & DMWRITE) ? FMODE_WRITE : 0;
++	if (ddm->dmt)
++		return ddlink_error(ddm->ddi, -EINVAL, "table already created");
++	if ((err = dm_create(DM_ANY_MINOR, &md))) // dm_create_with_minor
++		goto fail;
++	if ((err = dm_table_create(&table, mode, targets, md)))
++		goto fail_md;
++	ddm->dmt = table;
++	return 0;
++fail_md:
++	dm_put(md);
++fail:
++	return ddlink_error(ddm->ddi, err, "table create failed");
++}
++
++static int target(struct ddmap *ddm, sector_t offset, sector_t sectors)
++{
++	int err, i, argc = ddm->depth - 1;
++	char *type, **argv, *error = "out of memory";
++	struct dm_table *table = ddm->dmt;
++	struct dm_target *target;
++	struct list_head *next = ddm->stack.next;
++
++	if (!table)
++		return ddlink_error(ddm->ddi, -EINVAL,
++			"create table before target");
++	error = "no space for target";
++	if ((err = check_space(table)))
++		goto fail;
++	err = -EINVAL;
++	error = "zero size target not allowed";
++	if (!sectors)
++		goto fail;
++	err = -ENODATA;
++	error = "target type is missing";
++	if (ddm->depth < 1)
++		goto fail;
++	type = dditem_from_list(next)->data;
++	target = table->targets + table->num_targets;
++	*target = (typeof(*target)){
++		.table = table, .begin = offset, .len = sectors,
++		.type = dm_get_target_type(type), .error = "" };
++	if (!target->type)
++		return ddlink_error(ddm->ddi, -EINVAL,
++			"'%s' is not a target type", type);
++	/* from here on need to release target type on failure */
++
++	error = "gap in table";
++	if (!adjoin(table, target)) // why even have the offset field then???
++		goto fail_type;
++	argv = kmalloc(argc * sizeof(char *), __GFP_NOFAIL);
++	for (i = 0; i < argc; i++)
++		argv[i] = dditem_from_list(next = next->next)->data;
++	err = target->type->ctr(target, argc, argv);
++	error = target->error;
++	kfree(argv);
++	if (err)
++		goto fail_type;
++	table->highs[table->num_targets++] = target->begin + target->len - 1;
++	combine_restrictions_low(&table->limits, &target->limits);
++	return 0;
++fail_type:
++	dm_put_target_type(target->type);
++fail:
++	return ddlink_error(ddm->ddi, err, error);
++}
++
++static int install(struct ddmap *ddm)
++{
++	char *name = ddtop(ddm);
++	struct dm_table *table;
++	struct mapped_device *md;
++	struct ddresult result;
++	unsigned major, minor;
++	char *error;
++	int err;
++
++	if (!(table = ddm->dmt))
++		return ddlink_error(ddm->ddi, -EINVAL,
++			"create table before creating device");
++	md = table->md;
++	ddm->dmt = NULL;
++	error = "table complete failed";
++	if ((err = dm_table_complete(table)))
++		goto fail;
++	error = "invalid device name";
++	if ((err = check_name(name)))
++		goto fail;
++	error = "could not get a device number";
++	if ((err = get_devnums(dm_disk(md), &major, &minor)))
++		goto fail;
++	switch ((err = dm_hash_insert(name, NULL/*uuid*/, md))) {
++	case 0:
++		break;
++	case -EBUSY:
++		error = "device already exists";
++		goto fail;
++	default:
++		error = "hash insert failed";
++		goto fail;
++	}
++	if (!dm_suspended(md)) // wacky table install
++		dm_suspend(md, DM_SUSPEND_LOCKFS_FLAG);
++	error = "could not swap in table";
++	if ((err = dm_swap_table(md, table)))
++		goto fail;
++	set_disk_ro(dm_disk(md), !(dm_table_get_mode(table) & FMODE_WRITE)); // do it before installing!!!
++	dm_table_put(table);
++	if ((err = dm_resume(md)))
++		DMWARN("device %s is installed but not resumed", name);
++	dm_put(md);
++
++	result = (struct ddresult){ .dev.major = major, .dev.minor = minor };
++	error = "failed to post result";
++	if (!(err = ddlink_post(ddm->ddi, &result, sizeof(result))))
++		return 0;
++fail:
++	destroy_table(table);
++	return ddlink_error(ddm->ddi, err, "%s for %s", error, name);
++}
++
++static int remove(struct ddmap *ddm)
++{
++	char *name = ddtop(ddm);
++	struct hash_cell *hc;
++	struct mapped_device *md = NULL;
++	char *error = "%s not defined";
++	int err = -ENXIO;
++
++	down_write(&_hash_lock);
++	if (!(hc = __get_name_cell(name)))
++		goto fail;
++	md = hc->md;
++	err = -EBUSY;
++	error = "%s is still open";
++	if ((err = dm_lock_for_deletion(md)))
++		goto fail;
++	__hash_remove(hc);
++	up_write(&_hash_lock);
++	dm_put(md);
++	return 0;
++fail:
++	up_write(&_hash_lock);
++	if (md)
++		dm_put(md);
++	return ddlink_error(ddm->ddi, err, error, name);
++}
++
++struct mapped_device *lookup_device(char *name)
++{
++	struct mapped_device *md = NULL;
++	struct hash_cell *hc;
++	down_read(&_hash_lock);
++	if ((hc = __get_name_cell(name)))
++		md = hc->md;
++	up_read(&_hash_lock);
++	return md;
++}
++
++static int dependencies(struct ddmap *ddm)
++{
++	char *name = ddtop(ddm);
++	struct mapped_device *md;
++	struct dm_table *table;
++	struct dm_dev *dmd;
++	int err = 0, num = 0;
++
++	if (!(md = lookup_device(name)))
++		return -ENXIO;
++	if (!(table = dm_get_table(md)))
++		goto out;
++	err = -ENOMEM;
++	list_for_each_entry(dmd, dm_table_get_devices(table), list) {
++		dev_t dev = dmd->bdev->bd_dev;
++		struct dditem *item = dditem_new(ddm->ddi, sizeof(struct devnum));
++		if (!item)
++			goto out_table;
++		*(struct devnum *)item->data = (struct devnum){MAJOR(dev), MINOR(dev)};
++		ddlink_queue(ddm->ddi, item);
++		num++;
++	}
++	err = num;
++out_table:
++	dm_table_put(table);
++out:
++	dm_put(md);
++	return err;
++}
++
++static int suspend(struct ddmap *ddm, int suspend, int lockfs, int noflush)
++{
++	char *name = ddtop(ddm);
++	struct hash_cell *hc;
++	struct mapped_device *md;
++	struct dm_table *new_map = NULL;
++	char *error = "%s not found";
++	int err = 0, flags = 0;
++	if (lockfs)
++		flags |= DM_SUSPEND_LOCKFS_FLAG;
++	if (noflush)
++		flags |= DM_SUSPEND_NOFLUSH_FLAG;
++	if (suspend) {
++		if (!(md = lookup_device(name))) {
++			err = -ENXIO;
++			goto out;
++		}
++		error = "could not suspend %s";
++		if (!dm_suspended(md))
++			err = dm_suspend(md, flags);
++	} else {
++		down_write(&_hash_lock);
++		if (!(hc = __get_name_cell(name)) || !(md = hc->md)) {
++			up_write(&_hash_lock);
++			err = -ENXIO;
++			goto out;
++		}
++		new_map = hc->new_map;
++		hc->new_map = NULL;
++		up_write(&_hash_lock);
++		if (new_map) {
++			error = "could not suspend %s";
++			if (!dm_suspended(md) && (err = dm_suspend(md, flags)))
++				goto out_put;
++			error = "could not swap table for %s";
++			if ((err = dm_swap_table(md, new_map)))
++				goto out_put;
++			set_disk_ro(dm_disk(md), !!(dm_table_get_mode(new_map) & FMODE_WRITE));
++			dm_table_put(new_map);
++		}
++		error = "could not resume %s";
++		if (dm_suspended(md))
++			err = dm_resume(md);
++	}
++out_put:
++	dm_put(md);
++out:
++	return ddlink_error(ddm->ddi, err, error, name);
++}
++
++struct dumb { struct ddmap *ddm; int *err; }; /* dumb way to err out iterator */
++
++static void per_target(struct target_type *tt, void *data)
++{
++	unsigned len = sizeof(struct ddtype) + strlen(tt->name) + 1;
++	struct dumb *info = data;
++	struct ddinode *dd = info->ddm->ddi;
++	struct dditem *item = dditem_new(dd, len);
++	struct ddversion version = { tt->version[0], tt->version[1], tt->version[2] };
++
++	if (!item) {
++		*(info->err) = -ENOMEM; /* oh my... */
++		return;
++	}
++	strcpy(((struct ddtype *)item->data)->name, tt->name);
++	((struct ddtype *)item->data)->version = version;
++	ddlink_queue(dd, item);
++}
++
++static int ddlist(struct ddmap *ddm)
++{
++	struct ddinode *dd = ddm->ddi;
++	struct hash_cell *hc;
++	int i, err = -ENOMEM;
++	down_write(&_hash_lock);
++	for (i = 0; i < NUM_BUCKETS; i++)
++		list_for_each_entry(hc, _name_buckets + i, name_list) {
++			struct gendisk *disk = dm_disk(hc->md);
++			int len = strlen(hc->name);
++			struct dditem *item = dditem_new(dd, sizeof(struct ddname) + len);
++			struct ddname *info;
++			if (!item)
++				goto bleah;
++			info = (void *)item->data;
++			*info = (struct ddname){{disk->major, disk->first_minor}};
++			memcpy(info->name, hc->name, len);
++			ddlink_queue(dd, item);
++		}
++	err = 0;
++bleah:
++	up_write(&_hash_lock);
++	return ddlink_error(dd, err, "why me?");
++}
++
++static int dmstatus(struct ddinode *dd, struct mapped_device *md)
++{
++	struct gendisk *disk = dm_disk(md);
++	struct dm_table *table;
++	unsigned flags = 0, targets = 0;
++
++	if (dm_suspended(md))
++		flags |= DMFLAG_SUSPEND;
++	if (disk->policy)
++		flags |= DMFLAG_READONLY;
++	if ((table = dm_get_table(md))) {
++		flags |= DMFLAG_PRESENT;
++		targets = dm_table_get_num_targets(table);
++		dm_table_put(table);
++	}
++	return ddlink_post(dd, &(struct dmstatus){
++			.dev = {disk->major, disk->first_minor},
++			.event = dm_get_event_nr(md),
++			.targets = targets,
++			.opens = dm_open_count(md), /* racy */
++			.flags = flags},
++		sizeof(struct dmstatus));
++}
++
++static int ddmap_ioctl(struct inode *inode, struct file *file, unsigned cmd, unsigned long u)
++{
++	struct ddmap *ddm = ddmap(inode);
++	struct ddinode *dd = ddm->ddi;
++	const char __user *user = (void *)u;
++	int err = 0, need = 0, depth = ddm->depth;
++
++	switch (cmd) {
++	case DMTARGET:
++	case DMCREATE:
++	case DMREMOVE:
++	case DMSUSPEND:
++	case DMRESUME:
++	case DMDEPS:
++	case DMSTATUS:
++		need = 1;
++		break;
++	case DMRENAME:
++		need = 2;
++		break;
++	}
++	if (depth < need)
++		return ddlink_error(dd, -ENODATA, "need %u args", need);
++
++	switch (cmd) {
++	case DMTABLE:
++	{
++		struct ddcreate got;
++		if (copy_from_user(&got, user, sizeof(got)))
++			return -EFAULT;
++		err = create(ddm, got.targets, got.mode);
++		break;
++	}
++	case DMTARGET:
++	{
++		struct ddtarget got;
++		if (copy_from_user(&got, user, sizeof(got)))
++			return -EFAULT;
++		err = target(ddm, got.offset, got.sectors);
++		break;
++	}
++	case DMCREATE:
++		err = install(ddm);
++		break;
++	case DMREMOVE:
++		err = remove(ddm);
++		break;
++	case DMSUSPEND:
++	case DMRESUME:
++		err = suspend(ddm, cmd == DMSUSPEND, 0, 0);
++		break;
++	case DMDEPS:
++		err = dependencies(ddm);
++		break;
++	case DMTYPES:
++		dm_target_iterate(per_target, &(struct dumb){ ddm, &err });
++		if (err)
++			return ddlink_error(dd, err, "iteration failed");
++		break;
++	case DMNAMES:
++		return ddlink_error(dd, ddlist(ddm), "failed to list devices");
++	case DMSTATUS:
++	{
++		char *name = ddtop(ddm);
++		struct mapped_device *md = lookup_device(name);
++		err = -ENXIO;
++		if (!md)
++			break;
++		err = dmstatus(dd, md);
++		break;
++	}
++	case DMRENAME:
++	{
++		struct dditem *old = dditem_from_list(ddm->stack.next);
++		struct dditem *new = dditem_from_list(ddm->stack.next->next);
++		err = dm_hash_rename(old->data, new->data);
++		if (err == -EINVAL)
++			ddlink_error(dd, err, "invalid name %s", new->data);
++		if (err == -ENXIO)
++			ddlink_error(dd, err, "no device %s", old->data);
++		if (err == -EBUSY)
++			ddlink_error(dd, err, "%s already exists", new->data);
++		break;
++	}
++	case DMVERSION:
++		return ddlink_post(dd, &(struct ddversion){0, 0, 0}, sizeof(struct ddversion));
++	default:
++		return ddlink_error(dd, -ENOTTY, "invalid ioctl %u", cmd);
++	}
++	ddmap_drop(ddm, depth);
++	return err;
++}
++
++/* ddmap file methods */
++
++static ssize_t ddmap_write(struct file *file, const char *buf, size_t len, loff_t *offset)
++{
++	struct ddinode *dd = ddinode(file->f_dentry->d_inode);
++	struct ddmap *ddm = ddmap(file->f_dentry->d_inode);
++	struct dditem *item;
++
++	if (ddm->depth >= 1000)
++		return ddlink_error(ddm->ddi, -E2BIG, "%i arguments", ddm->depth + 1);
++	if (IS_ERR(item = dditem_in(dd, buf, len, 1)))
++		return ddlink_error(ddm->ddi, PTR_ERR(item), "write failed");
++	list_add_tail(&item->link, &ddm->stack);
++	ddm->depth++;
++	return len;
++
++}
++
++static ssize_t ddmap_read(struct file *file, char *buf, size_t len, loff_t *offset)
++{
++	struct ddinode *dd = ddinode(file->f_dentry->d_inode);
++	struct dditem *item;
++	unsigned size;
++	if (!ddlink_ready(dd))
++		return 0;
++	item = ddlink_pop(dd);
++	size = item->size;
++	if (size > len)
++		return ddlink_error(dd, -EINVAL,
++			"tried to read %zi bytes of %u byte item", len, size);
++	if (copy_to_user(buf, item->data, size))
++		return ddlink_error(dd, -EFAULT, "invalid address");
++	dd->destroy_item(item);
++	return size;
++}
++
++static void ddmap_destroy(struct ddmap *ddm)
++{
++	ddmap_drop(ddm, ddm->depth);
++	if (ddm->dmt)
++		destroy_table(ddm->dmt);
++	kfree(ddm);
++}
++
++void *ddmap_create(struct ddinode *dd, void *info)
++{
++	struct ddmap *ddm;
++	if (!(ddm = kmalloc(sizeof(*ddm), __GFP_NOFAIL)))
++		return ERR_PTR(-ENOMEM);
++	*ddm = (typeof(*ddm)){ .ddi = dd };
++	dd->destroy_info = (typeof(&kfree))ddmap_destroy;
++	dd->create_item = kmalloc;
++	dd->destroy_item = kfree;
++	INIT_LIST_HEAD(&ddm->stack);
++	return ddm;
++}
++
++static struct file_operations ddmap_fops = {
++	.read = ddmap_read,
++	.write = ddmap_write,
++	.ioctl = ddmap_ioctl,
++	.poll = ddlink_poll };
++
+ static int ctl_ioctl(struct inode *inode, struct file *file,
+ 		     uint command, ulong u)
+ {
+@@ -1413,6 +1945,9 @@ static int ctl_ioctl(struct inode *inode
+ 	if (!capable(CAP_SYS_ADMIN))
+ 		return -EACCES;
+ 
++	if (command == DDLINK)
++		return ddlink(&ddmap_fops, ddmap_create, NULL);
++
+ 	if (_IOC_TYPE(command) != DM_IOCTL)
+ 		return -ENOTTY;
+ 
+--- 2.6.23.12.base/drivers/md/dm-table.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/dm-table.c	2008-02-13 02:13:13.000000000 -0800
+@@ -24,41 +24,6 @@
+ #define KEYS_PER_NODE (NODE_SIZE / sizeof(sector_t))
+ #define CHILDREN_PER_NODE (KEYS_PER_NODE + 1)
+ 
+-struct dm_table {
+-	struct mapped_device *md;
+-	atomic_t holders;
+-
+-	/* btree table */
+-	unsigned int depth;
+-	unsigned int counts[MAX_DEPTH];	/* in nodes */
+-	sector_t *index[MAX_DEPTH];
+-
+-	unsigned int num_targets;
+-	unsigned int num_allocated;
+-	sector_t *highs;
+-	struct dm_target *targets;
+-
+-	/*
+-	 * Indicates the rw permissions for the new logical
+-	 * device.  This should be a combination of FMODE_READ
+-	 * and FMODE_WRITE.
+-	 */
+-	int mode;
+-
+-	/* a list of devices used by this table */
+-	struct list_head devices;
+-
+-	/*
+-	 * These are optimistic limits taken from all the
+-	 * targets, some targets will need smaller limits.
+-	 */
+-	struct io_restrictions limits;
+-
+-	/* events get handed up using this callback */
+-	void (*event_fn)(void *);
+-	void *event_context;
+-};
+-
+ /*
+  * Similar to ceiling(log_size(n))
+  */
+@@ -82,7 +47,7 @@ static unsigned int int_log(unsigned int
+ /*
+  * Combine two io_restrictions, always taking the lower value.
+  */
+-static void combine_restrictions_low(struct io_restrictions *lhs,
++void combine_restrictions_low(struct io_restrictions *lhs,
+ 				     struct io_restrictions *rhs)
+ {
+ 	lhs->max_sectors =
+@@ -179,7 +144,7 @@ void *dm_vcalloc(unsigned long nmemb, un
+  * highs, and targets are managed as dynamic arrays during a
+  * table load.
+  */
+-static int alloc_targets(struct dm_table *t, unsigned int num)
++int alloc_targets(struct dm_table *t, unsigned int num)
+ {
+ 	sector_t *n_highs;
+ 	struct dm_target *n_targets;
+@@ -334,17 +299,6 @@ void dm_table_put(struct dm_table *t)
+ }
+ 
+ /*
+- * Checks to see if we need to extend highs or targets.
+- */
+-static inline int check_space(struct dm_table *t)
+-{
+-	if (t->num_targets >= t->num_allocated)
+-		return alloc_targets(t, t->num_allocated * 2);
+-
+-	return 0;
+-}
+-
+-/*
+  * Convert a device path to a dev_t.
+  */
+ static int lookup_device(const char *path, dev_t *dev)
+@@ -598,7 +552,7 @@ void dm_put_device(struct dm_target *ti,
+ /*
+  * Checks to see if the target joins onto the end of the table.
+  */
+-static int adjoin(struct dm_table *table, struct dm_target *ti)
++int adjoin(struct dm_table *table, struct dm_target *ti)
+ {
+ 	struct dm_target *prev;
+ 
+--- 2.6.23.12.base/drivers/md/Makefile	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/Makefile	2008-02-17 20:38:22.000000000 -0800
+@@ -22,6 +22,7 @@ hostprogs-y	:= mktables
+ # themselves, and md.o may use the personalities when it 
+ # auto-initialised.
+ 
++obj-y				+= ddlink.o
+ obj-$(CONFIG_MD_LINEAR)		+= linear.o
+ obj-$(CONFIG_MD_RAID0)		+= raid0.o
+ obj-$(CONFIG_MD_RAID1)		+= raid1.o
+@@ -39,6 +40,7 @@ obj-$(CONFIG_DM_MULTIPATH_RDAC)	+= dm-rd
+ obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
+ obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
+ obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
++obj-y				+= dm-ramback.o
+ 
+ quiet_cmd_unroll = UNROLL  $@
+       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
+--- 2.6.23.12.base/include/linux/ddlink.h	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/include/linux/ddlink.h	2008-02-17 00:10:26.000000000 -0800
+@@ -0,0 +1,41 @@
++#define DDLINK _IO(0, 0xdd)
++
++struct dditem {
++	struct list_head link;
++	unsigned type; // not actually used
++	unsigned size;
++	unsigned char data[];
++};
++
++struct ddinode {
++	struct list_head list;
++	wait_queue_head_t wait;
++	typeof(kmalloc) *create_item;
++	typeof(kfree) *destroy_item;
++	typeof(kfree) *destroy_info;
++	struct inode inode;
++};
++
++int ddlink(struct file_operations *fops,
++	void *(*create)(struct ddinode *dd, void *info), void *info);
++void ddlink_queue(struct ddinode *dd, struct dditem *item);
++void ddlink_push(struct ddinode *dd, struct dditem *item);
++struct dditem *ddlink_pop(struct ddinode *dd);
++struct dditem *dditem_new(struct ddinode *dd, size_t size);
++void ddlink_clear(struct ddinode *dd);
++int ddlink_ready(struct ddinode *dd);
++
++struct dditem *dditem_in(struct ddinode *dd, const void *buf, size_t len, int z);
++int ddlink_post(struct ddinode *dd, void *data, unsigned len);
++unsigned ddlink_poll(struct file *file, poll_table *table);
++int ddlink_error(struct ddinode *dd, int err, const char *fmt, ...);
++
++static inline struct ddinode *ddinode(struct inode *inode)
++{
++	return container_of(inode, struct ddinode, inode); 
++}
++
++static inline void *ddinfo(struct inode *inode)
++{
++	return inode->i_private;
++}
+--- 2.6.23.12.base/include/linux/ddsetup.h	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/include/linux/ddsetup.h	2008-02-17 01:47:22.000000000 -0800
+@@ -0,0 +1,36 @@
++#ifndef DMSETUP_H
++#define DMSETUP_H
++
++#define DDLINK _IO(0, 0xdd)
++#define PACKED __attribute__ ((packed))
++
++enum { DMREAD = 1, DMWRITE = 2 };
++enum { DMRESULT = 0xDDC0DE00 };
++
++#define DMVERSION	_IO(0xdc, 0x0)
++#define DMSTRING	_IO(0xdc, 0x1)
++#define DMTABLE		_IO(0xdc, 0x2)
++#define DMTARGET	_IO(0xdc, 0x3)
++#define DMCREATE	_IO(0xdc, 0x4)
++#define DMREMOVE	_IO(0xdc, 0x5)
++#define DMSUSPEND	_IO(0xdc, 0x6)
++#define DMRESUME	_IO(0xdc, 0x7)
++#define DMRENAME	_IO(0xdc, 0x8)
++#define DMDEPS		_IO(0xdc, 0x9)
++#define DMNAMES		_IO(0xdc, 0xa)
++#define DMTYPES		_IO(0xdc, 0xb)
++#define DMSTATUS	_IO(0xdc, 0xc)
++
++#define DMFLAG_READONLY 1
++#define DMFLAG_PRESENT 2
++#define DMFLAG_SUSPEND 4
++
++struct devnum { uint32_t major, minor; } PACKED;
++struct ddcreate { uint32_t  mode, targets; } PACKED;
++struct ddtarget { uint64_t offset, sectors; uint32_t mode; } PACKED;
++struct ddresult { uint32_t magic; struct devnum dev; } PACKED;
++struct ddversion { uint32_t major, minor, point; } PACKED;
++struct ddtype { struct ddversion version; char name[]; } PACKED;
++struct ddname { struct devnum dev; char name[]; } PACKED;
++struct dmstatus { struct devnum dev; uint32_t flags, targets, opens, event; } PACKED;
++#endif
+--- 2.6.23.12.base/include/linux/device-mapper.h	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/include/linux/device-mapper.h	2008-02-13 02:13:13.000000000 -0800
+@@ -147,6 +147,43 @@ struct dm_target {
+ int dm_register_target(struct target_type *t);
+ int dm_unregister_target(struct target_type *t);
+ 
++#define DM_MAX_DEPTH 16
++
++struct dm_table {
++	struct mapped_device *md;
++	atomic_t holders;
++
++	/* btree table */
++	unsigned int depth;
++	unsigned int counts[DM_MAX_DEPTH];	/* in nodes */
++	sector_t *index[DM_MAX_DEPTH];
++
++	unsigned int num_targets;
++	unsigned int num_allocated;
++	sector_t *highs;
++	struct dm_target *targets;
++
++	/*
++	 * Indicates the rw permissions for the new logical
++	 * device.  This should be a combination of FMODE_READ
++	 * and FMODE_WRITE.
++	 */
++	int mode;
++
++	/* a list of devices used by this table */
++	struct list_head devices;
++
++	/*
++	 * These are optimistic limits taken from all the
++	 * targets, some targets will need smaller limits.
++	 */
++	struct io_restrictions limits;
++
++	/* events get handed up using this callback */
++	void (*event_fn)(void *);
++	void *event_context;
++};
++
+ 
+ /*-----------------------------------------------------------------
+  * Functions for creating and manipulating mapped devices.
