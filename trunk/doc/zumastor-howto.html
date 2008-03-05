@@ -596,6 +596,11 @@ $ sudo update-grub</tt></pre>
 all directories, not just the one you want!</p></div>
 <div class="para"><p>The install takes several minutes.
 Ignore the warnings about deleting symbolic links <tt>&#8230;/build</tt> and <tt>&#8230;/source</tt>.</p></div>
+<div class="para"><p>Try rebooting into your newly installed kernel.
+If booting hangs, the most likely cause is an hda1 / sda1 confusion.
+Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda1 instead of root=/dev/sda1.
+If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
+through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)</p></div>
 <h3 id="_prebuilt_debian_ubuntu_packages_from_ppa_launchpad_net_pgquiles">8.3. Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles</h3><div style="clear:left"></div>
 <div class="para"><p>We've created https://launchpad.net/~zumastor-team, but are not
 yet building standard Ubuntu kernel packages there.  Until we have that going,
@@ -1112,20 +1117,19 @@ like devices via the loopback device.</p></div>
 <div class="para"><p>Annoyingly, the loopback device naming scheme changed at some point;
 on some systems it's /dev/loop/0, on others it's /dev/loop0.
 You may need to adjust the path to suit your version of Linux.</p></div>
+<div class="para"><p>Run the following commands as root (e.g. with sudo sh):</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>$ sudo sh
-# dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
-# losetup -d /dev/loop0 &gt; /dev/null 2&gt;&amp;1 || true
-# losetup /dev/loop0 /media/vg.img
-# pvcreate /dev/loop0
-# vgcreate sysvg /dev/loop0
-# lvcreate --name test --size 100MB sysvg
-# mkfs.ext3 /dev/sysvg/test
-# lvcreate --name test_snap --size 100MB sysvg
-# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
-# zumastor define master zumatest
-# exit</tt></pre>
+<pre><tt>dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+losetup -d /dev/loop0 &gt; /dev/null 2&gt;&amp;1 || true
+losetup /dev/loop0 /media/vg.img
+pvcreate /dev/loop0
+vgcreate sysvg /dev/loop0
+lvcreate --name test --size 100MB sysvg
+mkfs.ext3 /dev/sysvg/test
+lvcreate --name test_snap --size 100MB sysvg
+zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define master zumatest</tt></pre>
 </div></div>
 <div class="para"><p>If this complains</p></div>
 <div class="literalblock">
@@ -1873,7 +1877,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-02-23 17:21:48 PDT
+Last updated 2008-03-04 17:55:20 PDT
 </div>
 </div>
 </body>

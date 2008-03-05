@@ -251,6 +251,11 @@ all directories, not just the one you want!
 The install takes several minutes.
 Ignore the warnings about deleting symbolic links +.../build+ and +.../source+.
 
+Try rebooting into your newly installed kernel.
+If booting hangs, the most likely cause is an hda1 / sda1 confusion.
+Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda1 instead of root=/dev/sda1.
+If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
+through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)
 
 Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -726,19 +731,18 @@ Annoyingly, the loopback device naming scheme changed at some point;
 on some systems it's /dev/loop/0, on others it's /dev/loop0. 
 You may need to adjust the path to suit your version of Linux.
 
+Run the following commands as root (e.g. with sudo sh):
 ...........
-$ sudo sh
-# dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
-# losetup -d /dev/loop0 > /dev/null 2>&1 || true
-# losetup /dev/loop0 /media/vg.img
-# pvcreate /dev/loop0
-# vgcreate sysvg /dev/loop0
-# lvcreate --name test --size 100MB sysvg
-# mkfs.ext3 /dev/sysvg/test
-# lvcreate --name test_snap --size 100MB sysvg
-# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
-# zumastor define master zumatest
-# exit
+dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+losetup -d /dev/loop0 > /dev/null 2>&1 || true
+losetup /dev/loop0 /media/vg.img
+pvcreate /dev/loop0
+vgcreate sysvg /dev/loop0
+lvcreate --name test --size 100MB sysvg
+mkfs.ext3 /dev/sysvg/test
+lvcreate --name test_snap --size 100MB sysvg
+zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define master zumatest
 ..........
 If this complains 
 ..........
