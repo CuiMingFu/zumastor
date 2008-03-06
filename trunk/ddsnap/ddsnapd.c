@@ -2441,7 +2441,7 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 	/* check if we are out of snapshots */
 	if (snapshots >= MAX_SNAPSHOTS) {
 	       	auto_delete_snapshot(sb);
-		if (snapshots >= MAX_SNAPSHOTS) {
+		if ((snapshots = sb->image.snapshots) >= MAX_SNAPSHOTS) {
 			warn("the number of snapshots is beyond the %d limit", MAX_SNAPSHOTS);
 			return -EFULL;
 		}
