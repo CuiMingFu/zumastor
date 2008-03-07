@@ -102,7 +102,7 @@ ${SSH} root@${slave} zumastor define volume testvol /dev/testvg/test /dev/testvg
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
 
-zumastor define target testvol slave:11235
+zumastor define target testvol slave
 ${SSH} root@${slave} zumastor define source testvol master
 zumastor replicate testvol --wait slave
 zumastor status --usage

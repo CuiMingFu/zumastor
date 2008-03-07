@@ -73,10 +73,10 @@ ${SSH} root@${slave2} zumastor define volume testvol /dev/sdb /dev/sdc --initial
 ${SSH} root@${slave2} zumastor status --usage
 echo ok 3 - slave2 testvol set up
  
-zumastor define target testvol slave1:11235 -p 30
+zumastor define target testvol slave1 -p 30
 zumastor status --usage
 ${SSH} root@${slave1} zumastor define source testvol master --period 600
-${SSH} root@${slave1} zumastor define target testvol slave2:11235 -p 30
+${SSH} root@${slave1} zumastor define target testvol slave2 -p 30
 ${SSH} root@${slave1} zumastor status --usage
 ${SSH} root@${slave2} zumastor define source testvol slave1 --period 600
 ${SSH} root@${slave2} zumastor status --usage

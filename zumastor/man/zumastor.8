@@ -9,10 +9,10 @@ zumastor \- block device snapshot and replication management
 .B zumastor define master \fIvolume \fB[options]\fP
 .br
 .B zumastor define source
-.I volume \fP\fIhost\fP \fB[options]\fP
+.I volume \fP\fIhost\fP[\fI:port\fP] \fB[options]\fP
 .br
 .B zumastor define target
-.I volume \fP\fIhost\fP[\fI:port\fP] \fB[options]\fP
+.I volume \fP\fIhost\fP \fB[options]\fP
 .br
 .B zumastor forget volume
 .I volume
@@ -91,7 +91,7 @@ By default, each newly created snapshot is mounted under the snapshot mountpoint
 
 Used after \fBdefine\fP \fBvolume\fP to specify the upstream host that is expected to replicate snapshots to this volume. If the volume was previously a \fBmaster\fP volume, removes the \fBmaster\fP definition, since it is now a replication target.  If the optional \fIinterval\fP (in seconds) is specified, the upstream server will be asked for updates at this interval and when the volume is started.  It should be smaller than the automatic replication interval configured for this target on the upstream host.  The name option allows you to specify a different \fIremote_volume\fP name on the upstream host.  The yes option answers yes to all prompts.
 .IP \fBdefine\ \fBtarget\fP
-.I volume \fP\fIhost\fP[\fI:port\fP] [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
+.I volume \fP\fIhost\fP [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
 
 Used after \fBdefine\fP \fBvolume\fP to specify a downstream host to which the volume will be replicated to.  If the optional \fIinterval\fP (in seconds) is specified, the target (downstream) server will be replicated to at the given interval.  The name option allows you to specify a different \fIremote_volume\fP name on the downstream host. The test option is used for testing purpose.
 .IP \fBforget\ \fBvolume\fP
