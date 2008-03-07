@@ -84,7 +84,7 @@ ${SSH} root@${slave} zumastor define master testvol -h 24 -d 7
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  
-zumastor define target testvol slave:11235 -p 30
+zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
 

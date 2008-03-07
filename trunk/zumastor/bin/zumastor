@@ -203,7 +203,6 @@ function replicate_snapshot {
 	local -r remote_file=$send_file.remote
 	local -r hold_file=$target_dir/hold
 	local -r server=$SERVERS/$vol
-	local -r port_file=$target_dir/port
 	local -r volume_file=$target_dir/name
 	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol
 
@@ -227,11 +226,9 @@ function replicate_snapshot {
 		old_snap=
 	fi
 
-	read port <$port_file || { log "error reading port from '$port_file'"; return 1; }
-
-	run_remote $host "zumastor receive start $remote_vol $port" > $remote_file
+	run_remote $host "zumastor receive start $remote_vol" > $remote_file
 	[[ $? -ne 0 ]] && { log "starting remote snapshot receive failed"; return 1; }
-	read remote_hold remote_send remote_addr < $remote_file
+	read port remote_hold remote_send remote_addr < $remote_file
 
 	if [[ $remote_hold == "-1" ]]; then # remote has no hold, must do initial
 		[[ $old_snap ]] && drop_snapshot $vol $old_snap
@@ -282,8 +279,8 @@ function replicate_snapshot {
 	fi
 
 	log "sending snapshot complete, notifying downstream host"
-	run_remote $host "zumastor receive done $remote_vol $port"
-	[[ $? -ne 0 ]] && { log "zumastor receive done $remote_vol $port failed"; return 1; }
+	run_remote $host "zumastor receive done $remote_vol"
+	[[ $? -ne 0 ]] && { log "zumastor receive done $remote_vol failed"; return 1; }
 
 	#[[ $snap -eq 5 ]] && restart_plug
 	# !!! FIXME TODO this is racy, we should save state by journaling
@@ -574,12 +571,11 @@ function forget_volume {
 }
 
 function define_target {
-	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
-	local -r port=$3
-	local -r name=$4
-	local -r period=$5
+	local -r name=$3
+	local -r period=$4
 	local -r path=$VOLUMES/$vol/targets/$host
 	local new=0
 
@@ -594,7 +590,6 @@ function define_target {
 	fi
 
 	echo $name >$path/name || return 1
-	echo $port > $path/port || return 1
 	if [[ -z $period ]]; then
 		rm $path/period 2> /dev/null
 		[[ $new == 0 ]] && pkill -f "zumastor replicate $vol $host --delay"
@@ -695,11 +690,12 @@ function forget_master {
 }
 
 function set_source {
-	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
-	local -r name=$3
-	local -r period=$4
+	local -r port=$3
+	local -r name=$4
+	local -r period=$5
 	local -r path=$VOLUMES/$vol
 	local -r mysize=$(ddsnap status $SERVERS/$vol --size) || return 1
 	local -r oldhost=$(cat $path/source/hostname 2>/dev/null)
@@ -720,6 +716,11 @@ function set_source {
 	fi
 
 	[[ $new == "yes" ]] && { mkdir -p $path/source || return 1; }
+
+	# check if the port has already been used
+	rm -f $path/source/port 2>/dev/null
+	grep -x "$port" $VOLUMES/*/source/port >&/dev/null && { echo "port $port already been used"; return 1; }
+	echo $port > $path/source/port || return 1
 	echo $host > $path/source/hostname || return 1
 	echo $name >$path/source/name || return 1
 
@@ -956,7 +957,7 @@ define)
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"
-		declare usage="usage: $cmd <vol> <host>[:port] [-p|--period period] [-t|--test test_feature>][-h|--help]"
+		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-t|--test test_feature>][-h|--help]"
 		declare test_fullvolume=0
 		declare period name
 
@@ -985,21 +986,12 @@ define)
 
 		[[ $# -eq 2 ]] || { echo $usage; exit 2; }
 		declare vol=$1 host=$2
-		declare port=${host/*:/}
 		[[ -z $name ]] && name=$vol
-
-		# check to see if port was specified, if so, strip it off the host
-		if [[ $host != $port ]]; then
-			host=${host/:*/}
-		else
-			# otherwise use the default port
-			port=$DEFAULT_PORT
-		fi
 
 		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 1; }
 		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 1; }
 
-		define_target $vol $host $port $name $period
+		define_target $vol $host $name $period
 		exit $? ;;
 	master)
 		declare args arg kind count delta=0
@@ -1091,7 +1083,7 @@ define)
 		exit 0 ;;
 	source)
 		declare period args cmd="$0 $1 $2"
-		declare usage="usage: $cmd <vol> <host> [-p|--period <period>] [-n|--name] [-y|--yes]"
+		declare usage="usage: $cmd <vol> <host>[:port] [-p|--period <period>] [-n|--name] [-y|--yes]"
 		shift 2
 		args=`getopt -op:yn: -l help,period:,yes,name: -n"$cmd" -- "$@"` || \
 			{ echo $usage; exit 2; }
@@ -1115,12 +1107,24 @@ define)
 		shift # remove --
 		[[ $# -eq 2 ]] || { echo $usage; exit 6; }
 		declare vol=$1 host=$2
+		declare port=${host/*:/}
 		[[ -z $name ]] && name=$vol
+
+		# check to see if port was specified, if so, strip it off the host
+		if [[ $host != $port ]]; then
+			host=${host/:*/}
+		else
+			# otherwise automatically pick up an unused one
+			port=$DEFAULT_PORT
+			while $(grep -x "$port" $VOLUMES/*/source/port >&/dev/null); do
+				let port++
+			done
+		fi
 
 		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 4; }
 		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 5; }
 
-		set_source $vol $host $name $period
+		set_source $vol $host $port $name $period
 		exit $? ;;
 	*)
 		echo "usage: $0 define volume|target|master|source"
@@ -1443,14 +1447,14 @@ status)
 	;;
 receive)
 	# called via upstream host's ssh command to start/stop listen
-	[[ $# -eq 4 ]] || { echo "usage: $0 receive {start|done} <vol> <port>}"; exit 2; }
+	[[ $# -eq 3 ]] || { echo "usage: $0 receive {start|done} <vol>}"; exit 2; }
 	declare startstop=$2
 	declare vol=$3
-	declare port=$4
 	declare holdfile=$VOLUMES/$vol/source/hold
 	declare progressfile=$VOLUMES/$vol/source/apply
+	declare portfile=$VOLUMES/$vol/source/port
 	declare log=${LOGS}/$vol/delta.log
-	declare hold send_snap send_chunk send_addr count=0 status
+	declare hold send_snap send_chunk send_addr port count=0 status
 
 	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
 	read send_snap send_chunk send_addr 2>/dev/null <$progressfile
@@ -1480,7 +1484,9 @@ receive)
 			hold=-1
 		fi
 		[[ $hold = $send_snap ]] && { send_snap= send_addr=; }
-		echo $hold $send_snap $send_addr
+		[[ -f $portfile ]] || { echo "source of volume $vol not define yet"; exit 1; }
+		read port < $portfile
+		echo $port $hold $send_snap $send_addr
 
 		# FIXME TODO - for now we listen on 0.0.0.0 and we don't check where
 		# the request came from, in the future, to avoid doing something

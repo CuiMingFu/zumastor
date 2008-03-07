@@ -3114,7 +3114,7 @@ int main(int argc, char *argv[])
 
 			int sock = bind_socket(hostname, port);
 			if (sock < 0) {
-				fprintf(stderr, "%s %s: unable to bind to %s port %u\n", command, subcommand, hostname, port);
+				fprintf(stderr, "%s %s: unable to bind to %s port %u, err: %s\n", command, subcommand, hostname, port, strerror(-sock));
 				free(hostname);
 				return 1;
 			}

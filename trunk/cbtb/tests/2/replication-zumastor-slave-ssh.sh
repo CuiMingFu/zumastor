@@ -89,7 +89,7 @@ ${SSH} testroot${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initi
 ${SSH} testroot${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  
-zumastor define target testvol slave:11235 -p 30
+zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
 
