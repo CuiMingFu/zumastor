@@ -1399,10 +1399,10 @@ small volumes, e.g. 500M rather than 5G, unless you have lots of time to kill.</
 # zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize</tt></pre>
 </div></div>
 <h4 id="_define_target_on_master">10.9.4. Define target on master</h4>
-<div class="para"><p>Tell <em>original</em> to be ready to replicate to port 11235 on <em>replica</em>:</p></div>
+<div class="para"><p>Tell <em>original</em> to be ready to replicate to <em>replica</em>:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>root@original:~# zumastor define target zumatest replica.example.com:11235</tt></pre>
+<pre><tt>root@original:~# zumastor define target zumatest replica.example.com</tt></pre>
 </div></div>
 <div class="para"><p>Replications have to be triggered somehow.  There are three ways to do this:</p></div>
 <div class="olist"><ol>
@@ -1430,7 +1430,6 @@ manually, with `zumastor replicate'
 `-- targets/
     `-- replica.example.com/
         |-- period
-        |-- port
         `-- trigger|
 ...</tt></pre>
 </div></div>
@@ -1449,10 +1448,10 @@ e.g.</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
-root@replica:~#  zumastor define source zumatest original.example.com --period 600</tt></pre>
+root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600</tt></pre>
 </div></div>
 <div class="para"><p>Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.</p></div>
-<div class="para"><p>Running <tt>zumastor status &#8212;usage</tt> on the target should show a hostname and period entry
+<div class="para"><p>Running <tt>zumastor status &#8212;usage</tt> on the target should show a hostname, replication port number, and period entry
 under source for volume zumatest.</p></div>
 <h4 id="_start_replication">10.9.7. Start replication</h4>
 <div class="para"><p>This is important; without it, no automatic replication happens:</p></div>
@@ -1520,10 +1519,10 @@ done
 ssh root@vm1 "mkfs.ext3 /dev/sysvg/test ;
  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
  zumastor define master zumatest ;
- zumastor define target zumatest vm2:11235"
+ zumastor define target zumatest vm2"
 ssh root@vm2 "
 zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
-zumastor define source zumatest vm1 --period 5;
+zumastor define source zumatest vm1:11235 --period 5;
 zumastor start source zumatest"</tt></pre>
 </div></div>
 <div class="para"><p>Release 0.6 doesn't support saving old snapshots downstream;
@@ -1877,7 +1876,7 @@ instructions and examples on running the benchmark.</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-03-04 17:55:20 PDT
+Last updated 2008-03-07 10:25:52 PDT
 </div>
 </div>
 </body>

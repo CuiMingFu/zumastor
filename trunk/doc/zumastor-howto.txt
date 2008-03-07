@@ -1042,9 +1042,9 @@ For instance:
 Define target on master
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Tell 'original' to be ready to replicate to port 11235 on 'replica':
+Tell 'original' to be ready to replicate to 'replica':
 
- root@original:~# zumastor define target zumatest replica.example.com:11235 
+ root@original:~# zumastor define target zumatest replica.example.com
 
 Replications have to be triggered somehow.  There are three ways to do this:
 
@@ -1059,7 +1059,6 @@ Now make sure the new relationship is reflected in `zumastor status`:
  `-- targets/
      `-- replica.example.com/
          |-- period
-         |-- port
          `-- trigger|
  ...
     
@@ -1079,11 +1078,11 @@ Define volume and configure source on target
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize  
- root@replica:~#  zumastor define source zumatest original.example.com --period 600  
+ root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600  
 
 Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.
 
-Running `zumastor status --usage` on the target should show a hostname and period entry
+Running `zumastor status --usage` on the target should show a hostname, replication port number, and period entry
 under source for volume zumatest.
     
 Start replication
@@ -1156,10 +1155,10 @@ replication, but seems to replicate quickly after that.
  ssh root@vm1 "mkfs.ext3 /dev/sysvg/test ;
   zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
   zumastor define master zumatest ;
-  zumastor define target zumatest vm2:11235"
+  zumastor define target zumatest vm2"
  ssh root@vm2 "
  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
- zumastor define source zumatest vm1 --period 5;
+ zumastor define source zumatest vm1:11235 --period 5;
  zumastor start source zumatest"
 
 Release 0.6 doesn't support saving old snapshots downstream;
