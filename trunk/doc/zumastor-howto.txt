@@ -903,6 +903,30 @@ If you want to export Zumastor snapshots via NFS or Samba, you need to use the +
 options with the +zumastor define master+ command. See sections "Exporting a Zumastor volume via NFS" 
 and "Exporting a Zumastor volume via Samba" for such examples.
 
+Comparison with LVM Snapshots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+LVM can of course also do snapshots.  For instance, to back up a filesystem 
+at an instant using an LVM snapshot and tar, you might do:
+
+ # lvcreate --name backup --size 100M --snapshot sysvg/test
+ # mkdir /mnt/backup
+ # mount /dev/sysvg/backup /mnt/backup
+ # tar -czf /tmp/backup.tgz -C /mnt/backup .
+ # umount /dev/backup
+ # lvremove --force sysvg/backup
+
+Zumastor simplifies this a bit in that it doesn't require creating
+a new LVM logical volume for each snapshot, and it handles the
+mounting for you.  For instance:
+
+ # zumastor snapshot zumatest hourly
+ # tar -czf /tmp/backup.tgz -C /var/run/zumastor/snapshot/zumatest/hourly.0 .
+ 
+The snapshot will be garbage-collected later, no need to remove it,
+no need for manual mounting or unmounting.
+
+
 Where do old snapshots go?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Assuming you've set up a volume to keep 24 hourly snapshots
