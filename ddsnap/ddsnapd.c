@@ -3365,13 +3365,13 @@ static struct snapshot *client_snap(struct superblock *sb, struct client *client
 	return snapshot;
 }
 
-void outerror(int sock, unsigned code, int err, char *text)
+void outerror(int sock, int err, char *text)
 {
 	unsigned len = sizeof(struct generic_error) + strlen(text) + 1;
-	if (outhead(sock, code, len) < 0 ||
+	if (outhead(sock, GENERIC_ERROR, len) < 0 ||
 		writepipe(sock, &err, sizeof(struct generic_error)) < 0 ||
 		writepipe(sock, text, len - sizeof(struct generic_error)) < 0)
-		warn("unable to send error %u", code);
+		warn("unable to send error %u", GENERIC_ERROR);
 }
 
 /*
@@ -3662,7 +3662,7 @@ static int incoming(struct superblock *sb, struct client *client)
 				-err == EFULL ? "too many snapshots" :
 				-err == EEXIST ? "snapshot already exists" :
 				"unknown snapshot create error";
-			outerror(sock, CREATE_SNAPSHOT_ERROR, err, error);
+			outerror(sock, -err, error);
 			break;
 		}
 		save_state(sb);
@@ -3672,19 +3672,18 @@ static int incoming(struct superblock *sb, struct client *client)
 	}
 	case DELETE_SNAPSHOT:
 	{
-#ifdef DEBUG_ERROR
-		goto delete_error;
-#endif
 		struct snapshot *snapshot = find_snap(sb, ((struct create_snapshot *)message.body)->snap);
-		if (!snapshot || usecount(sb, snapshot) || delete_snap(sb, snapshot))
-			goto delete_error;
-		save_state(sb);
-		if (outbead(sock, DELETE_SNAPSHOT_OK, struct { }) < 0)
-			warn("unable to reply to delete snapshot message"); // !!! return message
-		break;
-	delete_error:
-		if (outbead(sock, DELETE_SNAPSHOT_ERROR, struct { })  < 0) // !!! return message
-			warn("unable to send error for delete snapshot message");
+		if (!snapshot)
+			outerror(sock, EINVAL, "snapshot doesn't exist");
+		else if (usecount(sb, snapshot))
+			outerror(sock, EINVAL, "snapshot has non-zero usecount");
+		else if (delete_snap(sb, snapshot))
+			outerror(sock, EIO, "fail to delete snapshot");
+		else {
+			save_state(sb);
+			if (outbead(sock, DELETE_SNAPSHOT_OK, struct { }) < 0)
+				warn("unable to reply to delete snapshot message"); // !!! return message
+		}
 		break;
 	}
 	case INITIALIZE_SNAPSTORE:
@@ -3742,13 +3741,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		struct snapshot *snapshot;
 		uint32_t err = 0;
 		char err_msg[MAX_ERRMSG_SIZE];
-		unsigned int err_len;
 
-#ifdef DEBUG_ERROR
-		snprintf(err_msg, MAX_ERRMSG_SIZE, "Debug mode to test error messages");
-		err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-		goto prio_error;
-#endif
 		if (tag == (u32)~0UL) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Can not set priority for origin");
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
@@ -3767,11 +3760,7 @@ static int incoming(struct superblock *sb, struct client *client)
 			warn("unable to reply to set priority message");
 		break;
 	prio_error:
-		err_len = sizeof(struct priority_error) + strlen(err_msg) + 1;
-                if (outhead(sock, PRIORITY_ERROR, err_len) < 0 ||
-		    writepipe(sock, &err, sizeof(err)) < 0 ||
-		    writepipe(sock, err_msg, err_len - sizeof(struct priority_error)) < 0)
-			warn("unable to reply to PRIORITY message with error");
+		outerror(sock, err, err_msg);
 		break;
 	}
 	case USECOUNT:
@@ -3822,7 +3811,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		break;
 
 	usecnt_error:
-		outerror(sock, USECOUNT_ERROR, err, err_msg);
+		outerror(sock, err, err_msg);
 		break;
 	}
 	case STREAM_EXCEPTIONS:
@@ -3874,17 +3863,16 @@ static int incoming(struct superblock *sb, struct client *client)
 		free_change_list(gcl.cl);
 	eek:
 		warn("%s", error);
-		outerror(sock, CREATE_SNAPSHOT_ERROR, err, error);
+		outerror(sock, err, error);
 		break;
 	}
 	case STATUS:
 	{
 		struct snapshot const *snaplist = sb->image.snaplist;
-		char const *err_msg;
 
 		if (message.head.length != sizeof(struct status_request)) { // maybe we should allow messages to be long and assume zero filled for upward compatibility?
-			err_msg = "status_request has wrong length";
-			goto status_error;
+			outerror(sock, EINVAL, "status_request has wrong length");
+			break;
 		}
 
 		unsigned snapshots = sb->image.snapshots;
@@ -3926,24 +3914,14 @@ static int incoming(struct superblock *sb, struct client *client)
 		free(reply);
 		selfcheck_freespace(sb);
 		break;
-
-	status_error:
-		warn("%s", err_msg);
-		
-		int err;
-		if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
-				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
-			warn("unable to send error for status message: %s", strerror(-err));
-		break;
 	}
 	case REQUEST_SNAPSHOT_STATE:
 	{
 		struct status_request request;
-		char const *err_msg;
 
 		if (message.head.length != sizeof(request)) {
-			err_msg = "state_request has wrong length";
-			goto state_error;
+			outerror(sock, EINVAL, "state_request has wrong length");
+			break;
 		}
 		memcpy(&request, message.body, sizeof(request));
 
@@ -3962,14 +3940,6 @@ static int incoming(struct superblock *sb, struct client *client)
 		if (outbead(sock, SNAPSHOT_STATE, struct state_message, reply.snap, reply.state) < 0)
 			warn("unable to send state message");
 		break;
-
-	state_error:
-		warn("%s", err_msg);
-		int err;
-		if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
-				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
-			warn("unable to send error for status message: %s", strerror(-err));
-		break;
 	}
 	case REQUEST_SNAPSHOT_SECTORS:
 	{
@@ -3977,7 +3947,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		struct snapshot const *snaplist = sb->image.snaplist;
 		struct snapshot_sectors reply;
 		char err_msg[MAX_ERRMSG_SIZE];
-		int i, err;
+		int i;
 
 		reply.snap = snap;
 		reply.count = 0;
@@ -3993,9 +3963,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		if (reply.count == 0) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Snapshot %u is not valid", snap);
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
-				(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
-				warn("unable to send error for snapshot_sectors message: %s", strerror(-err));
+			outerror(sock, EINVAL, err_msg);
 		} else if (outbead(sock, SNAPSHOT_SECTORS, struct snapshot_sectors, reply.snap, reply.count) < 0)
 			warn("unable to send snapshot sectors message");
 		break;
@@ -4003,17 +3971,13 @@ static int incoming(struct superblock *sb, struct client *client)
 	case RESIZE:
 	{
 		int err;
-		char err_msg[MAX_ERRMSG_SIZE];
 		u64 orgsize = ((struct resize_request *)message.body)->orgsize;
 		u64 snapsize = ((struct resize_request *)message.body)->snapsize;
 		u64 metasize = ((struct resize_request *)message.body)->metasize;
 
 		if (sb->metadev == sb->snapdev) {
 			if (snapsize && metasize && snapsize != metasize) {
-				snprintf(err_msg, MAX_ERRMSG_SIZE, "snapshot device and metadata device are the same, can't resize them to two values");
-				if ((err = outhead(sock, STATUS_ERROR, strlen(err_msg)+1)) < 0 ||
-					(err = writepipe(sock, err_msg, strlen(err_msg)+1)) < 0)
-					warn("unable to send resize reply error message: %s", strerror(-err));
+				outerror(sock, EINVAL, "snapshot device and metadata device are the same, can't resize them to two values");
 				break;
 			}
 			if (!metasize)
@@ -4036,7 +4000,7 @@ static int incoming(struct superblock *sb, struct client *client)
 	{	struct protocol_error *pe = malloc(message.head.length);
 		
 		if (!pe) {
-			warn("received protocol error message; unable to retreive information");
+			warn("received protocol error message; unable to retrieve information");
 			break;
 		}
 		
