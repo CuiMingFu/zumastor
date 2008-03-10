@@ -425,8 +425,9 @@ infrequently changing files, the overhead for figuring out what files
 need to be sent can be extreme.</p></div>
 <div class="para"><p>Zumastor keeps track of which block change between one snapshot
 and the next, and can easily send just the changed blocks.
-Thus Zumastor can do periodic replication of large filesystems much more
+Thus Zumastor can do frequent replication of large filesystems much more
 efficiently than rsync can.</p></div>
+<div class="para"><p>See <a href="#_replication_latency_benchmark">Replication Latency Benchmark</a> below.</p></div>
 </div>
 <h2 id="_license">3. License</h2>
 <div class="sectionbody">
@@ -1302,6 +1303,9 @@ mounting for you.  For instance:</p></div>
 </div></div>
 <div class="para"><p>The snapshot will be garbage-collected later, no need to remove it,
 no need for manual mounting or unmounting.</p></div>
+<div class="para"><p>See <a href="#_replication_latency_benchmark">Replication Latency Benchmark</a> below
+for a script that compares performance of zumastor replication
+with rsync.</p></div>
 <h3 id="_where_do_old_snapshots_go">10.9. Where do old snapshots go?</h3><div style="clear:left"></div>
 <div class="para"><p>Assuming you've set up a volume to keep 24 hourly snapshots
 around with the command <tt>zumastor define master zumatest &#8212;hourly 24</tt>
@@ -1872,12 +1876,12 @@ Zumastor works properly for the volume size you intend to use.
 A simple test script is provided
 that copies a large volume to an exported zumastor volume via nfs and at
 the same time take hourly replication between the zumastor nfs server and a backup server.
-The scipt locates at <a href="http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh">http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh</a>.
+The srcipt is located at <a href="http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh">http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh</a>.
 Please take a look at the script and specify the configuration parameters according
 to your setup.</p></div>
 <h3 id="_nsnaps_benchmark">11.2. Nsnaps benchmark</h3><div style="clear:left"></div>
 <div class="para"><p>Nsnaps benchmark provides performance data that relates the number of snapshots taken versus
-the time needed to untar a Linux kernel source tree and sync. The test scipts locate at
+the time needed to untar a Linux kernel source tree and sync. The test script is located at
 <a href="http://zumastor.googlecode.com/svn/trunk/benchmarks/nsnaps/">http://zumastor.googlecode.com/svn/trunk/benchmarks/nsnaps/</a>. Please take a look at the
 README file included in that directory before running the test.</p></div>
 <h3 id="_bonnie_benchmark">11.3. Bonnie benchmark</h3><div style="clear:left"></div>
@@ -1894,11 +1898,20 @@ was originally obtainded from Duke and includes several small changes to port
 the code to the latest Linux systems.
 Please take a look at the README file included in that directory for the
 instructions and examples on running the benchmark.</p></div>
+<h3 id="_replication_latency_benchmark">11.5. Replication latency benchmark</h3><div style="clear:left"></div>
+<div class="para"><p>benchmarks/replatbench.sh is a trivial synthetic replication benchmark.
+It measures how long it takes to replicate filesystems containing
+1 to 100 directories, each containing 1MB of small or large files,
+with zumastor, rsync, and rsync plus lvm snapshots.
+It seems to show that Zumastor as of 0.7 is faster than rsync
+at replicating many, many small unchanged files, but slower
+in all other cases.  (In Zumastor's defense, we have not yet spent any
+time optimizing Zumastor's write performance.)</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-03-10 11:35:17 PDT
+Last updated 2008-03-10 15:06:07 PDT
 </div>
 </div>
 </body>
