@@ -1,0 +1,109 @@
+--- 2.6.23.12.base/fs/bio.c	2008-01-21 20:56:57.000000000 -0800
++++ 2.6.23.12/fs/bio.c	2008-01-21 22:26:01.000000000 -0800
+@@ -31,6 +31,50 @@
+ #define BIO_POOL_SIZE 2
+ #define BIO_NR_POOLS 6
+ 
++/* Bio push/pop (C) 2008, Daniel Phillips <phillips@phunq.net> */
++
++#define BIOSTACK_ALIGN (1 << 2)
++#define BIOCHUNK_SIZE (1 << 7)
++#define BIOCHUNK_MAGIC (0xddc0ffee)
++#define BIOCHUNK_OVERHEAD (sizeof(struct biochunk) + sizeof(struct bioframe))
++#define BIOCHUNK_PAYLOAD (BIOCHUNK_SIZE - BIOCHUNK_OVERHEAD)
++
++struct biochunk { u32 magic; void *oldstack; char frames[]; };
++
++static struct kmem_cache *biospace __read_mostly;
++
++void *bio_push(struct bio *bio, unsigned size, bio_end_io_t *endio)
++{
++	struct bioframe *frame = bio->bi_stack;
++	size += sizeof(struct bioframe);
++	size += -size & (BIOSTACK_ALIGN - 1);
++	if (size > frame->stacksize) {
++		struct biochunk *chunk = kmem_cache_alloc(biospace, __GFP_NOFAIL);
++		BUG_ON(size > BIOCHUNK_PAYLOAD);
++		*chunk = (struct biochunk){ .oldstack = bio->bi_stack, .magic = BIOCHUNK_MAGIC };
++		frame = bio->bi_stack = chunk->frames;
++		*frame = (struct bioframe){ .stacksize = BIOCHUNK_PAYLOAD };
++	}
++	*(struct bioframe *)(bio->bi_stack += size) = (struct bioframe){
++		.framesize = size, .stacksize = frame->stacksize - size, .endio = endio };
++	return frame->space;
++}
++EXPORT_SYMBOL_GPL(bio_push);
++
++void *bio_pop(struct bio *bio)
++{
++	struct bioframe *frame = bio->bi_stack;
++	frame = bio->bi_stack -= frame->framesize;
++	if (!frame->framesize) {
++		struct biochunk *chunk = bio->bi_stack - sizeof(struct biochunk);
++		BUG_ON(chunk->magic != BIOCHUNK_MAGIC);
++		bio->bi_stack = chunk->oldstack;
++		kmem_cache_free(biospace, chunk);
++	}
++	return frame->space;
++}
++EXPORT_SYMBOL_GPL(bio_pop);
++
+ /*
+  * a small number of entries is fine, not going to be performance critical.
+  * basically we just need to survive
+@@ -131,6 +175,8 @@ struct bio *bio_alloc_bioset(gfp_t gfp_m
+ 	bio->bi_flags |= idx << BIO_POOL_OFFSET;
+ 	bio->bi_max_vecs = bio_slabs[idx].nr_vecs;
+ 	bio->bi_io_vec = (void *)bio + sizeof(struct bio);
++	bio->bi_stack = &bio->stackbase;
++	bio->stackbase.framesize = sizeof(struct bioframe);
+ 	return bio;
+ }
+ 
+@@ -1123,6 +1169,8 @@ static int __init init_bio(void)
+ 	if (!bio_split_pool)
+ 		panic("bio: can't create split pool\n");
+ 
++	biospace = kmem_cache_create("biospace", BIOCHUNK_SIZE, 0, SLAB_PANIC, NULL);
++
+ 	return 0;
+ }
+ 
+--- 2.6.23.12.base/include/linux/bio.h	2008-01-21 20:56:57.000000000 -0800
++++ 2.6.23.12/include/linux/bio.h	2008-01-21 22:20:37.000000000 -0800
+@@ -68,6 +68,11 @@ typedef int (bio_end_io_t) (struct bio *
+ typedef void (bio_destructor_t) (struct bio *);
+ 
+ /*
++ * Support endio handler stacking with per-handler private workspace
++ */
++struct bioframe { u16 framesize, stacksize; bio_end_io_t *endio; char space[]; };
++
++/*
+  * main unit of I/O for the block layer and lower layers (ie drivers and
+  * stacking drivers)
+  */
+@@ -114,6 +119,8 @@ struct bio {
+ 	void			*bi_private;
+ 
+ 	bio_destructor_t	*bi_destructor;	/* destructor */
++	void			*bi_stack;	/* endio stacking */
++	struct bioframe		stackbase;
+ };
+ 
+ /*
+@@ -186,12 +193,12 @@ struct bio {
+ 
+ static inline void bio_set_endio(struct bio *bio, bio_end_io_t *endio)
+ {
+-	bio->bi_endio = endio;
++	((struct bioframe *)bio->bi_stack)->endio = endio;
+ }
+ 
+ static inline bio_end_io_t *bio_get_endio(struct bio *bio)
+ {
+-	return bio->bi_endio;
++	return ((struct bioframe *)bio->bi_stack)->endio;
+ }
+ 
+ /*

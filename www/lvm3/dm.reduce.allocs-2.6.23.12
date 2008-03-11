@@ -1,0 +1,155 @@
+--- 2.6.23.12.base/drivers/md/dm.c	2008-01-26 04:51:03.000000000 -0800
++++ 2.6.23.12/drivers/md/dm.c	2008-01-26 04:56:31.000000000 -0800
+@@ -491,11 +491,9 @@ static void dec_pending(struct dm_io *io
+ 	}
+ }
+ 
+-static int clone_endio(struct bio *bio, unsigned int done, int error)
++static int dm_endio(struct bio *bio, unsigned int done, int error, struct dm_target_io *tio)
+ {
+ 	int r = 0;
+-	struct dm_target_io *tio = bio->bi_private;
+-	struct mapped_device *md = tio->io->md;
+ 	dm_endio_fn endio = tio->ti->type->end_io;
+ 
+ 	if (bio->bi_size)
+@@ -522,17 +520,28 @@ static int clone_endio(struct bio *bio, 
+ 	}
+ 
+ 	dec_pending(tio->io, error);
++	return r;
++}
+ 
++static int clone_endio(struct bio *bio, unsigned int done, int error)
++{
++	struct dm_target_io *tio = bio->bi_private;
++	struct mapped_device *md = tio->io->md;
++	int r = dm_endio(bio, done, error, tio);
+ 	/*
+ 	 * Store md for cleanup instead of tio which is about to get freed.
+ 	 */
+ 	bio->bi_private = md->bs;
+-
+ 	bio_put(bio);
+ 	free_tio(md, tio);
+ 	return r;
+ }
+ 
++static int dm_endio_pop(struct bio *bio, unsigned int done, int error)
++{
++	return dm_endio(bio, done, error, bio_pop(bio));
++}
++
+ static sector_t max_io_len(struct mapped_device *md,
+ 			   sector_t sector, struct dm_target *ti)
+ {
+@@ -553,8 +562,7 @@ static sector_t max_io_len(struct mapped
+ 	return len;
+ }
+ 
+-static void __map_bio(struct dm_target *ti, struct bio *clone,
+-		      struct dm_target_io *tio)
++static void __map_bio(struct dm_target *ti, struct bio *clone, struct dm_target_io *tio)
+ {
+ 	int r;
+ 	sector_t sector;
+@@ -600,6 +608,37 @@ static void __map_bio(struct dm_target *
+ 	}
+ }
+ 
++static void dm_map(struct bio *bio, struct dm_target *ti, struct dm_target_io *tio)
++{
++	int r;
++	sector_t sector;
++
++	/*
++	 * Map the bio.  If r == 0 we don't need to do
++	 * anything, the target has assumed ownership of
++	 * this io.
++	 */
++	atomic_inc(&tio->io->io_count);
++	sector = bio->bi_sector;
++	r = ti->type->map(ti, bio, &tio->info);
++	if (r == DM_MAPIO_REMAPPED) {
++		/* the bio has been remapped so dispatch it */
++
++		blk_add_trace_remap(bdev_get_queue(bio->bi_bdev), bio,
++				    tio->io->bio->bi_bdev->bd_dev,
++				    bio->bi_sector, sector);
++
++		generic_make_request(bio);
++	} else if (r < 0 || r == DM_MAPIO_REQUEUE) {
++		/* error the io and bail out, or requeue it if needed */
++		bio_pop(bio);
++		dec_pending(tio->io, r);
++	} else if (r) {
++		DMWARN("unimplemented target map return value: %d", r);
++		BUG();
++	}
++}
++
+ struct clone_info {
+ 	struct mapped_device *md;
+ 	struct dm_table *map;
+@@ -670,23 +709,18 @@ static void __clone_and_map(struct clone
+ 	sector_t len = 0, max = max_io_len(ci->md, ci->sector, ti);
+ 	struct dm_target_io *tio;
+ 
+-	/*
+-	 * Allocate a target io object.
+-	 */
+-	tio = alloc_tio(ci->md);
+-	tio->io = ci->io;
+-	tio->ti = ti;
+-	memset(&tio->info, 0, sizeof(tio->info));
+-
+ 	if (ci->sector_count <= max) {
+ 		/*
+ 		 * Optimise for the simple case where we can do all of
+ 		 * the remaining io with a single clone.
+ 		 */
+-		clone = clone_bio(bio, ci->sector, ci->idx,
+-				  bio->bi_vcnt - ci->idx, ci->sector_count,
+-				  ci->md->bs);
+-		__map_bio(ti, clone, tio);
++		tio = bio_push(bio, sizeof(*tio), dm_endio_pop);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++		bio->bi_sector = ci->sector;
++		bio->bi_idx = ci->idx;
++		bio->bi_size = to_bytes(ci->sector_count);
++		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
++		dm_map(bio, ti, tio);
+ 		ci->sector_count = 0;
+ 
+ 	} else if (to_sector(bio->bi_io_vec[ci->idx].bv_len) <= max) {
+@@ -698,6 +732,9 @@ static void __clone_and_map(struct clone
+ 		sector_t remaining = max;
+ 		sector_t bv_len;
+ 
++		tio = alloc_tio(ci->md);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++
+ 		for (i = ci->idx; remaining && (i < bio->bi_vcnt); i++) {
+ 			bv_len = to_sector(bio->bi_io_vec[i].bv_len);
+ 
+@@ -724,6 +761,9 @@ static void __clone_and_map(struct clone
+ 		sector_t remaining = to_sector(bv->bv_len);
+ 		unsigned int offset = 0;
+ 
++		tio = alloc_tio(ci->md);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++
+ 		do {
+ 			if (offset) {
+ 				ti = dm_table_find_target(ci->map, ci->sector);
+--- 2.6.23.12.base/drivers/md/dm-crypt.c	2008-01-26 04:51:03.000000000 -0800
++++ 2.6.23.12/drivers/md/dm-crypt.c	2008-01-26 04:57:07.000000000 -0800
+@@ -854,7 +854,7 @@ static int crypt_ctr(struct dm_target *t
+ 		goto bad4;
+ 	}
+ 
+-	cc->bs = bioset_create(MIN_IOS, MIN_IOS);
++	cc->bs = bioset_create(MIN_IOS);
+ 	if (!cc->bs) {
+ 		ti->error = "Cannot allocate crypt bioset";
+ 		goto bad_bs;
