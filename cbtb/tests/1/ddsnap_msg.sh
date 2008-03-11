@@ -27,22 +27,22 @@ ddsnap create /tmp/src.server 0
 echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/src.control 0 | dmsetup create test\(0\)
 
 # error message checking
-(ddsnap create /tmp/src.server 0 >& /tmp/error)
+(ddsnap create /tmp/src.server 0 > /tmp/error 2>&1)
 grep "snapshot already exists" /tmp/error || { echo "not ok 0 - create error check"; exit -1; }
 echo "ok 0 - create error check"
-(ddsnap delete /tmp/src.server 1 >& /tmp/error)
+(ddsnap delete /tmp/src.server 1 > /tmp/error 2>&1)
 grep "snapshot doesn't exist" /tmp/error || { echo "not ok 1 - delete error check"; exit -1; }
 echo "ok 1 - delete error check"
-(ddsnap usecount /tmp/src.server 0 -1 >& /tmp/error)
+(ddsnap usecount /tmp/src.server 0 -1 > /tmp/error 2>&1)
 grep "Usecount underflow" /tmp/error || { echo "not ok 2 - usecount error check"; exit -1; }
 echo "ok 2 - usecount error check"
-(ddsnap priority /tmp/src.server 1 2 >& /tmp/error)
+(ddsnap priority /tmp/src.server 1 2 > /tmp/error 2>&1)
 grep "Snapshot tag 1 is not valid" /tmp/error || { echo "not ok 3 - priority error check"; exit -1; }
 echo "ok 3 - priority error check"
-(ddsnap status --size /tmp/src.server 1 >& /tmp/error)
+(ddsnap status --size /tmp/src.server 1 > /tmp/error 2>&1)
 grep "Snapshot 1 is not valid" /tmp/error || { echo "not ok 4 - size error check"; exit -1; }
 echo "ok 4 - size error check"
-(ddsnap resize /tmp/src.server -s 3G -m 1G >& /tmp/error)
+(ddsnap resize /tmp/src.server -s 3G -m 1G > /tmp/error 2>&1)
 grep "snapshot device and metadata device are the same, can't resize them to two values" /tmp/error || { echo "not ok 5 - size error check"; exit -1; }
 echo "ok 5 - size error check"
 
