@@ -1553,7 +1553,122 @@ zumastor start source zumatest"</tt></pre>
 </div></div>
 <div class="para"><p>Release 0.6 doesn't support saving old snapshots downstream;
 this is <a href="http://code.google.com/p/zumastor/issues/detail?id=26">bug 26</a>.</p></div>
-<h3 id="_export_a_zumastor_volume_via_nfs">10.11. Export a Zumastor volume via NFS</h3><div style="clear:left"></div>
+<h3 id="_multilayer_replication">10.11. Multilayer replication</h3><div style="clear:left"></div>
+<div class="para"><p>This section illustrates how to set up chained replication on multiple machines, e.g.,
+<em>original</em> replicates to <em>replica1</em> that replicates to <em>replica2</em>.</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Set up root login on all of the three machines, see section "Enable root login" above.
+</p>
+</li>
+<li>
+<p>
+Set up SSH authorizations between <em>original</em> and <em>replica1</em>, and <em>replica1</em> and <em>replica2</em>,
+as described in section "SSH authorization" above.
+</p>
+</li>
+<li>
+<p>
+Create volume on master, as described in section "Create volume on master".
+</p>
+</li>
+<li>
+<p>
+Define target on master, as described in section "Define target on master".
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor define target zumatest replica1.example.com</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Create volume on <em>replica1</em>, as described in section "Create volume on target".
+</p>
+</li>
+<li>
+<p>
+Define volume and configure source on <em>replica1</em>, as described in section "Define volume and configure source on target".
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica1:~#  zumastor define source zumatest original.example.com --period 600</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Define target on <em>replica1</em>.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor define target zumatest replica2.example.com</tt></pre>
+</div></div>
+<div class="para"><p>Running <tt>zumastor status</tt> on <em>replica1</em> shows that the machine is both the target and the source
+of the volume replication.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~# zumastor status
+...
+source
+   hostname: original.example.com
+   name: zumatest
+   period: 600
+targets
+   replica2.example.com
+      name: zumatest
+...</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Create volume on <em>replica2</em>, as described in section "Create volume on target".
+</p>
+</li>
+<li>
+<p>
+Define volume and configure source on <em>replica2</em> as <em>replica1</em>.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica2:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica2:~#  zumastor define source zumatest replica1.example.com --period 600</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Start replication.
+You can set up automatic chained replication
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor start source zumatest
+root@replica2:~#  zumastor start source zumatest</tt></pre>
+</div></div>
+<div class="para"><p>or start replication manually</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  zumastor replicate zumatest replica1.example.com
+root@replica1:~#  zumastor replicate zumatest replica2.example.com</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Verify replication.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  date &gt;&gt; /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>Wait for the next replication cycle to complete on both replicas.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica2:~#  cat /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<h3 id="_export_a_zumastor_volume_via_nfs">10.12. Export a Zumastor volume via NFS</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1607,7 +1722,7 @@ does this for you:</p></div>
 <div class="para"><p>To export zumastor volumes from a different path, you can either symlink the zumastor volumes
 to that path or use the <tt>&#8212;mountpoint</tt> and <tt>&#8212;snappath</tt> options
 with the command <tt>zumastor define volume</tt> described in section "Origin and Snapshot mount points" above.</p></div>
-<h3 id="_recover_files_through_nfs_using_a_zumastor_snapshot">10.12. Recover files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recover_files_through_nfs_using_a_zumastor_snapshot">10.13. Recover files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>&#8212;export</tt> option with the <tt>zumastor define master</tt>
 command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.</p></div>
@@ -1632,7 +1747,7 @@ visible inside each directory, which would let you access them from any
 place under the volume mount point.</td>
 </tr></table>
 </div>
-<h3 id="_export_a_zumastor_volume_via_samba">10.13. Export a Zumastor volume via Samba</h3><div style="clear:left"></div>
+<h3 id="_export_a_zumastor_volume_via_samba">10.14. Export a Zumastor volume via Samba</h3><div style="clear:left"></div>
 <div class="para"><p>Here is an example of setting up Samba on Zumastor using the USER authentication flavor.</p></div>
 <div class="olist"><ol>
 <li>
@@ -1691,7 +1806,7 @@ the <tt>&#8212;samba</tt> option with the command <tt>zumastor define master</tt
 </div></div>
 </li>
 </ol></div>
-<h3 id="_recover_files_through_samba_using_a_zumastor_snapshot">10.14. Recover files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
+<h3 id="_recover_files_through_samba_using_a_zumastor_snapshot">10.15. Recover files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
 <div class="para"><p>First, make sure you have used the <tt>samba</tt> option with the <tt>zumastor define master</tt>
 command as described in the section "Exporting a Zumastor volume via Samba" above.
 Then you can recover files from a Windows Samba client as follows.</p></div>
@@ -1712,12 +1827,12 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 </p>
 </li>
 </ol></div>
-<h3 id="_resize_a_zumastor_volume">10.15. Resize a Zumastor volume</h3><div style="clear:left"></div>
+<h3 id="_resize_a_zumastor_volume">10.16. Resize a Zumastor volume</h3><div style="clear:left"></div>
 <div class="para"><p>Suppose you have a Zumastor volume <em>zumatest</em> that uses the <em>/dev/sysvg/test</em> LVM device as the origin and
 <em>/dev/sysvg/test_snap</em> LVM device as the snapshot store.
 Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system
 running on top of it.</p></div>
-<h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.15.1. Enlarge the origin device of a Zumastor volume</h4>
+<h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.16.1. Enlarge the origin device of a Zumastor volume</h4>
 <div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="olist"><ol>
 <li>
@@ -1764,7 +1879,7 @@ You will see that the size of the origin volume has changed but the size of
 all the existing snapshots is unchanged.</p></div>
 </li>
 </ol></div>
-<h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.15.2. Shrink the origin device of a Zumastor volume</h4>
+<h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.16.2. Shrink the origin device of a Zumastor volume</h4>
 <div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="para"><p>The steps to shrink the origin device of a Zumastor volume is similar to those for
 enlarging the origin device, but need to be ran in different orders.</p></div>
@@ -1817,7 +1932,7 @@ Now it is safe to shrink the origin LVM device.
 </div></div>
 </li>
 </ol></div>
-<h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.15.3. Enlarge the snapshot store of a Zumastor volume</h4>
+<h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.16.3. Enlarge the snapshot store of a Zumastor volume</h4>
 <div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="para"><p>Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
 run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the snapshot lvm device.</p></div>
@@ -1827,7 +1942,7 @@ run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the sna
 zumastor resize zumatest --snapshot newsize</tt></pre>
 </div></div>
 <div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
-<h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.15.4. Shrink the snapshot store of a Zumastor volume</h4>
+<h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.16.4. Shrink the snapshot store of a Zumastor volume</h4>
 <div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="para"><p>The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
 to be run carefully. First, run the <tt>zumastor resize &#8212;snapshot</tt> command to shrink
@@ -1855,7 +1970,7 @@ If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize those partitions.</td>
 </tr></table>
 </div>
-<h3 id="_how_can_i_run_the_above_examples_using_uml">10.16. How can I run the above examples using UML?</h3><div style="clear:left"></div>
+<h3 id="_how_can_i_run_the_above_examples_using_uml">10.17. How can I run the above examples using UML?</h3><div style="clear:left"></div>
 <div class="para"><p>First off, cd into test/uml.</p></div>
 <div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
 and working.</p></div>
@@ -1911,7 +2026,7 @@ time optimizing Zumastor's write performance.)</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-03-10 15:06:07 PDT
+Last updated 2008-03-10 18:27:23 PDT
 </div>
 </div>
 </body>
