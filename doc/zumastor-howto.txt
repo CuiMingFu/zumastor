@@ -1193,6 +1193,87 @@ replication, but seems to replicate quickly after that.
 Release 0.6 doesn't support saving old snapshots downstream;
 this is http://code.google.com/p/zumastor/issues/detail?id=26[bug 26].
 
+Multilayer replication
+~~~~~~~~~~~~~~~~~~~~~~~
+This section illustrates how to set up chained replication on multiple machines, e.g.,
+'original' replicates to 'replica1' that replicates to 'replica2'.
+
+1. Set up root login on all of the three machines, see section "Enable root login" above.
+
+2. Set up SSH authorizations between 'original' and 'replica1', and 'replica1' and 'replica2',
+as described in section "SSH authorization" above.
+
+3. Create volume on master, as described in section "Create volume on master".
+
+4. Define target on master, as described in section "Define target on master".
+
+ root@original:~# zumastor define target zumatest replica1.example.com
+
+5. Create volume on 'replica1', as described in section "Create volume on target".
+
+6. Define volume and configure source on 'replica1', as described in section "Define volume and configure source on target".
+
+ root@replica1:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+ root@replica1:~#  zumastor define source zumatest original.example.com --period 600
+
+7. Define target on 'replica1'.
++
+.....................................
+root@replica1:~#  zumastor define target zumatest replica2.example.com
+.....................................
++
+Running `zumastor status` on 'replica1' shows that the machine is both the target and the source
+of the volume replication.
++
+.....................................
+root@replica1:~# zumastor status
+...
+source
+   hostname: original.example.com
+   name: zumatest
+   period: 600
+targets
+   replica2.example.com
+      name: zumatest
+...
+.....................................
++
+
+8. Create volume on 'replica2', as described in section "Create volume on target".
+
+9. Define volume and configure source on 'replica2' as 'replica1'.
+
+ root@replica2:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+ root@replica2:~#  zumastor define source zumatest replica1.example.com --period 600
+
+10. Start replication.
+You can set up automatic chained replication
++
+.....................................
+root@replica1:~#  zumastor start source zumatest
+root@replica2:~#  zumastor start source zumatest
+.....................................
++
+or start replication manually
++
+.....................................
+root@original:~#  zumastor replicate zumatest replica1.example.com
+root@replica1:~#  zumastor replicate zumatest replica2.example.com
+.....................................
++
+
+11. Verify replication.
++
+.....................................
+root@original:~#  date >> /var/run/zumastor/mount/zumatest/testfile
+.....................................
++
+Wait for the next replication cycle to complete on both replicas.
++
+.....................................
+root@replica2:~#  cat /var/run/zumastor/mount/zumatest/testfile
+.....................................
+
 Export a Zumastor volume via NFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1. Install the NFS server packages:
