@@ -1,5 +1,5 @@
---- 2.6.23.12.clean/drivers/md/dm.c	2007-12-18 13:55:57.000000000 -0800
-+++ 2.6.23.12/drivers/md/dm.c	2008-01-19 21:41:41.000000000 -0800
+--- 2.6.23.12.base/drivers/md/dm.c	2008-02-14 02:01:41.000000000 -0800
++++ 2.6.23.12/drivers/md/dm.c	2008-03-11 01:39:04.000000000 -0700
 @@ -1017,7 +1017,7 @@ static struct mapped_device *alloc_dev(i
  	if (!md->tio_pool)
  		goto bad3;
@@ -9,8 +9,30 @@
  	if (!md->bs)
  		goto bad_no_bioset;
  
---- 2.6.23.12.clean/fs/bio.c	2007-12-18 13:55:57.000000000 -0800
-+++ 2.6.23.12/fs/bio.c	2008-01-20 02:09:11.000000000 -0800
+--- 2.6.23.12.base/drivers/md/dm-crypt.c	2008-01-28 20:33:06.000000000 -0800
++++ 2.6.23.12/drivers/md/dm-crypt.c	2008-03-11 01:47:19.000000000 -0700
+@@ -854,7 +854,7 @@ static int crypt_ctr(struct dm_target *t
+ 		goto bad4;
+ 	}
+ 
+-	cc->bs = bioset_create(MIN_IOS, MIN_IOS);
++	cc->bs = bioset_create(MIN_IOS);
+ 	if (!cc->bs) {
+ 		ti->error = "Cannot allocate crypt bioset";
+ 		goto bad_bs;
+--- 2.6.23.12.base/drivers/md/dm-io.c	2008-01-28 20:33:06.000000000 -0800
++++ 2.6.23.12/drivers/md/dm-io.c	2008-03-11 01:39:04.000000000 -0700
+@@ -55,7 +55,7 @@ struct dm_io_client *dm_io_client_create
+ 	if (!client->pool)
+ 		goto bad;
+ 
+-	client->bios = bioset_create(16, 16);
++	client->bios = bioset_create(16);
+ 	if (!client->bios)
+ 		goto bad;
+ 
+--- 2.6.23.12.base/fs/bio.c	2008-01-28 20:33:09.000000000 -0800
++++ 2.6.23.12/fs/bio.c	2008-03-11 01:39:04.000000000 -0700
 @@ -29,10 +29,7 @@
  #include <scsi/sg.h>		/* for struct sg_iovec */
  
@@ -289,8 +311,8 @@
  	if (!fs_bio_set)
  		panic("bio: can't allocate bios\n");
  
---- 2.6.23.12.clean/include/linux/bio.h	2007-12-18 13:55:57.000000000 -0800
-+++ 2.6.23.12/include/linux/bio.h	2008-01-19 21:16:51.000000000 -0800
+--- 2.6.23.12.base/include/linux/bio.h	2008-01-28 20:33:09.000000000 -0800
++++ 2.6.23.12/include/linux/bio.h	2008-03-11 01:39:42.000000000 -0700
 @@ -278,7 +278,7 @@ extern struct bio_pair *bio_split(struct
  extern mempool_t *bio_split_pool;
  extern void bio_pair_release(struct bio_pair *dbio);

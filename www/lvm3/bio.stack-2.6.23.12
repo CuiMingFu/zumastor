@@ -1,6 +1,6 @@
---- 2.6.23.12.base/fs/bio.c	2008-01-21 20:56:57.000000000 -0800
-+++ 2.6.23.12/fs/bio.c	2008-01-21 22:26:01.000000000 -0800
-@@ -31,6 +31,50 @@
+--- 2.6.23.12.base/fs/bio.c	2008-03-11 02:00:13.000000000 -0700
++++ 2.6.23.12/fs/bio.c	2008-03-11 02:31:33.000000000 -0700
+@@ -31,6 +31,63 @@
  #define BIO_POOL_SIZE 2
  #define BIO_NR_POOLS 6
  
@@ -16,20 +16,33 @@
 +
 +static struct kmem_cache *biospace __read_mostly;
 +
++static struct biochunk *alloc_biochunk(void)
++{
++	return kmem_cache_alloc(biospace, __GFP_NOFAIL);
++}
++
++static void free_biochunk(struct biochunk *chunk)
++{
++	kmem_cache_free(biospace, chunk);
++}
++
 +void *bio_push(struct bio *bio, unsigned size, bio_end_io_t *endio)
 +{
 +	struct bioframe *frame = bio->bi_stack;
 +	size += sizeof(struct bioframe);
 +	size += -size & (BIOSTACK_ALIGN - 1);
-+	if (size > frame->stacksize) {
-+		struct biochunk *chunk = kmem_cache_alloc(biospace, __GFP_NOFAIL);
++	if (unlikely(size > frame->stacksize)) {
++		struct biochunk *chunk = alloc_biochunk();
++		bio_end_io_t *old = frame->endio;
 +		BUG_ON(size > BIOCHUNK_PAYLOAD);
 +		*chunk = (struct biochunk){ .oldstack = bio->bi_stack, .magic = BIOCHUNK_MAGIC };
 +		frame = bio->bi_stack = chunk->frames;
-+		*frame = (struct bioframe){ .stacksize = BIOCHUNK_PAYLOAD };
++		*frame = (struct bioframe){ .stacksize = BIOCHUNK_PAYLOAD, .endio = old };
 +	}
-+	*(struct bioframe *)(bio->bi_stack += size) = (struct bioframe){
-+		.framesize = size, .stacksize = frame->stacksize - size, .endio = endio };
++	bio->bi_stack += size;
++	*(struct bioframe *)bio->bi_stack = (struct bioframe){
++		.stacksize = frame->stacksize - size,
++		.framesize = size, .endio = endio };
 +	return frame->space;
 +}
 +EXPORT_SYMBOL_GPL(bio_push);
@@ -37,13 +50,13 @@
 +void *bio_pop(struct bio *bio)
 +{
 +	struct bioframe *frame = bio->bi_stack;
-+	frame = bio->bi_stack -= frame->framesize;
-+	if (!frame->framesize) {
++	if (unlikely(!frame->framesize)) {
 +		struct biochunk *chunk = bio->bi_stack - sizeof(struct biochunk);
 +		BUG_ON(chunk->magic != BIOCHUNK_MAGIC);
-+		bio->bi_stack = chunk->oldstack;
-+		kmem_cache_free(biospace, chunk);
++		frame = bio->bi_stack = chunk->oldstack;
++		free_biochunk(chunk);
 +	}
++	frame = bio->bi_stack -= frame->framesize;
 +	return frame->space;
 +}
 +EXPORT_SYMBOL_GPL(bio_pop);
@@ -51,16 +64,27 @@
  /*
   * a small number of entries is fine, not going to be performance critical.
   * basically we just need to survive
-@@ -131,6 +175,8 @@ struct bio *bio_alloc_bioset(gfp_t gfp_m
+@@ -75,8 +132,9 @@ void bio_free(struct bio *bio, struct bi
+ {
+ 	const int pool_idx = BIO_POOL_IDX(bio);
+ 
++	if (!((struct bioframe *)bio->bi_stack)->framesize)
++		bio_pop(bio);
+ 	BIO_BUG_ON(pool_idx >= BIO_NR_POOLS);
+-
+ 	mempool_free(bio, bio_set->bio_pools[pool_idx]);
+ }
+ 
+@@ -131,6 +189,8 @@ struct bio *bio_alloc_bioset(gfp_t gfp_m
  	bio->bi_flags |= idx << BIO_POOL_OFFSET;
  	bio->bi_max_vecs = bio_slabs[idx].nr_vecs;
  	bio->bi_io_vec = (void *)bio + sizeof(struct bio);
-+	bio->bi_stack = &bio->stackbase;
-+	bio->stackbase.framesize = sizeof(struct bioframe);
++	bio->bi_stack = &bio->space;
++	bio->space.framesize = sizeof(struct bioframe);
  	return bio;
  }
  
-@@ -1123,6 +1169,8 @@ static int __init init_bio(void)
+@@ -1123,6 +1183,8 @@ static int __init init_bio(void)
  	if (!bio_split_pool)
  		panic("bio: can't create split pool\n");
  
@@ -69,8 +93,8 @@
  	return 0;
  }
  
---- 2.6.23.12.base/include/linux/bio.h	2008-01-21 20:56:57.000000000 -0800
-+++ 2.6.23.12/include/linux/bio.h	2008-01-21 22:20:37.000000000 -0800
+--- 2.6.23.12.base/include/linux/bio.h	2008-03-11 02:00:13.000000000 -0700
++++ 2.6.23.12/include/linux/bio.h	2008-03-11 02:42:44.000000000 -0700
 @@ -68,6 +68,11 @@ typedef int (bio_end_io_t) (struct bio *
  typedef void (bio_destructor_t) (struct bio *);
  
@@ -88,7 +112,7 @@
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
 +	void			*bi_stack;	/* endio stacking */
-+	struct bioframe		stackbase;
++	struct bioframe		space;
  };
  
  /*
@@ -107,3 +131,13 @@
  }
  
  /*
+@@ -295,7 +302,8 @@ extern struct bio *bio_alloc(gfp_t, int)
+ extern struct bio *bio_alloc_bioset(gfp_t, int, struct bio_set *);
+ extern void bio_put(struct bio *);
+ extern void bio_free(struct bio *, struct bio_set *);
+-
++extern void *bio_push(struct bio *bio, unsigned size, bio_end_io_t *endio);
++extern void *bio_pop(struct bio *bio);
+ extern void bio_endio(struct bio *, unsigned int, int);
+ struct request_queue;
+ extern int bio_phys_segments(struct request_queue *, struct bio *);

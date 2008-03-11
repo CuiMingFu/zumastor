@@ -142,14 +142,3 @@
  		do {
  			if (offset) {
  				ti = dm_table_find_target(ci->map, ci->sector);
---- 2.6.23.12.base/drivers/md/dm-crypt.c	2008-01-26 04:51:03.000000000 -0800
-+++ 2.6.23.12/drivers/md/dm-crypt.c	2008-01-26 04:57:07.000000000 -0800
-@@ -854,7 +854,7 @@ static int crypt_ctr(struct dm_target *t
- 		goto bad4;
- 	}
- 
--	cc->bs = bioset_create(MIN_IOS, MIN_IOS);
-+	cc->bs = bioset_create(MIN_IOS);
- 	if (!cc->bs) {
- 		ti->error = "Cannot allocate crypt bioset";
- 		goto bad_bs;
