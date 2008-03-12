@@ -34,7 +34,7 @@ timeout_file_wait() {
 
 function file_check {
   if diff -q /var/run/zumastor/mount/testvol/testfile \
-      /var/run/zumastor/mount/testvol/.snapshot/hourly.0/testfile 2>&1 >/dev/null ; then
+      /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
     echo "ok $1 - $2"
   else
     ls -lR /var/run/zumastor/mount
