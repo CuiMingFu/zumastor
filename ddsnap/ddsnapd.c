@@ -3814,12 +3814,11 @@ static int incoming(struct superblock *sb, struct client *client)
 		outerror(sock, err, err_msg);
 		break;
 	}
-	case STREAM_EXCEPTIONS:
 	case STREAM_CHANGELIST:
 	{
 		u32 tag1 = ((struct stream_changelist *)message.body)->snap1;
 		u32 tag2 = ((struct stream_changelist *)message.body)->snap2;
-		int against_origin = message.head.code == STREAM_EXCEPTIONS;
+		int against_origin = (tag1 == (u32)~0UL);
 		char *error = "unable to generate changelist";
 		err = EINVAL;
 
@@ -3844,7 +3843,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		error = "unable to generate changelist";
 		struct gen_changelist gcl = {
 			.cl = init_change_list(sb->snapdata.asi->allocsize_bits, tag1, tag2),
-			.mask1 = against_origin ? 0 : 1ULL << snapshot1->bit,
+			.mask1 = against_origin ? ~0ULL : 1ULL << snapshot1->bit,
 			.mask2 = 1ULL << snapshot2->bit };
 
 		if (!gcl.cl)

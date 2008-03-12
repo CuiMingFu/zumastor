@@ -2113,6 +2113,8 @@ int main(int argc, char *argv[])
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
 		  "Resize\n\t Function: Change origin/snapshot/metadata device size\n\t Usage: resize [OPTION...] <sockname>", NULL },
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
+		  "Revert to snapshot\n\t Function: Revert to a snapshot\n\t Usage: revert <sockname> <snapshot>", NULL },
 		{ "version", 'V', POPT_ARG_NONE, NULL, 0, "Show version", NULL },
 		POPT_AUTOHELP
 		POPT_TABLEEND
@@ -3104,6 +3106,85 @@ int main(int argc, char *argv[])
 		int ret = ddsnap_resize_devices(sock, orgsize, snapsize, metasize);
 
 		return ret;
+	}
+	/* syntax for snapshot revert: ddsnap revert <socket> <snap> */
+	if (strcmp(command, "revert") == 0) {
+		u32 snaptag;
+		int err = 0, orgdev = -1, snapdev = -1, serv_fd;
+		char *devstem = NULL, *devname = NULL, *buffer = NULL, *volume;
+		struct change_list *cl = NULL;
+
+		if (argc != 4) {
+			printf("Usage: %s revert <sockname> <snapshot>\n", argv[0]);
+			return -1;
+		}
+		if (parse_snaptag(argv[3], &snaptag) < 0) {
+			fprintf(stderr, "%s: invalid snapshot %s\n", argv[0], argv[3]);
+			return -1;
+		}
+		serv_fd = create_socket(argv[2]);
+
+		err = -EINVAL;
+		if (!(volume = strrchr(argv[2], '/'))) {
+			warn("cannot get volume name from server sockname");
+			goto out;
+		}
+		if ((cl = stream_changelist(serv_fd, (u32)~0UL, snaptag)) == NULL) {
+			warn("could not receive change list between origin and snapshot %Lu", (llu_t) snaptag);
+			goto out;
+		}
+
+		err = -ENOMEM;
+		size_t chunksize = 1 << cl->chunksize_bits;
+		if (!(buffer = malloc(chunksize)))
+			goto out;
+		if (!(devstem = malloc(strlen(DEVMAP_PATH) + strlen(volume) + 1)))
+			goto out;
+		sprintf(devstem, "%s%s", DEVMAP_PATH, volume);
+		if (!(devname = malloc_snapshot_name(devstem, snaptag)))
+			goto out;
+
+		trace_off(printf("volume %s, devstem %s, devname %s\n", volume, devstem, devname););
+		if ((orgdev = open(devstem, O_WRONLY)) < 0) {
+			warn("unable to open origin device %s: %s", devstem, strerror(errno));
+			err = orgdev;
+			goto out;
+		}
+		if ((snapdev = open(devname, O_RDONLY)) < 0) {
+			warn("unable to open target snapshot: %s", strerror(errno));
+			err = snapdev;
+			goto out;
+		}
+
+		err = -EIO;
+		trace_off(printf("cl->count %Lu, chunksize %u\n", cl->count, chunksize););
+		for (int i = 0; i < cl->count; i++) {
+			off_t chunkpos = cl->chunks[i] << cl->chunksize_bits;
+			if (diskread(snapdev, buffer, chunksize, chunkpos) == -1) {
+				warn("error when reading snapshot at %Lu", (unsigned long long)chunkpos);
+				goto out;
+			}
+			if (diskwrite(orgdev, buffer, chunksize, chunkpos) == -1) {
+				warn("error when writing origin at %Lu", (unsigned long long)chunkpos);
+				goto out;	
+			}
+		}
+		err = 0;
+out:
+		close(serv_fd);
+		if (cl)
+			free_change_list(cl);
+		if (buffer)
+			free(buffer);
+		if (devstem)
+			free(devstem);
+		if (devname)
+			free(devname);
+		if (orgdev >= 0)
+			close(orgdev);
+		if (snapdev >= 0)
+			close(snapdev);
+		return err;
 	}
 
 	fprintf(stderr, "%s: unrecognized subcommand: %s.\n", argv[0], command);
