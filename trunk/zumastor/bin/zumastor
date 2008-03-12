@@ -951,7 +951,7 @@ define)
 		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
 		[[ -z $cachesize ]] || echo $cachesize >$path/cachesize
 		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || { echo "$0: initialize volume '$vol' failed"; exit 1; }
-		[[ -z $zero ]] || dd if=/dev/zero of=$origin bs=1M || { echo "$0: zero volume '$vol' failed"; exit 1; }
+		[[ -z $zero ]] || dd if=/dev/zero of=$origin bs=512 count=`blockdev --getsz $origin` || { echo "$0: zero volume '$vol' failed"; exit 1; }
 
 		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
 		exit ;;
