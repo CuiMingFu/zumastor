@@ -286,8 +286,8 @@ static int unknown_message(int sock, struct head *head)
 		struct protocol_error error;
 		if (head->length < sizeof(error)) {
 			snprintf(reason, sizeof(reason),
-				"expected protocol error of %i bytes but only got %i",
-				sizeof(error), head->length);
+				"expected protocol error of %zu bytes but only got %u",
+					 sizeof(error), head->length);
 			err = EINVAL;
 			return -1;
 		}
@@ -342,7 +342,7 @@ static int get_reply(int sock, char *request, int code_ok, int reply_len, void *
 		return -1;
 	if (size != reply_len) {
 		snprintf(reason, sizeof(reason),
-			"%s length mismatch: expected >=%zu, actual %u", request, reply_len, size);
+			"%s length mismatch: expected >=%i, actual %i", request, reply_len, size);
 		errno = EINVAL;
 		return -1;
 	}
@@ -1936,9 +1936,9 @@ static int ddsnap_resize_devices(int serv_fd, u64 orgsize, u64 snapsize, u64 met
 		return -1;
 	}
 	printf("Device sizes after resizing:\n\t");
-	printf("origin device %Lu\n\t", reply.orgsize);
-	printf("snapshot device %Lu\n\t", reply.snapsize);
-	printf("metadata device %Lu\n", reply.metasize);
+	printf("origin device %Lu\n\t", (unsigned long long) reply.orgsize);
+	printf("snapshot device %Lu\n\t", (unsigned long long) reply.snapsize);
+	printf("metadata device %Lu\n", (unsigned long long) reply.metasize);
 
 	if ((orgsize && reply.orgsize != orgsize) || (snapsize && reply.snapsize != snapsize) || (metasize && reply.metasize != metasize)) {
 		warn("Can not resize devices to the specified value: orgsize %Lu snapsize %Lu metasize %Lu!!", orgsize, snapsize, metasize);
