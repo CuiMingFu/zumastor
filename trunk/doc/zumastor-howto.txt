@@ -1278,17 +1278,17 @@ Export a Zumastor volume via NFS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1. Install the NFS server packages:
 +
---------------------------------------
+.....................................
 # aptitude install nfs-common nfs-kernel-server
---------------------------------------
+.....................................
 +
 2. Add the following lines to the NFS exports file `/etc/exports`
 (where 'zumatest' is the Zumastor volume to be exported):
 +
---------------------------------------
+.....................................
 /var/run/zumastor/mount/zumatest *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
 /var/run/zumastor/snapshot/zumatest *(ro,fsid=1,nohide,no_subtree_check,crossmnt)
---------------------------------------
+.....................................
 +
 The ``fsid=xxx'' option is required to ensure that the NFS server uses the same
 file handle after a restart or remount of an exported volume.  If it is not
@@ -1303,20 +1303,20 @@ directories mounted under the Zumastor volume, see below.
 the +--export+ option with the command +zumastor define master+ described in section
 "Mount a new volume and set up periodic snapshots" above.
 +
---------------------------------------
-zumastor define master zumatest --hourly 24 --export
---------------------------------------
+.....................................
+# zumastor define master zumatest --hourly 24 --export
+.....................................
 +
 You'll also need to modify your system's NFS startup script to
 reread /etc/exports on restart.  For Ubuntu, we provide a patch that
 does this for you:
 +
---------------------------------------
+.....................................
 # cd /etc/init.d/
 # wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
 # patch -p0 < nfs-kernel-server.patch
 # rm -f nfs-kernel-server.patch
---------------------------------------
+.....................................
 
 To export zumastor volumes from a different path, you can either symlink the zumastor volumes
 to that path or use the +--mountpoint+ and +--snappath+ options
@@ -1329,10 +1329,10 @@ command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.
 
 Then mount the Zumastor volume as normal on an NFS client, for instance:
---------------------------------------
-mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
-ls /mnt
---------------------------------------
+.....................................
+# mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
+# ls /mnt
+.....................................
 
 There will be a number of snapshot directories under /mnt.
 Each of these directories is named for the time at which that snapshot was
@@ -1352,16 +1352,16 @@ Here is an example of setting up Samba on Zumastor using the USER authentication
 
 1. Install the Samba server packages:
 +
---------------------------------------
+.....................................
 # aptitude install samba
---------------------------------------
+.....................................
 +
 2. Edit file `/etc/samba/smb.conf`, configuring the ``workgroup'' option according to your domain setup, 
 commenting out the ``obey pam restrictions = yes'' option, and adding the following lines 
 (where 'zumatest' is the Zumastor volume to be exported and 'homevol' is the name of 
 the exported Samba volume):
 +
---------------------------------------
+.....................................
 [homevol]
 
 path = /var/run/zumastor/mount/zumatest
@@ -1370,7 +1370,7 @@ browseable = yes
 case sensitive = no
 read only = no
 vfs objects = shadow_copy
---------------------------------------
+.....................................
 +
 The ``vfs objects = shadow_copy'' option is required for accessing snapshot directories via
 CIFS's *previous version* interface, see below.
@@ -1379,20 +1379,20 @@ CIFS's *previous version* interface, see below.
 use for accessing the exported Samba volume from a client. You don't need the +useradd+ command if 
 'testuser' has already existed on the Samba server.
 +
---------------------------------------
-#useradd testuser
-#smbpasswd -a testuser
+.....................................
+# useradd testuser
+# smbpasswd -a testuser
 New SMB password: your-secure-passwd
 Retype new SMB password: your-secure-passwd 
---------------------------------------
+.....................................
 +
 4. If you want to also export zumastor *snapshots* via CIFS's *previous version* interface, you'll need to use
 the +--samba+ option with the command +zumastor define master+ described in section
 "Mount a new volume and set up periodic snapshots" above.
 +
---------------------------------------
-zumastor define master zumatest --hourly 24 --samba
---------------------------------------
+.....................................
+# zumastor define master zumatest --hourly 24 --samba
+.....................................
 
 Recover files through Samba using a Zumastor snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1423,15 +1423,19 @@ Please note as of Zumastor 0.6, enlarging or shrinking devices is not working an
 
 1. First, make sure you have shut down all of the services running on top of the Zumastor volume,
 such as NFS or Samba. You can use 'lsof' to check if any file in /var/run/zumastor/mount/zumatest is still open:
++
+................................
 # sync
 # lsof | grep /var/run/zumastor/mount/zumatest
+................................
++
 
 2. Resize the LVMm device of the origin volume with the 'newsize'. Here 'newsize' may be suffixed 
 by unit designator such as K, M, or G.
 +
---------------------------------------
-lvresize /dev/sysvg/test -L newsize
---------------------------------------
+.....................................
+# lvresize /dev/sysvg/test -L newsize
+.....................................
 +
 3. Resize zumastor origin volume with the +zumastor resize --origin+ command.
 Then resize the EXT3 file system with the +e2fsck/resize2fs+ utilities from the
@@ -1440,7 +1444,7 @@ Here, we need to first stop +zumastor master+, which will umount the
 origin volume as well as all of the existing snapshots. If the volume is being replicated to another server, you need to stop replication (both in the origin and in the replica host). After the EXT3 resizing, we restart
 +zumastor master+, which will mount the origin volume with the new size.
 +
---------------------------------------
+.....................................
 root@replica:~# zumastor stop source zumatest
 root@original:~# zumastor stop target zumatest replica
 root@original:~# zumastor stop master zumatest
@@ -1450,7 +1454,7 @@ root@original:~# resize2fs /dev/mapper/zumatest newsize
 root@original:~# zumastor start master zumatest
 root@original:~# zumastor start target zumatest replica
 root@replica:~# zumastor start source zumatest
---------------------------------------
+.....................................
 +
 Now check the size of the Zumastor volume with +df | grep zumatest+.
 You will see that the size of the origin volume has changed but the size of
@@ -1468,11 +1472,11 @@ enlarging the origin device, but need to be ran in different orders.
 
 2. Stop +zumastor master+. Then shrink the EXT3 file system.
 +
---------------------------------------
-zumastor stop master zumatest
-e2fsck -f /dev/mapper/zumatest
-resize2fs /dev/mapper/zumatest newsize
---------------------------------------
+.....................................
+# zumastor stop master zumatest
+# e2fsck -f /dev/mapper/zumatest
+# resize2fs /dev/mapper/zumatest newsize
+.....................................
 +
 3. Shrink the zumastor origin device. Before running the +zumastor resize --origin+
 command, we need to first have all of the data on the shrinked space to be copied out to the
@@ -1483,12 +1487,12 @@ E.g., when shrinking the origin device from 4G to 1G, you can use
 Depends on the old size of your origin device, this step may take a long time.
 After that, restart +zumastor master+.
 +
---------------------------------------
-dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
-sync
-zumastor resize zumatest --origin newsize
-zumastor start master zumatest
---------------------------------------
+.....................................
+# dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
+# sync
+# zumastor resize zumatest --origin newsize
+# zumastor start master zumatest
+.....................................
 +
 Now check the size of the Zumastor volume with +df | grep zumatest+.
 You should see that the size of the origin volume has changed but the size of
@@ -1496,9 +1500,9 @@ all the existing snapshots is unchanged.
 
 4. Now it is safe to shrink the origin LVM device.
 +
---------------------------------------
-lvresize /dev/sysvg/test -L newsize
---------------------------------------
+.....................................
+# lvresize /dev/sysvg/test -L newsize
+.....................................
 
 Enlarge the snapshot store of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1507,10 +1511,10 @@ Please note as of Zumastor 0.6, enlarging or shrinking devices is not working an
 
 Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
 run the +zumastor resize --snapshot+ command after enlarging the snapshot lvm device.
---------------------------------------
-lvresize /dev/sysvg/test_snap -L newsize
-zumastor resize zumatest --snapshot newsize
---------------------------------------
+.....................................
+# lvresize /dev/sysvg/test_snap -L newsize
+# zumastor resize zumatest --snapshot newsize
+.....................................
 After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
 
 Shrink the snapshot store of a Zumastor volume
@@ -1526,10 +1530,10 @@ If the  +zumastor resize --snapshot+ command succeeds, you can run the +lvresize
 command to shrink the snapshot lvm device.
 Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
 may damage the whole Zumastor volume.
---------------------------------------
-zumastor resize zumatest --snapshot newsize
-lvresize /dev/sysvg/test_snap -L newsize
---------------------------------------
+.....................................
+# zumastor resize zumatest --snapshot newsize
+# lvresize /dev/sysvg/test_snap -L newsize
+.....................................
 After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
 
 [NOTE]
@@ -1538,6 +1542,43 @@ system running on top of it. For example, you can replace the
 +e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/zumatest+ to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
+
+How to revert a Zumastor volume to a previous snapshot
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. Take a look at +/var/run/zumastor/snapshot/zumatest/+ and decide the snapshot you want to revert to.
+Suppose you want to revert to a snapshot that is created two days ago. You can find out its corresponding snapshot
+number as follows:
++
+................................
+# zumastor status
+...
+snapshot
+...
+  daily.2 -> 2008.03.10-09.09.40
+...
+
+# mount | grep mapper | grep 2008.03.10-09.09.40
+/dev/mapper/zumatest(xxx) on /var/run/zumastor/snapshot/zumatest/2008.03.10-09.09.40 type ext3 (ro)
+................................
++
+Here, xxx is the snapshot number you want to revert to.
+
+2. Stop all of the services running on top of the zumastor volume and then stop zumastor master.
+
+ # zumastor stop master zumatest
+
+3. Revert the zumastor volume to snapshot xxx.
+
+ # zumastor revert zumatest xxx
+
+4. Restart zumastor master.
++
+................................
+ # zumastor start master zumatest
+ # ls /var/run/zumastor/mount/zumatest
+................................
++
+You will see that the zumastor volume has changed back to the old version.
 
 How can I run the above examples using UML?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

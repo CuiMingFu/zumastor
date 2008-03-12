@@ -1674,7 +1674,7 @@ Verify replication.
 <p>
 Install the NFS server packages:
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt># aptitude install nfs-common nfs-kernel-server</tt></pre>
 </div></div>
@@ -1684,7 +1684,7 @@ Install the NFS server packages:
 Add the following lines to the NFS exports file <tt>/etc/exports</tt>
 (where <em>zumatest</em> is the Zumastor volume to be exported):
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt>/var/run/zumastor/mount/zumatest *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
 /var/run/zumastor/snapshot/zumatest *(ro,fsid=1,nohide,no_subtree_check,crossmnt)</tt></pre>
@@ -1703,14 +1703,14 @@ If you want to also export zumastor <strong>snapshots</strong>, you'll need to u
 the <tt>&#8212;export</tt> option with the command <tt>zumastor define master</tt> described in section
 "Mount a new volume and set up periodic snapshots" above.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>zumastor define master zumatest --hourly 24 --export</tt></pre>
+<pre><tt># zumastor define master zumatest --hourly 24 --export</tt></pre>
 </div></div>
 <div class="para"><p>You'll also need to modify your system's NFS startup script to
 reread /etc/exports on restart.  For Ubuntu, we provide a patch that
 does this for you:</p></div>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt># cd /etc/init.d/
 # wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
@@ -1727,10 +1727,10 @@ with the command <tt>zumastor define volume</tt> described in section "Origin an
 command and modified your NFS server's startup script
 as described in the section "Exporting a Zumastor volume via NFS" above.</p></div>
 <div class="para"><p>Then mount the Zumastor volume as normal on an NFS client, for instance:</p></div>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
-ls /mnt</tt></pre>
+<pre><tt># mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
+# ls /mnt</tt></pre>
 </div></div>
 <div class="para"><p>There will be a number of snapshot directories under /mnt.
 Each of these directories is named for the time at which that snapshot was
@@ -1754,7 +1754,7 @@ place under the volume mount point.</td>
 <p>
 Install the Samba server packages:
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt># aptitude install samba</tt></pre>
 </div></div>
@@ -1766,7 +1766,7 @@ commenting out the &#8220;obey pam restrictions = yes&#8221; option, and adding 
 (where <em>zumatest</em> is the Zumastor volume to be exported and <em>homevol</em> is the name of
 the exported Samba volume):
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt>[homevol]
 
@@ -1786,10 +1786,10 @@ Setup smbpasswd for the volume <em>homevol</em>. Please replace <em>testuser</em
 use for accessing the exported Samba volume from a client. You don't need the <tt>useradd</tt> command if
 <em>testuser</em> has already existed on the Samba server.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>#useradd testuser
-#smbpasswd -a testuser
+<pre><tt># useradd testuser
+# smbpasswd -a testuser
 New SMB password: your-secure-passwd
 Retype new SMB password: your-secure-passwd</tt></pre>
 </div></div>
@@ -1800,9 +1800,9 @@ If you want to also export zumastor <strong>snapshots</strong> via CIFS's <stron
 the <tt>&#8212;samba</tt> option with the command <tt>zumastor define master</tt> described in section
 "Mount a new volume and set up periodic snapshots" above.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>zumastor define master zumatest --hourly 24 --samba</tt></pre>
+<pre><tt># zumastor define master zumatest --hourly 24 --samba</tt></pre>
 </div></div>
 </li>
 </ol></div>
@@ -1839,18 +1839,21 @@ running on top of it.</p></div>
 <p>
 First, make sure you have shut down all of the services running on top of the Zumastor volume,
 such as NFS or Samba. You can use <em>lsof</em> to check if any file in /var/run/zumastor/mount/zumatest is still open:
- sync
- lsof | grep /var/run/zumastor/mount/zumatest
 </p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># sync
+# lsof | grep /var/run/zumastor/mount/zumatest</tt></pre>
+</div></div>
 </li>
 <li>
 <p>
 Resize the LVMm device of the origin volume with the <em>newsize</em>. Here <em>newsize</em> may be suffixed
 by unit designator such as K, M, or G.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>lvresize /dev/sysvg/test -L newsize</tt></pre>
+<pre><tt># lvresize /dev/sysvg/test -L newsize</tt></pre>
 </div></div>
 </li>
 <li>
@@ -1862,7 +1865,7 @@ Here, we need to first stop <tt>zumastor master</tt>, which will umount the
 origin volume as well as all of the existing snapshots. If the volume is being replicated to another server, you need to stop replication (both in the origin and in the replica host). After the EXT3 resizing, we restart
 <tt>zumastor master</tt>, which will mount the origin volume with the new size.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
 <pre><tt>root@replica:~# zumastor stop source zumatest
 root@original:~# zumastor stop target zumatest replica
@@ -1893,11 +1896,11 @@ Shut down all of the services running on top of the Zumastor volume.
 <p>
 Stop <tt>zumastor master</tt>. Then shrink the EXT3 file system.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>zumastor stop master zumatest
-e2fsck -f /dev/mapper/zumatest
-resize2fs /dev/mapper/zumatest newsize</tt></pre>
+<pre><tt># zumastor stop master zumatest
+# e2fsck -f /dev/mapper/zumatest
+# resize2fs /dev/mapper/zumatest newsize</tt></pre>
 </div></div>
 </li>
 <li>
@@ -1911,12 +1914,12 @@ E.g., when shrinking the origin device from 4G to 1G, you can use
 Depends on the old size of your origin device, this step may take a long time.
 After that, restart <tt>zumastor master</tt>.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
-sync
-zumastor resize zumatest --origin newsize
-zumastor start master zumatest</tt></pre>
+<pre><tt># dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
+# sync
+# zumastor resize zumatest --origin newsize
+# zumastor start master zumatest</tt></pre>
 </div></div>
 <div class="para"><p>Now check the size of the Zumastor volume with <tt>df | grep zumatest</tt>.
 You should see that the size of the origin volume has changed but the size of
@@ -1926,9 +1929,9 @@ all the existing snapshots is unchanged.</p></div>
 <p>
 Now it is safe to shrink the origin LVM device.
 </p>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>lvresize /dev/sysvg/test -L newsize</tt></pre>
+<pre><tt># lvresize /dev/sysvg/test -L newsize</tt></pre>
 </div></div>
 </li>
 </ol></div>
@@ -1936,10 +1939,10 @@ Now it is safe to shrink the origin LVM device.
 <div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="para"><p>Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
 run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the snapshot lvm device.</p></div>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>lvresize /dev/sysvg/test_snap -L newsize
-zumastor resize zumatest --snapshot newsize</tt></pre>
+<pre><tt># lvresize /dev/sysvg/test_snap -L newsize
+# zumastor resize zumatest --snapshot newsize</tt></pre>
 </div></div>
 <div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
 <h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.16.4. Shrink the snapshot store of a Zumastor volume</h4>
@@ -1952,10 +1955,10 @@ If the  <tt>zumastor resize &#8212;snapshot</tt> command succeeds, you can run t
 command to shrink the snapshot lvm device.
 Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
 may damage the whole Zumastor volume.</p></div>
-<div class="listingblock">
+<div class="literalblock">
 <div class="content">
-<pre><tt>zumastor resize zumatest --snapshot newsize
-lvresize /dev/sysvg/test_snap -L newsize</tt></pre>
+<pre><tt># zumastor resize zumatest --snapshot newsize
+# lvresize /dev/sysvg/test_snap -L newsize</tt></pre>
 </div></div>
 <div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
 <div class="admonitionblock">
@@ -1970,7 +1973,59 @@ If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize those partitions.</td>
 </tr></table>
 </div>
-<h3 id="_how_can_i_run_the_above_examples_using_uml">10.17. How can I run the above examples using UML?</h3><div style="clear:left"></div>
+<h3 id="_how_to_revert_a_zumastor_volume_to_a_previous_snapshot">10.17. How to revert a Zumastor volume to a previous snapshot</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Take a look at <tt>/var/run/zumastor/snapshot/zumatest/</tt> and decide the snapshot you want to revert to.
+Suppose you want to revert to a snapshot that is created two days ago. You can find out its corresponding snapshot
+number as follows:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor status
+...
+snapshot
+...
+  daily.2 -&gt; 2008.03.10-09.09.40
+...
+
+# mount | grep mapper | grep 2008.03.10-09.09.40
+/dev/mapper/zumatest(xxx) on /var/run/zumastor/snapshot/zumatest/2008.03.10-09.09.40 type ext3 (ro)</tt></pre>
+</div></div>
+<div class="para"><p>Here, xxx is the snapshot number you want to revert to.</p></div>
+</li>
+<li>
+<p>
+Stop all of the services running on top of the zumastor volume and then stop zumastor master.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor stop master zumatest</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Revert the zumastor volume to snapshot xxx.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor revert zumatest xxx</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Restart zumastor master.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt> # zumastor start master zumatest
+ # ls /var/run/zumastor/mount/zumatest</tt></pre>
+</div></div>
+<div class="para"><p>You will see that the zumastor volume has changed back to the old version.</p></div>
+</li>
+</ol></div>
+<h3 id="_how_can_i_run_the_above_examples_using_uml">10.18. How can I run the above examples using UML?</h3><div style="clear:left"></div>
 <div class="para"><p>First off, cd into test/uml.</p></div>
 <div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
 and working.</p></div>
@@ -2026,7 +2081,7 @@ time optimizing Zumastor's write performance.)</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.6<br />
-Last updated 2008-03-10 18:27:23 PDT
+Last updated 2008-03-12 15:59:56 PDT
 </div>
 </div>
 </body>
