@@ -63,7 +63,6 @@ enum csnap_codes
 	SNAPSHOT_STATE,
 	REQUEST_SNAPSHOT_SECTORS, // !!! don't dedicate a whole message type to just this, return some other global stats here (and move me out of kernel)
 	SNAPSHOT_SECTORS,
-	STREAM_EXCEPTIONS, /* New in 0.5 */
 	RESIZE, /* New in 0.6 */
 };
 

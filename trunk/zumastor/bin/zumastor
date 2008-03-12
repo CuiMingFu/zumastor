@@ -1574,6 +1574,17 @@ resize)
 		create_device $vol -1 || { echo "Fail to create the new origin block device"; exit 1; }
 	fi
 	exit 0
+	;;
+revert)
+	[[ $# -eq 3 ]] || { echo "usage: $0 revert <vol> <snapshot>"; exit 2; }
+	declare vol=$2
+	declare snap=$3
+	declare server=$SERVERS/$vol
+	declare mount=$(mount_name $vol -1)
+
+	mountpoint -q $mount && { echo "please first stop zumastor master before reverting"; exit 1; }
+	ddsnap revert $server $snap
+	exit $?
 esac
 
 [ $# -gt 0 ] && echo "Error in command: $@"
