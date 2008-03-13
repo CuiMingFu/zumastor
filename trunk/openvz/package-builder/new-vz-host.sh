@@ -21,6 +21,7 @@ OUTSIDEUBUNTU="http://archive.ubuntu.com/ubuntu/"
 OUTSIDEDEBIAN="http://ftp.us.debian.org/debian/"
 OUTSIDEDEBIANSEC="http://mirror.steadfast.net/debian-security/"
 GUESTDEBLINE="deb http://${IPBASE}.1/ubuntu gutsy main universe multiverse"
+GUESTDEBLINE="${GUESTDEBLINE} restricted"
 
 if [ ! -f ${VZTPATH} ]
 then
@@ -33,9 +34,12 @@ then
   sudo vzctl destroy $VMID
 fi
 
+# I picked the last OUI from http://standards.ieee.org/regauth/oui/oui.txt
+# It was listed as 'PRIVATE' so probably little chance of collision. Still bad
+# juju though.
 randmac() {
   dd if=/dev/urandom bs=1 count=3 2>/dev/null | od -tx1 | head -1 \
-  | cut -d' ' -f2- | awk '{ print "00:1a:11:"$1":"$2":"$3 }' | tr a-z A-Z
+  | cut -d' ' -f2- | awk '{ print "AC:DE:48:"$1":"$2":"$3 }' | tr a-z A-Z
 }
 
 VIRT_HOST_ETH=`randmac`
@@ -65,8 +69,8 @@ sudo apt-get -y install apache2
 sudo a2enmod proxy_http
 sudo a2enmod mem_cache
 sudo a2enmod cache
-
-cat > /tmp/new-apache-config <<EOF
+TMPCFG=`mktemp`
+cat > ${TMPCFG} <<EOF
 NameVirtualHost 192.168.1.1
 <VirtualHost 192.168.1.1>
 ServerName mirror.localnet
@@ -98,7 +102,7 @@ CustomLog /var/log/apache2/proxy.log combined
 </VirtualHost>
 EOF
 
-sudo cp /tmp/new-apache-config /etc/apache2/sites-available/proxy
+sudo cp ${TMPCFG} /etc/apache2/sites-available/proxy
 sudo a2ensite proxy
 sudo a2dissite 000-default
 sudo /etc/init.d/apache2 reload
@@ -110,3 +114,10 @@ sudo vzctl exec $VMID mkdir /build /build/incoming /build/complete \
 sudo wget ${PBSVN}/builder.py -O /var/lib/vz/private/${VMID}/usr/bin/builder.py
 sudo chmod 755 /var/lib/vz/private/${VMID}/usr/bin/builder.py
 
+echo "Setup Complete!"
+echo "To build packages, place source packages in:"
+echo "  /var/lib/vz/private/${VMID}/build/incoming"
+echo "Run 'sudo vzctl exec ${VMID} /usr/bin/builder.py'"
+echo "Wait...."
+echo "Retrieve complete packages from:"
+echo "  /var/lib/vz/private/${VMID}/build/complete"
