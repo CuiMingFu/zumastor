@@ -143,7 +143,7 @@ class QueueItem:
     dsc = self.dscobject()
     os.unlink(self.dsc_file(False))
     for file in dsc['files']:
-      os.unlink('%s/%s' % (QUEUE_DIR, file['name'])
+      os.unlink('%s/%s' % (QUEUE_DIR, file['name']))
 
 
 if __name__ == '__main__':
