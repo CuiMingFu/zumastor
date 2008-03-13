@@ -925,6 +925,10 @@ out:
 		free(dev2_gzip_extent);
 	if (progress_tmpfile)
 		free(progress_tmpfile);
+	if (dev1name)
+		free(dev1name);
+	if (dev2name)
+		free(dev2name);
 	return err;
 }
 
@@ -1575,6 +1579,7 @@ static int usecount(int sock, u32 snaptag, int32_t usecnt_dev)
 		errprint("set/get usecount");
 		return 1;
 	}
+	printf("%u\n", (unsigned int)(reply.usecount));
 	return 0;
 }
 
@@ -2111,7 +2116,7 @@ int main(int argc, char *argv[])
 		  "Get statistics\n\t Function: Report snapshot usage statistics\n\t Usage: status [OPTION...] <sockname> [<snapshot>]", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &deltaOptions, 0,
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &initOptions, 0,
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &resizeOptions, 0,
 		  "Resize\n\t Function: Change origin/snapshot/metadata device size\n\t Usage: resize [OPTION...] <sockname>", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
 		  "Revert to snapshot\n\t Function: Revert to a snapshot\n\t Usage: revert <sockname> <snapshot>", NULL },
