@@ -113,7 +113,7 @@ if [ "x$templatedir" = "x$diskimgdir" ] ; then
   ${qemu_img} create  -b `basename "${TEMPLATEIMG}"` -f qcow2 `basename "${DISKIMG}"`
   popd
 else
-  ln -s ../${TEMPLATEIMG} $diskimgdir/dapper-i386.img
+  ln -sf ../${TEMPLATEIMG} $diskimgdir/dapper-i386.img
   pushd $diskimgdir
     ${qemu_img} create  -b dapper-i386.img -f qcow2 "${DISKIMG}"
   popd
