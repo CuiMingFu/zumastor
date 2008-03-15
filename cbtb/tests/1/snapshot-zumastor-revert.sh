@@ -40,7 +40,7 @@ aptitude install -y e2fsprogs
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
@@ -87,16 +87,15 @@ else
   exit 5
 fi
 
-zumastor snapshot testvol hourly 
 zumastor stop master testvol
 zumastor revert testvol 0
 zumastor start master testvol
 
 if ! diff -q /var/run/zumastor/mount/testvol/testfile \
 	/var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
-  echo "ok 6 - testfile changed between origin and second snapshot"
+  echo "ok 6 - testfile changed between origin and second snapshot after revert"
 else
-  echo "not ok 6 - testfile changed between origin and second snapshot"
+  echo "not ok 6 - testfile changed between origin and second snapshot after revert"
   exit 6
 fi
 
@@ -104,6 +103,8 @@ if diff -q /var/run/zumastor/mount/testvol/testfile \
 	/var/run/zumastor/snapshot/testvol/hourly.1/testfile 2>&1 >/dev/null ; then
   echo "ok 7 - testfile changed backup to version of the first snapshot"
 else
+  zumastor status
+  diff /var/run/zumastor/mount/testvol/testfile /var/run/zumastor/snapshot/testvol/hourly.1/testfile
   echo "not ok 7 - testfile changed backup to version of the first snapshot"
   exit 7
 fi

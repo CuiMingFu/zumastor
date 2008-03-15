@@ -48,7 +48,7 @@ mount
 ls -l /dev/sdb /dev/sdc
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize --mountopts nouuid
 mkfs.xfs -f /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 

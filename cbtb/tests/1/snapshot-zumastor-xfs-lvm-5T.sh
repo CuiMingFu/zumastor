@@ -57,7 +57,7 @@ echo "1..6"
 
 zumastor define volume testvol /dev/testvg/test /dev/testvg/test_snap --initialize --mountopts nouuid
 mkfs.xfs /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 

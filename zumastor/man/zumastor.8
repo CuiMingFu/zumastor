@@ -11,6 +11,8 @@ zumastor \- block device snapshot and replication management
 .B zumastor define source
 .I volume \fP\fIhost\fP[\fI:port\fP] \fB[options]\fP
 .br
+.B zumastor define schedule \fIvolume \fB[options]\fP
+.br
 .B zumastor define target
 .I volume \fP\fIhost\fP \fB[options]\fP
 .br
@@ -80,9 +82,9 @@ The amount of RAM dedicated to the snapshot store cache defaults to min(128MB, s
 
 A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Mount options that apply to that mount point may be defined with the \fBmountopts\fP option.  The snapshot mountpoint under which the volume snapshots are mounted can be defined with the \fBsnappath\fP option. 
 .IP \fBdefine\ \fBmaster\fP
-.I volume \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP] [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-s\fP|\fB--dotsnapshot\fP] [\fB-n\fP|\fB--no-snapmount\fP]
+.I volume [\fB-e\fP|\fB--export\fP] [\fB-p\fP|\fB--samba\fP] [\fB-s\fP|\fB--dotsnapshot\fP] [\fB-n\fP|\fB--no-snapmount\fP]
 
-Used after \fBdefine\fP \fBvolume\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If this volume was previously a replication target, removes the \fBsource\fP definition, since it is now a master. If \fIvolume\fP is already defined, just updates the rotation limits.
+Used after \fBdefine\fP \fBvolume\fP to declare the master role for the volume. If this volume was previously a replication target, removes the \fBsource\fP definition, since it is now a master.
 
 By default, each newly created snapshot is mounted under the snapshot mountpoint specified by \fBdefine\fP \fBvolume\fP, with each snapshot named for its creation time. But if the \fBno-snapmount\fP option is specified, the newly created snapshot will NOT be mounted. If the \fBexport\fP option is used, each mounted snapshot will be exported via NFS. If the \fBsamba\fP option is used, each mounted snapshot will be bind mounted to a directory following Samba's '@GMT-creation-time' naming convention under the volume mount point, and will be accessible via Samba's previous version interface. If the \fBdotsnapshot\fP option is used, the snapshot mountpoint will be bind mounted to the .snapshot directory under the volume mount point. If the \fBno-snapmount\fP option is specified, the \fBexport\fP, \fBsamba\fP, and \fBdotsnapshot\fP options will be ignored.
 .IP \fBdefine\ source\fP
@@ -90,6 +92,10 @@ By default, each newly created snapshot is mounted under the snapshot mountpoint
 \fIhost\fP[\fI:port\fP]] [-p|--period \fIinterval\fP] [-y|--yes] [-n|--name \fIremote_volume\fP]
 
 Used after \fBdefine\fP \fBvolume\fP to specify the upstream host that is expected to replicate snapshots to this volume. If the volume was previously a \fBmaster\fP volume, removes the \fBmaster\fP definition, since it is now a replication target.  If the optional \fIinterval\fP (in seconds) is specified, the upstream server will be asked for updates at this interval and when the volume is started.  It should be smaller than the automatic replication interval configured for this target on the upstream host.  The name option allows you to specify a different \fIremote_volume\fP name on the upstream host.  The yes option answers yes to all prompts.
+.IP \fBdefine\ \fBschedule\fP
+.I volume \fP[\fB-h\fP|\fB--hourly\fP \fIsnapshots\fP] [\fB-d\fP|\fB--daily\fP \fIsnapshots\fP] [\fB-w\fP|\fB--weekly\fP \fIsnapshots\fP] [\fB-m\fP|\fB--monthly\fP \fIsnapshots\fP] [\fB-c\fP|\fB--custom\fP \fIsnapshots\fP]
+
+Used after \fBdefine\fP \fBmaster\fP or \fBdefine\fP \fBsource\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If the schedule of the \fIvolume\fP is already defined, just updates the rotation limits.
 .IP \fBdefine\ \fBtarget\fP
 .I volume \fP\fIhost\fP [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
 

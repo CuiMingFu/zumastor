@@ -79,7 +79,7 @@ $SSH root@${slave} rm /root/.ssh/authorized_keys
 
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
 ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts

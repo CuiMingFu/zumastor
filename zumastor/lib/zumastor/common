@@ -478,6 +478,7 @@ function get_managed_snapshots {
 	local snappath snap
 
 	cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null
+	cat $VOLUMES/$vol/source/snapshots/* 2>/dev/null
 	for snappath in $VOLUMES/$vol/targets/*/{hold,send} $VOLUMES/$vol/source/{hold,send}; do
 		[[ -e $snappath ]] && { read -d" " snap <$snappath; echo $snap; }
 	done

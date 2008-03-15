@@ -62,7 +62,7 @@ aptitude install -y e2fsprogs
   zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 
   $mkfs /dev/mapper/testvol
-  zumastor define master testvol -h 24 -d 7 -s
+  zumastor define master testvol -s; zumastor define schedule testvol -h 24 -d 7
 
   echo ok 1 - testvol set up
 
