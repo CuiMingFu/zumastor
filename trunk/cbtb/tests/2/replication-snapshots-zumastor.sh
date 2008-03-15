@@ -69,7 +69,7 @@ echo ${IPADDR2} slave >>/etc/hosts
 hostname master
 zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 mkfs.ext3 /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
 ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
@@ -80,7 +80,6 @@ echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
-${SSH} root@${slave} zumastor define master testvol -h 24 -d 7
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  
@@ -88,7 +87,8 @@ zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
 
-${SSH} root@${slave} zumastor define source testvol master --period 600
+${SSH} root@${slave} zumastor define source testvol master --period 600 -m
+${SSH} root@${slave} zumastor define schedule testvol -h 24 -d 7
 ${SSH} root@${slave} zumastor status --usage
 echo ok 4 - configured source on target
 
@@ -96,6 +96,7 @@ ${SSH} root@${slave} zumastor start source testvol
 ${SSH} root@${slave} zumastor status --usage
 echo ok 5 - replication started on slave
 
+$SSH root@${slave} 'zumastor snapshot testvol hourly'
 zumastor replicate testvol --wait slave
 zumastor status --usage
 
@@ -114,9 +115,8 @@ else
 fi
 
 # take a snapshot of the empty volume on the slave and wait for it
-$SSH root@${slave} 'sync ; zumastor snapshot testvol hourly'
 slavehourly0=/var/run/zumastor/snapshot/testvol/hourly.0
-if timeout_file_wait 30 root@${slave} $slavehourly0
+if ! timeout_remote_file_wait 30 root@${slave} $slavehourly0
 then
   $SSH root@${slave} "df -h ; mount"
   $SSH root@${slave} ls -alR /var/run/zumastor
@@ -126,11 +126,9 @@ then
   echo not ok 7 - first slave snapshot
   exit 7
 else
-  slavesnap0=`readlink $slavehourly0`
+  slavesnap0=`$SSH root@${slave} "readlink $slavehourly0"`
   echo ok 7 - first slave snapshot
 fi
-
-
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
@@ -149,6 +147,7 @@ fi
 
 hash=`md5sum /var/run/zumastor/mount/testvol/testfile|cut -f1 -d\ `
 
+$SSH root@${slave} zumastor snapshot testvol hourly 
 #
 # schedule an immediate replication cycle
 #
@@ -210,9 +209,7 @@ EOF
 fi
 
 
-# take a new snapshot on the slave and wait for it
-$SSH root@${slave} zumastor snapshot testvol hourly 
-if timeout_remote_file_wait 30 root@${slave} \
+if ! timeout_remote_file_wait 30 root@${slave} \
   /var/run/zumastor/snapshot/testvol/hourly.1
 then
   $SSH root@${slave} "df -h ; mount"

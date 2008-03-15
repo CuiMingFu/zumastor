@@ -35,7 +35,7 @@ ln -s /dev/snapstor2 /dev/snapstor
 
 zumastor define volume testvol /dev/originstor /dev/snapstor --initialize --mountopts nouuid
 mkfs.ext3 -F /dev/mapper/testvol
-zumastor define master testvol -h 24 -d 7
+zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
