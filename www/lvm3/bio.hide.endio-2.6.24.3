@@ -1,0 +1,795 @@
+--- 2.6.24.3.base/block/ll_rw_blk.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/block/ll_rw_blk.c	2008-03-16 03:18:46.000000000 -0700
+@@ -2701,7 +2701,7 @@ int blkdev_issue_flush(struct block_devi
+ 	if (!bio)
+ 		return -ENOMEM;
+ 
+-	bio->bi_end_io = bio_end_empty_barrier;
++	bio_set_endio(bio, bio_end_empty_barrier);
+ 	bio->bi_private = &wait;
+ 	bio->bi_bdev = bdev;
+ 	submit_bio(1 << BIO_RW_BARRIER, bio);
+@@ -3194,13 +3194,13 @@ static inline int bio_check_eod(struct b
+  *
+  * generic_make_request() does not return any status.  The
+  * success/failure status of the request, along with notification of
+- * completion, is delivered asynchronously through the bio->bi_end_io
++ * completion, is delivered asynchronously through the bio->bi_endio
+  * function described (one day) else where.
+  *
+  * The caller of generic_make_request must make sure that bi_io_vec
+  * are set to describe the memory buffer, and that bi_dev and bi_sector are
+  * set to describe the device address, and the
+- * bi_end_io and optionally bi_private are set to describe how
++ * bi_endio and optionally bi_private are set to describe how
+  * completion notification should be signaled.
+  *
+  * generic_make_request and the drivers it calls may use bi_next if this
+--- 2.6.24.3.base/drivers/block/floppy.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/block/floppy.c	2008-03-16 03:11:07.000000000 -0700
+@@ -3847,7 +3847,7 @@ static int __floppy_read_block_0(struct 
+ 	bio.bi_sector = 0;
+ 	init_completion(&complete);
+ 	bio.bi_private = &complete;
+-	bio.bi_end_io = floppy_rb0_complete;
++	bio_set_endio(&bio, floppy_rb0_complete);
+ 
+ 	submit_bio(READ, &bio);
+ 	generic_unplug_device(bdev_get_queue(bdev));
+--- 2.6.24.3.base/drivers/block/pktcdvd.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/block/pktcdvd.c	2008-03-16 03:11:07.000000000 -0700
+@@ -1155,7 +1155,7 @@ static void pkt_gather_data(struct pktcd
+ 		bio->bi_max_vecs = 1;
+ 		bio->bi_sector = pkt->sector + f * (CD_FRAMESIZE >> 9);
+ 		bio->bi_bdev = pd->bdev;
+-		bio->bi_end_io = pkt_end_io_read;
++		bio_set_endio(bio, pkt_end_io_read);
+ 		bio->bi_private = pkt;
+ 		bio->bi_io_vec = vec;
+ 		bio->bi_destructor = pkt_bio_destructor;
+@@ -1257,7 +1257,7 @@ static int pkt_start_recovery(struct pac
+ 	BUG_ON(pkt->bio->bi_rw != (1 << BIO_RW));
+ 	BUG_ON(pkt->bio->bi_vcnt != pkt->frames);
+ 	BUG_ON(pkt->bio->bi_size != pkt->frames * CD_FRAMESIZE);
+-	BUG_ON(pkt->bio->bi_end_io != pkt_end_io_packet_write);
++	BUG_ON(bio_get_endio(pkt->bio) != pkt_end_io_packet_write);
+ 	BUG_ON(pkt->bio->bi_private != pkt);
+ 
+ 	drop_super(sb);
+@@ -1453,7 +1453,7 @@ static void pkt_start_write(struct pktcd
+ 	pkt->w_bio->bi_max_vecs = PACKET_MAX_SIZE;
+ 	pkt->w_bio->bi_sector = pkt->sector;
+ 	pkt->w_bio->bi_bdev = pd->bdev;
+-	pkt->w_bio->bi_end_io = pkt_end_io_packet_write;
++	bio_set_endio(pkt->w_bio, pkt_end_io_packet_write);
+ 	pkt->w_bio->bi_private = pkt;
+ 	pkt->w_bio->bi_io_vec = bvec;
+ 	pkt->w_bio->bi_destructor = pkt_bio_destructor;
+@@ -2508,7 +2508,7 @@ static int pkt_make_request(struct reque
+ 		psd->bio = bio;
+ 		cloned_bio->bi_bdev = pd->bdev;
+ 		cloned_bio->bi_private = psd;
+-		cloned_bio->bi_end_io = pkt_end_io_read_cloned;
++		bio_set_endio(cloned_bio, pkt_end_io_read_cloned);
+ 		pd->stats.secs_r += bio->bi_size >> 9;
+ 		pkt_queue_bio(pd, cloned_bio);
+ 		return 0;
+--- 2.6.24.3.base/drivers/md/dm.c	2008-03-16 03:36:21.000000000 -0700
++++ 2.6.24.3/drivers/md/dm.c	2008-03-16 03:11:07.000000000 -0700
+@@ -574,7 +574,7 @@ static void __map_bio(struct dm_target *
+ 	 */
+ 	BUG_ON(!clone->bi_size);
+ 
+-	clone->bi_end_io = clone_endio;
++	bio_set_endio(clone, clone_endio);
+ 	clone->bi_private = tio;
+ 
+ 	/*
+--- 2.6.24.3.base/drivers/md/dm-crypt.c	2008-03-16 03:36:21.000000000 -0700
++++ 2.6.24.3/drivers/md/dm-crypt.c	2008-03-16 03:11:07.000000000 -0700
+@@ -537,7 +537,7 @@ static void clone_init(struct dm_crypt_i
+ 	struct crypt_config *cc = io->target->private;
+ 
+ 	clone->bi_private = io;
+-	clone->bi_end_io  = crypt_endio;
++	bio_set_endio(clone, crypt_endio);
+ 	clone->bi_bdev    = cc->dev->bdev;
+ 	clone->bi_rw      = io->base_bio->bi_rw;
+ 	clone->bi_destructor = dm_crypt_bio_destructor;
+--- 2.6.24.3.base/drivers/md/dm-emc.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/dm-emc.c	2008-03-16 03:11:07.000000000 -0700
+@@ -71,7 +71,7 @@ static struct bio *get_failover_bio(stru
+ 	bio->bi_bdev = path->dev->bdev;
+ 	bio->bi_sector = 0;
+ 	bio->bi_private = path;
+-	bio->bi_end_io = emc_endio;
++	bio_set_endio(bio, emc_endio);
+ 
+ 	page = alloc_page(GFP_ATOMIC);
+ 	if (!page) {
+--- 2.6.24.3.base/drivers/md/dm-io.c	2008-03-16 03:36:21.000000000 -0700
++++ 2.6.24.3/drivers/md/dm-io.c	2008-03-16 03:11:07.000000000 -0700
+@@ -294,7 +294,7 @@ static void do_region(int rw, unsigned i
+ 		bio = bio_alloc_bioset(GFP_NOIO, num_bvecs, io->client->bios);
+ 		bio->bi_sector = where->sector + (where->count - remaining);
+ 		bio->bi_bdev = where->bdev;
+-		bio->bi_end_io = endio;
++		bio_set_endio(bio, endio);
+ 		bio->bi_private = io;
+ 		bio->bi_destructor = dm_bio_destructor;
+ 		bio->bi_max_vecs--;
+--- 2.6.24.3.base/drivers/md/faulty.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/faulty.c	2008-03-16 03:29:43.000000000 -0700
+@@ -210,7 +210,7 @@ static int make_request(struct request_q
+ 		struct bio *b = bio_clone(bio, GFP_NOIO);
+ 		b->bi_bdev = conf->rdev->bdev;
+ 		b->bi_private = bio;
+-		b->bi_end_io = faulty_fail;
++		bio_set_endio(b, faulty_fail);
+ 		generic_make_request(b);
+ 		return 0;
+ 	} else {
+--- 2.6.24.3.base/drivers/md/md.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/md.c	2008-03-16 03:11:07.000000000 -0700
+@@ -445,7 +445,7 @@ void md_super_write(mddev_t *mddev, mdk_
+ 	bio->bi_sector = sector;
+ 	bio_add_page(bio, page, size, 0);
+ 	bio->bi_private = rdev;
+-	bio->bi_end_io = super_written;
++	bio_set_endio(bio, super_written);
+ 	bio->bi_rw = rw;
+ 
+ 	atomic_inc(&mddev->pending_writes);
+@@ -454,7 +454,7 @@ void md_super_write(mddev_t *mddev, mdk_
+ 		rw |= (1<<BIO_RW_BARRIER);
+ 		rbio = bio_clone(bio, GFP_NOIO);
+ 		rbio->bi_private = bio;
+-		rbio->bi_end_io = super_written_barrier;
++		bio_set_endio(rbio, super_written_barrier);
+ 		submit_bio(rw, rbio);
+ 	} else
+ 		submit_bio(rw, bio);
+@@ -503,7 +503,7 @@ int sync_page_io(struct block_device *bd
+ 	bio_add_page(bio, page, size, 0);
+ 	init_completion(&event);
+ 	bio->bi_private = &event;
+-	bio->bi_end_io = bi_complete;
++	bio_set_endio(bio, bi_complete);
+ 	submit_bio(rw, bio);
+ 	wait_for_completion(&event);
+ 
+--- 2.6.24.3.base/drivers/md/multipath.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/multipath.c	2008-03-16 03:11:07.000000000 -0700
+@@ -173,7 +173,7 @@ static int multipath_make_request (struc
+ 	mp_bh->bio.bi_sector += multipath->rdev->data_offset;
+ 	mp_bh->bio.bi_bdev = multipath->rdev->bdev;
+ 	mp_bh->bio.bi_rw |= (1 << BIO_RW_FAILFAST);
+-	mp_bh->bio.bi_end_io = multipath_end_request;
++	bio_set_endio(&mp_bh->bio, multipath_end_request);
+ 	mp_bh->bio.bi_private = mp_bh;
+ 	generic_make_request(&mp_bh->bio);
+ 	return 0;
+@@ -390,7 +390,7 @@ static void multipathd (mddev_t *mddev)
+ 			bio->bi_sector += conf->multipaths[mp_bh->path].rdev->data_offset;
+ 			bio->bi_bdev = conf->multipaths[mp_bh->path].rdev->bdev;
+ 			bio->bi_rw |= (1 << BIO_RW_FAILFAST);
+-			bio->bi_end_io = multipath_end_request;
++			bio_set_endio(bio, multipath_end_request);
+ 			bio->bi_private = mp_bh;
+ 			generic_make_request(bio);
+ 		}
+--- 2.6.24.3.base/drivers/md/raid10.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/raid10.c	2008-03-16 03:11:07.000000000 -0700
+@@ -825,7 +825,7 @@ static int make_request(struct request_q
+ 		read_bio->bi_sector = r10_bio->devs[slot].addr +
+ 			mirror->rdev->data_offset;
+ 		read_bio->bi_bdev = mirror->rdev->bdev;
+-		read_bio->bi_end_io = raid10_end_read_request;
++		bio_set_endio(read_bio, raid10_end_read_request);
+ 		read_bio->bi_rw = READ | do_sync;
+ 		read_bio->bi_private = r10_bio;
+ 
+@@ -871,7 +871,7 @@ static int make_request(struct request_q
+ 		mbio->bi_sector	= r10_bio->devs[i].addr+
+ 			conf->mirrors[d].rdev->data_offset;
+ 		mbio->bi_bdev = conf->mirrors[d].rdev->bdev;
+-		mbio->bi_end_io	= raid10_end_write_request;
++		bio_set_endio(mbio, raid10_end_write_request);
+ 		mbio->bi_rw = WRITE | do_sync;
+ 		mbio->bi_private = r10_bio;
+ 
+@@ -1227,7 +1227,7 @@ static void sync_request_write(mddev_t *
+ 
+ 		tbio = r10_bio->devs[i].bio;
+ 
+-		if (tbio->bi_end_io != end_sync_read)
++		if (bio_get_endio(tbio) != end_sync_read)
+ 			continue;
+ 		if (i == first)
+ 			continue;
+@@ -1274,7 +1274,7 @@ static void sync_request_write(mddev_t *
+ 			       page_address(fbio->bi_io_vec[j].bv_page),
+ 			       PAGE_SIZE);
+ 		}
+-		tbio->bi_end_io = end_sync_write;
++		bio_set_endio(tbio, end_sync_write);
+ 
+ 		d = r10_bio->devs[i].devnum;
+ 		atomic_inc(&conf->mirrors[d].rdev->nr_pending);
+@@ -1542,7 +1542,7 @@ static void raid10d(mddev_t *mddev)
+ 				bio->bi_bdev = rdev->bdev;
+ 				bio->bi_rw = READ | do_sync;
+ 				bio->bi_private = r10_bio;
+-				bio->bi_end_io = raid10_end_read_request;
++				bio_set_endio(bio, raid10_end_read_request);
+ 				unplug = 1;
+ 				generic_make_request(bio);
+ 			}
+@@ -1750,7 +1750,7 @@ static sector_t sync_request(mddev_t *md
+ 						bio->bi_next = biolist;
+ 						biolist = bio;
+ 						bio->bi_private = r10_bio;
+-						bio->bi_end_io = end_sync_read;
++						bio_set_endio(bio, end_sync_read);
+ 						bio->bi_rw = READ;
+ 						bio->bi_sector = r10_bio->devs[j].addr +
+ 							conf->mirrors[d].rdev->data_offset;
+@@ -1767,7 +1767,7 @@ static sector_t sync_request(mddev_t *md
+ 						bio->bi_next = biolist;
+ 						biolist = bio;
+ 						bio->bi_private = r10_bio;
+-						bio->bi_end_io = end_sync_write;
++						bio_set_endio(bio, end_sync_write);
+ 						bio->bi_rw = WRITE;
+ 						bio->bi_sector = r10_bio->devs[k].addr +
+ 							conf->mirrors[i].rdev->data_offset;
+@@ -1827,7 +1827,7 @@ static sector_t sync_request(mddev_t *md
+ 		for (i=0; i<conf->copies; i++) {
+ 			int d = r10_bio->devs[i].devnum;
+ 			bio = r10_bio->devs[i].bio;
+-			bio->bi_end_io = NULL;
++			bio_set_endio(bio, NULL);
+ 			clear_bit(BIO_UPTODATE, &bio->bi_flags);
+ 			if (conf->mirrors[d].rdev == NULL ||
+ 			    test_bit(Faulty, &conf->mirrors[d].rdev->flags))
+@@ -1837,7 +1837,7 @@ static sector_t sync_request(mddev_t *md
+ 			bio->bi_next = biolist;
+ 			biolist = bio;
+ 			bio->bi_private = r10_bio;
+-			bio->bi_end_io = end_sync_read;
++			bio_set_endio(bio, end_sync_read);
+ 			bio->bi_rw = READ;
+ 			bio->bi_sector = r10_bio->devs[i].addr +
+ 				conf->mirrors[d].rdev->data_offset;
+@@ -1848,7 +1848,7 @@ static sector_t sync_request(mddev_t *md
+ 		if (count < 2) {
+ 			for (i=0; i<conf->copies; i++) {
+ 				int d = r10_bio->devs[i].devnum;
+-				if (r10_bio->devs[i].bio->bi_end_io)
++				if (bio_get_endio(&r10_bio->devs[i].bio))
+ 					rdev_dec_pending(conf->mirrors[d].rdev, mddev);
+ 			}
+ 			put_buf(r10_bio);
+@@ -1860,7 +1860,7 @@ static sector_t sync_request(mddev_t *md
+ 	for (bio = biolist; bio ; bio=bio->bi_next) {
+ 
+ 		bio->bi_flags &= ~(BIO_POOL_MASK - 1);
+-		if (bio->bi_end_io)
++		if (bio_get_endio(bio))
+ 			bio->bi_flags |= 1 << BIO_UPTODATE;
+ 		bio->bi_vcnt = 0;
+ 		bio->bi_idx = 0;
+@@ -1910,7 +1910,7 @@ static sector_t sync_request(mddev_t *md
+ 		r10_bio = bio->bi_private;
+ 		r10_bio->sectors = nr_sectors;
+ 
+-		if (bio->bi_end_io == end_sync_read) {
++		if (bio_get_endio(bio) == end_sync_read) {
+ 			md_sync_acct(bio->bi_bdev, nr_sectors);
+ 			generic_make_request(bio);
+ 		}
+--- 2.6.24.3.base/drivers/md/raid1.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/raid1.c	2008-03-16 03:29:15.000000000 -0700
+@@ -197,7 +197,7 @@ static void put_buf(r1bio_t *r1_bio)
+ 
+ 	for (i=0; i<conf->raid_disks; i++) {
+ 		struct bio *bio = r1_bio->bios[i];
+-		if (bio->bi_end_io)
++		if (bio_get_endio(bio))
+ 			rdev_dec_pending(conf->mirrors[i].rdev, r1_bio->mddev);
+ 	}
+ 
+@@ -800,7 +800,7 @@ static int make_request(struct request_q
+ 
+ 		read_bio->bi_sector = r1_bio->sector + mirror->rdev->data_offset;
+ 		read_bio->bi_bdev = mirror->rdev->bdev;
+-		read_bio->bi_end_io = raid1_end_read_request;
++		bio_set_endio(read_bio, raid1_end_read_request);
+ 		read_bio->bi_rw = READ | do_sync;
+ 		read_bio->bi_private = r1_bio;
+ 
+@@ -871,7 +871,7 @@ static int make_request(struct request_q
+ 
+ 		mbio->bi_sector	= r1_bio->sector + conf->mirrors[i].rdev->data_offset;
+ 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
+-		mbio->bi_end_io	= raid1_end_write_request;
++		bio_set_endio(mbio, raid1_end_write_request;)
+ 		mbio->bi_rw = WRITE | do_barriers | do_sync;
+ 		mbio->bi_private = r1_bio;
+ 
+@@ -1177,7 +1177,7 @@ static void sync_request_write(mddev_t *
+ 		int primary;
+ 		if (!test_bit(R1BIO_Uptodate, &r1_bio->state)) {
+ 			for (i=0; i<mddev->raid_disks; i++)
+-				if (r1_bio->bios[i]->bi_end_io == end_sync_read)
++				if (bio_get_endio(r1_bio->bios[i]) == end_sync_read)
+ 					md_error(mddev, conf->mirrors[i].rdev);
+ 
+ 			md_done_sync(mddev, r1_bio->sectors, 1);
+@@ -1185,15 +1185,15 @@ static void sync_request_write(mddev_t *
+ 			return;
+ 		}
+ 		for (primary=0; primary<mddev->raid_disks; primary++)
+-			if (r1_bio->bios[primary]->bi_end_io == end_sync_read &&
++			if (bio_get_endio(r1_bio->bios[primary]) == end_sync_read &&
+ 			    test_bit(BIO_UPTODATE, &r1_bio->bios[primary]->bi_flags)) {
+-				r1_bio->bios[primary]->bi_end_io = NULL;
++				bio_set_endio(r1_bio->bios[primary], NULL);
+ 				rdev_dec_pending(conf->mirrors[primary].rdev, mddev);
+ 				break;
+ 			}
+ 		r1_bio->read_disk = primary;
+ 		for (i=0; i<mddev->raid_disks; i++)
+-			if (r1_bio->bios[i]->bi_end_io == end_sync_read) {
++			if (bio_set_endio(r1_bio->bios[i], end_sync_read)) {
+ 				int j;
+ 				int vcnt = r1_bio->sectors >> (PAGE_SHIFT- 9);
+ 				struct bio *pbio = r1_bio->bios[primary];
+@@ -1213,9 +1213,10 @@ static void sync_request_write(mddev_t *
+ 					j = 0;
+ 				if (j >= 0)
+ 					mddev->resync_mismatches += r1_bio->sectors;
++
+ 				if (j < 0 || (test_bit(MD_RECOVERY_CHECK, &mddev->recovery)
+ 					      && test_bit(BIO_UPTODATE, &sbio->bi_flags))) {
+-					sbio->bi_end_io = NULL;
++					bio_set_endio(sbio, NULL);
+ 					rdev_dec_pending(conf->mirrors[i].rdev, mddev);
+ 				} else {
+ 					/* fixup the bio for reuse */
+@@ -1263,7 +1264,7 @@ static void sync_request_write(mddev_t *
+ 			if (s > (PAGE_SIZE>>9))
+ 				s = PAGE_SIZE >> 9;
+ 			do {
+-				if (r1_bio->bios[d]->bi_end_io == end_sync_read) {
++				if (bio_get_endio(r1_bio->bios[d]) == end_sync_read) {
+ 					/* No rcu protection needed here devices
+ 					 * can only be removed when no resync is
+ 					 * active, and resync is currently active
+@@ -1291,7 +1292,7 @@ static void sync_request_write(mddev_t *
+ 					if (d == 0)
+ 						d = conf->raid_disks;
+ 					d--;
+-					if (r1_bio->bios[d]->bi_end_io != end_sync_read)
++					if (bio_get_endio(r1_bio->bios[d]) != end_sync_read)
+ 						continue;
+ 					rdev = conf->mirrors[d].rdev;
+ 					atomic_add(s, &rdev->corrected_errors);
+@@ -1307,7 +1308,7 @@ static void sync_request_write(mddev_t *
+ 					if (d == 0)
+ 						d = conf->raid_disks;
+ 					d--;
+-					if (r1_bio->bios[d]->bi_end_io != end_sync_read)
++					if (bio_get_endio(r1_bio->bios[d]) != end_sync_read)
+ 						continue;
+ 					rdev = conf->mirrors[d].rdev;
+ 					if (sync_page_io(rdev->bdev,
+@@ -1341,14 +1342,14 @@ static void sync_request_write(mddev_t *
+ 	atomic_set(&r1_bio->remaining, 1);
+ 	for (i = 0; i < disks ; i++) {
+ 		wbio = r1_bio->bios[i];
+-		if (wbio->bi_end_io == NULL ||
+-		    (wbio->bi_end_io == end_sync_read &&
++		if (bio_get_endio(wbio) == NULL ||
++		    (bio_get_endio(wbio) == end_sync_read &&
+ 		     (i == r1_bio->read_disk ||
+ 		      !test_bit(MD_RECOVERY_SYNC, &mddev->recovery))))
+ 			continue;
+ 
+ 		wbio->bi_rw = WRITE;
+-		wbio->bi_end_io = end_sync_write;
++		bio_set_endio(wbio, end_sync_write);
+ 		atomic_inc(&r1_bio->remaining);
+ 		md_sync_acct(conf->mirrors[i].rdev->bdev, wbio->bi_size >> 9);
+ 
+@@ -1534,7 +1535,7 @@ static void raid1d(mddev_t *mddev)
+ 					bio->bi_sector = r1_bio->sector +
+ 						conf->mirrors[i].rdev->data_offset;
+ 					bio->bi_bdev = conf->mirrors[i].rdev->bdev;
+-					bio->bi_end_io = raid1_end_write_request;
++					bio_set_endio(bio, raid1_end_write_request);
+ 					bio->bi_rw = WRITE | do_sync;
+ 					bio->bi_private = r1_bio;
+ 					r1_bio->bios[i] = bio;
+@@ -1582,7 +1583,7 @@ static void raid1d(mddev_t *mddev)
+ 					       (unsigned long long)r1_bio->sector);
+ 				bio->bi_sector = r1_bio->sector + rdev->data_offset;
+ 				bio->bi_bdev = rdev->bdev;
+-				bio->bi_end_io = raid1_end_read_request;
++				bio_set_endio(bio, raid1_end_read_request);
+ 				bio->bi_rw = READ | do_sync;
+ 				bio->bi_private = r1_bio;
+ 				unplug = 1;
+@@ -1717,7 +1718,7 @@ static sector_t sync_request(mddev_t *md
+ 		bio->bi_phys_segments = 0;
+ 		bio->bi_hw_segments = 0;
+ 		bio->bi_size = 0;
+-		bio->bi_end_io = NULL;
++		bio_set_endio(bio, NULL);
+ 		bio->bi_private = NULL;
+ 
+ 		rdev = rcu_dereference(conf->mirrors[i].rdev);
+@@ -1727,12 +1728,12 @@ static sector_t sync_request(mddev_t *md
+ 			continue;
+ 		} else if (!test_bit(In_sync, &rdev->flags)) {
+ 			bio->bi_rw = WRITE;
+-			bio->bi_end_io = end_sync_write;
++			bio_set_endio(bio, end_sync_write);
+ 			write_targets ++;
+ 		} else {
+ 			/* may need to read from here */
+ 			bio->bi_rw = READ;
+-			bio->bi_end_io = end_sync_read;
++			bio_set_endio(bio, end_sync_read);
+ 			if (test_bit(WriteMostly, &rdev->flags)) {
+ 				if (wonly < 0)
+ 					wonly = i;
+@@ -1788,7 +1789,7 @@ static sector_t sync_request(mddev_t *md
+ 
+ 		for (i=0 ; i < conf->raid_disks; i++) {
+ 			bio = r1_bio->bios[i];
+-			if (bio->bi_end_io) {
++			if (bio_get_endio(bio)) {
+ 				page = bio->bi_io_vec[bio->bi_vcnt].bv_page;
+ 				if (bio_add_page(bio, page, len, 0) == 0) {
+ 					/* stop here */
+@@ -1796,7 +1797,7 @@ static sector_t sync_request(mddev_t *md
+ 					while (i > 0) {
+ 						i--;
+ 						bio = r1_bio->bios[i];
+-						if (bio->bi_end_io==NULL)
++						if (bio_get_endio(bio) == NULL)
+ 							continue;
+ 						/* remove last page from this bio */
+ 						bio->bi_vcnt--;
+@@ -1821,7 +1822,7 @@ static sector_t sync_request(mddev_t *md
+ 		atomic_set(&r1_bio->remaining, read_targets);
+ 		for (i=0; i<conf->raid_disks; i++) {
+ 			bio = r1_bio->bios[i];
+-			if (bio->bi_end_io == end_sync_read) {
++			if (bio_get_endio(bio) == end_sync_read) {
+ 				md_sync_acct(bio->bi_bdev, nr_sectors);
+ 				generic_make_request(bio);
+ 			}
+--- 2.6.24.3.base/drivers/md/raid5.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/md/raid5.c	2008-03-16 03:24:40.000000000 -0700
+@@ -112,7 +112,7 @@ static void return_io(struct bio *return
+ 		return_bi = bi->bi_next;
+ 		bi->bi_next = NULL;
+ 		bi->bi_size = 0;
+-		bi->bi_end_io(bi,
+++		(bio_get_endio(bi))(bi,
+ 			      test_bit(BIO_UPTODATE, &bi->bi_flags)
+ 			        ? 0 : -EIO);
+ 		bi = return_bi;
+@@ -413,9 +413,9 @@ static void ops_run_io(struct stripe_hea
+ 
+ 		bi->bi_rw = rw;
+ 		if (rw == WRITE)
+-			bi->bi_end_io = raid5_end_write_request;
++			bio_set_endio(bi, raid5_end_write_request);
+ 		else
+-			bi->bi_end_io = raid5_end_read_request;
++			bio_set_endio(bi, raid5_end_read_request);
+ 
+ 		rcu_read_lock();
+ 		rdev = rcu_dereference(conf->disks[i].rdev);
+@@ -3091,9 +3091,9 @@ static void handle_stripe6(struct stripe
+ 
+ 		bi->bi_rw = rw;
+ 		if (rw == WRITE)
+-			bi->bi_end_io = raid5_end_write_request;
++			bio_set_endio(bi, raid5_end_write_request);
+ 		else
+-			bi->bi_end_io = raid5_end_read_request;
++			bio_set_endio(bi, raid5_end_read_request);
+ 
+ 		rcu_read_lock();
+ 		rdev = rcu_dereference(conf->disks[i].rdev);
+@@ -3389,7 +3389,7 @@ static int chunk_aligned_read(struct req
+ 	 *   set bi_end_io to a new function, and set bi_private to the
+ 	 *     original bio.
+ 	 */
+-	align_bi->bi_end_io  = raid5_align_endio;
++	bio_set_endio(align_bi, raid5_align_endio);
+ 	align_bi->bi_private = raid_bio;
+ 	/*
+ 	 *	compute position
+--- 2.6.24.3.base/drivers/scsi/scsi_lib.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/drivers/scsi/scsi_lib.c	2008-03-16 03:11:07.000000000 -0700
+@@ -318,7 +318,7 @@ static int scsi_req_map_sg(struct reques
+ 					err = -ENOMEM;
+ 					goto free_bios;
+ 				}
+-				bio->bi_end_io = scsi_bi_endio;
++				bio_set_endio(bio, scsi_bi_endio);
+ 			}
+ 
+ 			if (bio_add_pc_page(q, bio, page, bytes, off) !=
+--- 2.6.24.3.base/fs/bio.c	2008-03-16 03:36:21.000000000 -0700
++++ 2.6.24.3/fs/bio.c	2008-03-16 03:21:28.000000000 -0700
+@@ -786,7 +786,7 @@ static struct bio *__bio_map_kern(struct
+ 		offset = 0;
+ 	}
+ 
+-	bio->bi_end_io = bio_map_kern_endio;
++	bio_set_endio(bio, bio_map_kern_endio);
+ 	return bio;
+ }
+ 
+@@ -954,7 +954,7 @@ void bio_check_pages_dirty(struct bio *b
+  *   preferred way to end I/O on a bio, it takes care of clearing
+  *   BIO_UPTODATE on error. @error is 0 on success, and and one of the
+  *   established -Exxxx (-EIO, for instance) error values in case
+- *   something went wrong. Noone should call bi_end_io() directly on a
++ *   something went wrong. Noone should call bi_endio() directly on a
+  *   bio unless they own it and thus know that it has an end_io
+  *   function.
+  **/
+@@ -965,8 +965,8 @@ void bio_endio(struct bio *bio, int erro
+ 	else if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
+ 		error = -EIO;
+ 
+-	if (bio->bi_end_io)
+-		bio->bi_end_io(bio, error);
++	if (bio_get_endio(bio))
++		(bio_get_endio(bio))(bio, error);
+ }
+ 
+ void bio_pair_release(struct bio_pair *bp)
+@@ -1035,8 +1035,8 @@ struct bio_pair *bio_split(struct bio *b
+ 	bp->bio1.bi_max_vecs = 1;
+ 	bp->bio2.bi_max_vecs = 1;
+ 
+-	bp->bio1.bi_end_io = bio_pair_end_1;
+-	bp->bio2.bi_end_io = bio_pair_end_2;
++	bio_set_endio(&bp->bio1, bio_pair_end_1);
++	bio_set_endio(&bp->bio2, bio_pair_end_2);
+ 
+ 	bp->bio1.bi_private = bi;
+ 	bp->bio2.bi_private = pool;
+--- 2.6.24.3.base/fs/block_dev.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/block_dev.c	2008-03-16 03:11:07.000000000 -0700
+@@ -293,7 +293,7 @@ blkdev_direct_IO(int rw, struct kiocb *i
+ 		/* bio_alloc should not fail with GFP_KERNEL flag */
+ 		bio = bio_alloc(GFP_KERNEL, nvec);
+ 		bio->bi_bdev = I_BDEV(inode);
+-		bio->bi_end_io = blk_end_aio;
++		bio_set_endio(bio, blk_end_aio);
+ 		bio->bi_private = iocb;
+ 		bio->bi_sector = pos >> blkbits;
+ same_bio:
+--- 2.6.24.3.base/fs/buffer.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/buffer.c	2008-03-16 03:11:07.000000000 -0700
+@@ -2895,7 +2895,7 @@ int submit_bh(int rw, struct buffer_head
+ 	bio->bi_idx = 0;
+ 	bio->bi_size = bh->b_size;
+ 
+-	bio->bi_end_io = end_bio_bh_io_sync;
++	bio_set_endio(bio, end_bio_bh_io_sync);
+ 	bio->bi_private = bh;
+ 
+ 	bio_get(bio);
+--- 2.6.24.3.base/fs/direct-io.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/direct-io.c	2008-03-16 03:11:07.000000000 -0700
+@@ -319,9 +319,9 @@ dio_bio_alloc(struct dio *dio, struct bl
+ 	bio->bi_bdev = bdev;
+ 	bio->bi_sector = first_sector;
+ 	if (dio->is_async)
+-		bio->bi_end_io = dio_bio_end_aio;
++		bio_set_endio(bio, dio_bio_end_aio);
+ 	else
+-		bio->bi_end_io = dio_bio_end_io;
++		bio_set_endio(bio, dio_bio_end_io);
+ 
+ 	dio->bio = bio;
+ 	return 0;
+--- 2.6.24.3.base/fs/gfs2/super.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/gfs2/super.c	2008-03-16 03:11:07.000000000 -0700
+@@ -233,8 +233,7 @@ int gfs2_read_super(struct gfs2_sbd *sdp
+ 	bio->bi_sector = sector * (sb->s_blocksize >> 9);
+ 	bio->bi_bdev = sb->s_bdev;
+ 	bio_add_page(bio, page, PAGE_SIZE, 0);
+-
+-	bio->bi_end_io = end_bio_io_page;
++	bio_set_endio(bio, end_bio_io_page);
+ 	bio->bi_private = page;
+ 	submit_bio(READ_SYNC | (1 << BIO_RW_META), bio);
+ 	wait_on_page_locked(page);
+--- 2.6.24.3.base/fs/jfs/jfs_logmgr.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/jfs/jfs_logmgr.c	2008-03-16 03:11:07.000000000 -0700
+@@ -2015,7 +2015,7 @@ static int lbmRead(struct jfs_log * log,
+ 	bio->bi_idx = 0;
+ 	bio->bi_size = LOGPSIZE;
+ 
+-	bio->bi_end_io = lbmIODone;
++	bio_set_endio(bio, lbmIODone);
+ 	bio->bi_private = bp;
+ 	submit_bio(READ_SYNC, bio);
+ 
+@@ -2156,7 +2156,7 @@ static void lbmStartIO(struct lbuf * bp)
+ 	bio->bi_idx = 0;
+ 	bio->bi_size = LOGPSIZE;
+ 
+-	bio->bi_end_io = lbmIODone;
++	bio_set_endio(bio, lbmIODone);
+ 	bio->bi_private = bp;
+ 
+ 	/* check if journaling to disk has been disabled */
+--- 2.6.24.3.base/fs/jfs/jfs_metapage.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/jfs/jfs_metapage.c	2008-03-16 03:11:07.000000000 -0700
+@@ -432,7 +432,7 @@ static int metapage_writepage(struct pag
+ 		bio = bio_alloc(GFP_NOFS, 1);
+ 		bio->bi_bdev = inode->i_sb->s_bdev;
+ 		bio->bi_sector = pblock << (inode->i_blkbits - 9);
+-		bio->bi_end_io = metapage_write_end_io;
++		bio_set_endio(bio, metapage_write_end_io);
+ 		bio->bi_private = page;
+ 
+ 		/* Don't call bio_add_page yet, we may add to this vec */
+@@ -502,7 +502,7 @@ static int metapage_readpage(struct file
+ 			bio = bio_alloc(GFP_NOFS, 1);
+ 			bio->bi_bdev = inode->i_sb->s_bdev;
+ 			bio->bi_sector = pblock << (inode->i_blkbits - 9);
+-			bio->bi_end_io = metapage_read_end_io;
++			bio_set_endio(bio, metapage_read_end_io);
+ 			bio->bi_private = page;
+ 			len = xlen << inode->i_blkbits;
+ 			offset = block_offset << inode->i_blkbits;
+--- 2.6.24.3.base/fs/mpage.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/mpage.c	2008-03-16 03:11:07.000000000 -0700
+@@ -84,9 +84,9 @@ static void mpage_end_io_write(struct bi
+ 
+ static struct bio *mpage_bio_submit(int rw, struct bio *bio)
+ {
+-	bio->bi_end_io = mpage_end_io_read;
++	bio_set_endio(bio, mpage_end_io_read);
+ 	if (rw == WRITE)
+-		bio->bi_end_io = mpage_end_io_write;
++		bio_set_endio(bio, mpage_end_io_write);
+ 	submit_bio(rw, bio);
+ 	return NULL;
+ }
+--- 2.6.24.3.base/fs/ocfs2/cluster/heartbeat.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/ocfs2/cluster/heartbeat.c	2008-03-16 03:11:07.000000000 -0700
+@@ -260,7 +260,7 @@ static struct bio *o2hb_setup_one_bio(st
+ 	bio->bi_sector = (reg->hr_start_block + cs) << (bits - 9);
+ 	bio->bi_bdev = reg->hr_bdev;
+ 	bio->bi_private = wc;
+-	bio->bi_end_io = o2hb_bio_end_io;
++	bio_set_endio(bio, o2hb_bio_end_io);
+ 
+ 	vec_start = (cs << bits) % PAGE_CACHE_SIZE;
+ 	while(cs < max_slots) {
+--- 2.6.24.3.base/fs/xfs/linux-2.6/xfs_aops.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/xfs/linux-2.6/xfs_aops.c	2008-03-16 03:11:07.000000000 -0700
+@@ -334,8 +334,8 @@ xfs_end_bio(
+ 	ioend->io_error = test_bit(BIO_UPTODATE, &bio->bi_flags) ? 0 : error;
+ 
+ 	/* Toss bio and pass work off to an xfsdatad thread */
+-	bio->bi_private = NULL;
+-	bio->bi_end_io = NULL;
++	bio->bi_private = NULL; // why?
++	bio_set_endio(bio, NULL); // why?
+ 	bio_put(bio);
+ 
+ 	xfs_finish_ioend(ioend, 0);
+@@ -349,7 +349,7 @@ xfs_submit_ioend_bio(
+ 	atomic_inc(&ioend->io_remaining);
+ 
+ 	bio->bi_private = ioend;
+-	bio->bi_end_io = xfs_end_bio;
++	bio_set_endio(bio, xfs_end_bio);
+ 
+ 	submit_bio(WRITE, bio);
+ 	ASSERT(!bio_flagged(bio, BIO_EOPNOTSUPP));
+--- 2.6.24.3.base/fs/xfs/linux-2.6/xfs_buf.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/fs/xfs/linux-2.6/xfs_buf.c	2008-03-16 03:11:07.000000000 -0700
+@@ -1197,7 +1197,7 @@ _xfs_buf_ioapply(
+ 
+ 		bio->bi_bdev = bp->b_target->bt_bdev;
+ 		bio->bi_sector = sector - (offset >> BBSHIFT);
+-		bio->bi_end_io = xfs_buf_bio_end_io;
++		bio_set_endio(bio, xfs_buf_bio_end_io);
+ 		bio->bi_private = bp;
+ 
+ 		bio_add_page(bio, bp->b_pages[0], PAGE_CACHE_SIZE, 0);
+@@ -1235,7 +1235,7 @@ next_chunk:
+ 	bio = bio_alloc(GFP_NOIO, nr_pages);
+ 	bio->bi_bdev = bp->b_target->bt_bdev;
+ 	bio->bi_sector = sector;
+-	bio->bi_end_io = xfs_buf_bio_end_io;
++	bio_set_endio(bio, xfs_buf_bio_end_io);
+ 	bio->bi_private = bp;
+ 
+ 	for (; size && nr_pages; nr_pages--, map_i++) {
+--- 2.6.24.3.base/include/linux/bio.h	2008-03-16 03:36:21.000000000 -0700
++++ 2.6.24.3/include/linux/bio.h	2008-03-16 03:11:07.000000000 -0700
+@@ -108,7 +108,7 @@ struct bio {
+ 
+ 	struct bio_vec		*bi_io_vec;	/* the actual vec list */
+ 
+-	bio_end_io_t		*bi_end_io;
++	bio_end_io_t		*bi_endio;
+ 	atomic_t		bi_cnt;		/* pin count */
+ 
+ 	void			*bi_private;
+@@ -199,6 +199,16 @@ static inline void *bio_data(struct bio 
+ 	return NULL;
+ }
+ 
++static inline void bio_set_endio(struct bio *bio, bio_end_io_t *endio)
++{
++	bio->bi_endio = endio;
++}
++
++static inline bio_end_io_t *bio_get_endio(struct bio *bio)
++{
++	return bio->bi_endio;
++}
++
+ /*
+  * will die
+  */
+--- 2.6.24.3.base/kernel/power/swap.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/kernel/power/swap.c	2008-03-16 03:11:07.000000000 -0700
+@@ -70,7 +70,7 @@ static int submit(int rw, pgoff_t page_o
+ 		return -ENOMEM;
+ 	bio->bi_sector = page_off * (PAGE_SIZE >> 9);
+ 	bio->bi_bdev = resume_bdev;
+-	bio->bi_end_io = end_swap_bio_read;
++	bio_set_endio(bio, end_swap_bio_read);
+ 
+ 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
+ 		printk("swsusp: ERROR: adding page to bio at %ld\n", page_off);
+--- 2.6.24.3.base/mm/bounce.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/mm/bounce.c	2008-03-16 03:11:07.000000000 -0700
+@@ -247,13 +247,13 @@ static void __blk_queue_bounce(struct re
+ 	bio->bi_size = (*bio_orig)->bi_size;
+ 
+ 	if (pool == page_pool) {
+-		bio->bi_end_io = bounce_end_io_write;
++		bio_set_endio(bio, bounce_end_io_write);
+ 		if (rw == READ)
+-			bio->bi_end_io = bounce_end_io_read;
++			bio_set_endio(bio, bounce_end_io_read);
+ 	} else {
+-		bio->bi_end_io = bounce_end_io_write_isa;
++		bio_set_endio(bio, bounce_end_io_write_isa);
+ 		if (rw == READ)
+-			bio->bi_end_io = bounce_end_io_read_isa;
++			bio_set_endio(bio, bounce_end_io_read_isa);
+ 	}
+ 
+ 	bio->bi_private = *bio_orig;
+--- 2.6.24.3.base/mm/page_io.c	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/mm/page_io.c	2008-03-16 03:11:07.000000000 -0700
+@@ -39,7 +39,7 @@ static struct bio *get_swap_bio(gfp_t gf
+ 		bio->bi_vcnt = 1;
+ 		bio->bi_idx = 0;
+ 		bio->bi_size = PAGE_SIZE;
+-		bio->bi_end_io = end_io;
++		bio_set_endio(bio, end_io);
+ 	}
+ 	return bio;
+ }

@@ -1,0 +1,152 @@
+--- 2.6.24.3.base/drivers/md/dm.c	2008-03-16 04:15:11.000000000 -0700
++++ 2.6.24.3/drivers/md/dm.c	2008-03-16 04:09:17.000000000 -0700
+@@ -504,11 +504,9 @@ static void dec_pending(struct dm_io *io
+ 	}
+ }
+ 
+-static void clone_endio(struct bio *bio, int error)
++static int dm_endio(struct bio *bio, int error, struct dm_target_io *tio)
+ {
+ 	int r = 0;
+-	struct dm_target_io *tio = bio->bi_private;
+-	struct mapped_device *md = tio->io->md;
+ 	dm_endio_fn endio = tio->ti->type->end_io;
+ 
+ 	if (!bio_flagged(bio, BIO_UPTODATE) && !error)
+@@ -524,7 +522,7 @@ static void clone_endio(struct bio *bio,
+ 			error = r;
+ 		else if (r == DM_ENDIO_INCOMPLETE)
+ 			/* The target will handle the io */
+-			return;
++			return 0;
+ 		else if (r) {
+ 			DMWARN("unimplemented target endio return value: %d", r);
+ 			BUG();
+@@ -532,16 +530,27 @@ static void clone_endio(struct bio *bio,
+ 	}
+ 
+ 	dec_pending(tio->io, error);
++	return r;
++}
+ 
++static void clone_endio(struct bio *bio, int error)
++{
++	struct dm_target_io *tio = bio->bi_private;
++	struct mapped_device *md = tio->io->md;
++	dm_endio(bio, error, tio);
+ 	/*
+ 	 * Store md for cleanup instead of tio which is about to get freed.
+ 	 */
+ 	bio->bi_private = md->bs;
+-
+ 	bio_put(bio);
+ 	free_tio(md, tio);
+ }
+ 
++static void dm_endio_pop(struct bio *bio, int error)
++{
++	dm_endio(bio, error, bio_pop(bio));
++}
++
+ static sector_t max_io_len(struct mapped_device *md,
+ 			   sector_t sector, struct dm_target *ti)
+ {
+@@ -562,8 +571,7 @@ static sector_t max_io_len(struct mapped
+ 	return len;
+ }
+ 
+-static void __map_bio(struct dm_target *ti, struct bio *clone,
+-		      struct dm_target_io *tio)
++static void __map_bio(struct dm_target *ti, struct bio *clone, struct dm_target_io *tio)
+ {
+ 	int r;
+ 	sector_t sector;
+@@ -609,6 +617,37 @@ static void __map_bio(struct dm_target *
+ 	}
+ }
+ 
++static void dm_map(struct bio *bio, struct dm_target *ti, struct dm_target_io *tio)
++{
++	int r;
++	sector_t sector;
++
++	/*
++	 * Map the bio.  If r == 0 we don't need to do
++	 * anything, the target has assumed ownership of
++	 * this io.
++	 */
++	atomic_inc(&tio->io->io_count);
++	sector = bio->bi_sector;
++	r = ti->type->map(ti, bio, &tio->info);
++	if (r == DM_MAPIO_REMAPPED) {
++		/* the bio has been remapped so dispatch it */
++
++		blk_add_trace_remap(bdev_get_queue(bio->bi_bdev), bio,
++				    tio->io->bio->bi_bdev->bd_dev,
++				    bio->bi_sector, sector);
++
++		generic_make_request(bio);
++	} else if (r < 0 || r == DM_MAPIO_REQUEUE) {
++		/* error the io and bail out, or requeue it if needed */
++		bio_pop(bio);
++		dec_pending(tio->io, r);
++	} else if (r) {
++		DMWARN("unimplemented target map return value: %d", r);
++		BUG();
++	}
++}
++
+ struct clone_info {
+ 	struct mapped_device *md;
+ 	struct dm_table *map;
+@@ -685,23 +724,18 @@ static int __clone_and_map(struct clone_
+ 
+ 	max = max_io_len(ci->md, ci->sector, ti);
+ 
+-	/*
+-	 * Allocate a target io object.
+-	 */
+-	tio = alloc_tio(ci->md);
+-	tio->io = ci->io;
+-	tio->ti = ti;
+-	memset(&tio->info, 0, sizeof(tio->info));
+-
+ 	if (ci->sector_count <= max) {
+ 		/*
+ 		 * Optimise for the simple case where we can do all of
+ 		 * the remaining io with a single clone.
+ 		 */
+-		clone = clone_bio(bio, ci->sector, ci->idx,
+-				  bio->bi_vcnt - ci->idx, ci->sector_count,
+-				  ci->md->bs);
+-		__map_bio(ti, clone, tio);
++		tio = bio_push(bio, sizeof(*tio), dm_endio_pop);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++		bio->bi_sector = ci->sector;
++		bio->bi_idx = ci->idx;
++		bio->bi_size = to_bytes(ci->sector_count);
++		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
++		dm_map(bio, ti, tio);
+ 		ci->sector_count = 0;
+ 
+ 	} else if (to_sector(bio->bi_io_vec[ci->idx].bv_len) <= max) {
+@@ -713,6 +747,9 @@ static int __clone_and_map(struct clone_
+ 		sector_t remaining = max;
+ 		sector_t bv_len;
+ 
++		tio = alloc_tio(ci->md);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++
+ 		for (i = ci->idx; remaining && (i < bio->bi_vcnt); i++) {
+ 			bv_len = to_sector(bio->bi_io_vec[i].bv_len);
+ 
+@@ -739,6 +776,9 @@ static int __clone_and_map(struct clone_
+ 		sector_t remaining = to_sector(bv->bv_len);
+ 		unsigned int offset = 0;
+ 
++		tio = alloc_tio(ci->md);
++		*tio = (typeof(*tio)){ .io = ci->io, .ti = ti };
++
+ 		do {
+ 			if (offset) {
+ 				ti = dm_table_find_target(ci->map, ci->sector);
