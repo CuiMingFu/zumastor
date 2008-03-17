@@ -846,7 +846,7 @@ Set up periodic snapshots
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 To set up hourly snapshots on the volume from the previous example, do:
 ........
-# zumastor define master zumatest --hourly 24
+# zumastor define schedule zumatest --hourly 24
 ........
 The +--hourly 24+ specifies that we want to keep the 24 most recent hourly snapshots (a days worth).
 A snapshot will be created once an hour via the zumastor hourly cron
@@ -935,7 +935,7 @@ with rsync.
 Where do old snapshots go?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Assuming you've set up a volume to keep 24 hourly snapshots
-around with the command +zumastor define master zumatest --hourly 24+
+around with the command +zumastor define schedule zumatest --hourly 24+
 as in the last example, what happens when the 25th snapshot is taken?
 
 To find out, you can run a loop that takes lots of snapshots.
@@ -950,7 +950,7 @@ Run it, then use df to see how many snapshots are around afterwards:
   done
 # df -P | grep zumatest
 .......
-You should see 24 snapshots (the limit set when we did the +zumastor define master+)
+You should see 24 snapshots (the limit set when we did the +zumastor define schedule+)
 plus the origin volume.  Each time you run +zumastor snapshot ...+
 it creates a new snapshot, and deletes any that are 'too old'.
 
@@ -1114,6 +1114,14 @@ Please note you do not need to create a filesystem (i.e. run mkfs) on the target
 Running `zumastor status --usage` on the target should show a hostname, replication port number, and period entry
 under source for volume zumatest.
     
+You can use +zumastor define schedule+ command to keep periodic snapshots on target.
+By default, periodic snapshots are not mounted on target. You can use the +--mount-snap+ option
+of the command +zumastor define source+ to have snapshots mounted and symlinked, in the same way
+as those mounted on master.
+
+  root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600 --mount-snap
+  root@replica:~#  zumastor define schedule --hourly 24
+
 Start replication
 ^^^^^^^^^^^^^^^^^
 
@@ -1304,7 +1312,7 @@ the +--export+ option with the command +zumastor define master+ described in sec
 "Mount a new volume and set up periodic snapshots" above.
 +
 .....................................
-# zumastor define master zumatest --hourly 24 --export
+# zumastor define master zumatest --export
 .....................................
 +
 You'll also need to modify your system's NFS startup script to
@@ -1391,7 +1399,7 @@ the +--samba+ option with the command +zumastor define master+ described in sect
 "Mount a new volume and set up periodic snapshots" above.
 +
 .....................................
-# zumastor define master zumatest --hourly 24 --samba
+# zumastor define master zumatest --samba
 .....................................
 
 Recover files through Samba using a Zumastor snapshot
