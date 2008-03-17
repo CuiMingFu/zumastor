@@ -10,15 +10,63 @@
 <img src="linux1.png" class="floatRight" alt="Zumastor Logo">
 
 We would love to have a Summer of Code student contribute
-to Zumastor.  Here are a few quick ideas:
+to Zumastor.  
+<p>
+Here are a few quick ideas:
 
-<ul>
-<li>Remove 64 snapshot limit (<a href="http://code.google.com/p/zumastor/issues/detail?id=6">issue 6</a>)
+<h2>Remove 64 snapshot limit</h2>
+aka <a href="http://code.google.com/p/zumastor/issues/detail?id=6">issue 6</a>.
+<p>
+Language: C<br>
+Skills required: Linux kernel coding<br>
+Difficulty: 2 Months?
+<p>
+Zumastor's <a href="http://code.google.com/p/zumastor/source/browse/trunk/ddsnap/ddsnap.c">ddsnapd.c</a> uses a 64 bit bitmask 
+(e.g. <a href="http://www.google.com/codesearch?q=snapmask+package%3Ahttp%3A%2F%2Fzumastor%5C.googlecode%5C.com&origq=snapmask&btnG=Search+Trunk">search for "snapmask"</a>) 
+internally to say which snapshots a particular block belongs to.
+This limits us to supporting 64 snapshots.  Dan Phillips has an idea
+for switching to using extents instead of a bitmap, and estimates
+this would take about two months to get working.
 
-<li>Add support for online Resize (<a href="http://code.google.com/p/zumastor/issues/detail?id=20">issue 20</a>)
+<h2>Add support for online Resize</h2>
+aka <a href="http://code.google.com/p/zumastor/issues/detail?id=20">issue 20</a>.
+<p>
+Language: C<br>
+Skills required: Linux kernel coding<br>
+Difficulty: 2 Months?
+<p>
+The ext3 filesystem and lvm2 both have support for online resizing;
+see e.g.
+<a href="http://jbopensrc.wordpress.com/2007/10/10/growing-a-lvm2-ext3-partition/">this recipe</a> or
+<a href="http://www.causton.net/areca.shtml">this recipe</a>.
+Zumastor already has support for offline resizing.
+It should be possible to add support for online resizing, and ideally
+to hook into LVM2's interfaces so the recipies above don't need
+modification.
 
-<li>Easy way for users to access snapshots e.g. in Nautilus (<a href="http://code.google.com/p/zumastor/issues/detail?id=37">issue 37</a>)
 
+<h2>Easy way for users to access snapshots e.g. in Nautilus</h2>
+aka <a href="http://code.google.com/p/zumastor/issues/detail?id=37">issue 37</a>.
+<p>
+Language: any universally deployed scripting language (bash / perl / python)<br>
+Skills required: moderate scripting<br>
+Difficulty: 1 months
+<p>
+The first order of business is to provide a simple commandline utility
+that lists the snapshots of a particular directory or file,
+in a way that could be extended to work with
+any kind of snapshot (zumastor, netapp, samba, ...).
+That should only take a week or two.
+<p>
+The next order of business is to use that utility inside Nautilus
+and/or Konqueror plugins to let a user right click a file,
+choose 'Previous Versions', and see the old versions of the file.
+This shouldn't require any C/C++ coding at all.
+Here's one <a href="http://tech.shantanugoel.com/2008/03/09/ubuntu-tip-extending-nautilus-scripting-your-way-to-ui-bliss.html">tutorial on how to extend Nautilus</a>.
+There are already several such snapshot plugins for Nautilus 
+(see e.g. <a href="http://opensolaris.org/os/project/jds/tasks/zfs_nautilus/">here</a>), 
+but they are specific to a single type of snapshot, whereas we
+want to support several.
 </ul>
 
 <hr>
