@@ -28,22 +28,27 @@ This limits us to supporting 64 snapshots.  Dan Phillips has an idea
 for switching to using extents instead of a bitmap, and estimates
 this would take about two months to get working.
 
-<h2>Add support for online Resize</h2>
+<h2>Improve Support for Volume Resizing</h2>
 aka <a href="http://code.google.com/p/zumastor/issues/detail?id=20">issue 20</a>.
 <p>
 Language: C<br>
-Skills required: Linux kernel coding<br>
+Skills required: Userspace coding / Linux kernel coding<br>
 Difficulty: 2 Months?
 <p>
+Part 1, userspace, easy:
+Zumastor, lvm2, and ext3 all have support for offline resizing,
+but they're not integrated together.
+It should be possible to to hook into LVM2's interfaces so offline resize
+of zumastor ext3 volumes can be done with a single lvm command.
+<p>
+Part 2, kernel space, hard:
 The ext3 filesystem and lvm2 both have support for online resizing;
 see e.g.
 <a href="http://jbopensrc.wordpress.com/2007/10/10/growing-a-lvm2-ext3-partition/">this recipe</a> or
 <a href="http://www.causton.net/areca.shtml">this recipe</a>.
-Zumastor already has support for offline resizing.
-It should be possible to add support for online resizing, and ideally
-to hook into LVM2's interfaces so the recipies above don't need
 modification.
-
+It should be relatively straightforward
+to add support to Zumastor for online resizing.
 
 <h2>Easy way for users to access snapshots e.g. in Nautilus</h2>
 aka <a href="http://code.google.com/p/zumastor/issues/detail?id=37">issue 37</a>.
