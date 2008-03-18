@@ -73,9 +73,12 @@ class VzHostSetup:
     self._vzparams['numflock'] = '1000:2000'
     self._vzparams['dcachesize'] = '3840001:3850000'
     self._vzparams['kmemsize'] = '11355923:11377049'
-    self._vzparams['diskspace'] = '5G:6G'
+    self._vzparams['diskspace'] = '20G:25G'
 
   def adjustQuota(self):
+    ''' Set quotas with vzquota
+    Turns out we need a good deal of inodes to build kernel packages.
+    '''
     logging.info('Adjusting Quota')
     cmd = '/usr/sbin/vzquota setlimit %s -i 400000 -I 500000' % (self._veid)
     self._quietRun(cmd)
@@ -238,7 +241,7 @@ class VzHostSetup:
       sys.exit(1)
 
   def _checkHostPkgs(self):
-    hostpkg = ['vzquota', 'vzctl', 'python', 'foopkg']
+    hostpkg = ['vzquota', 'vzctl', 'python']
     for pkg in hostpkg:
       cmd = '/usr/bin/dpkg-query -s %s' % pkg
       sp = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE,
