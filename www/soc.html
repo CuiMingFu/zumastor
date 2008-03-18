@@ -55,23 +55,30 @@ aka <a href="http://code.google.com/p/zumastor/issues/detail?id=37">issue 37</a>
 <p>
 Language: any universally deployed scripting language (bash / perl / python)<br>
 Skills required: moderate scripting<br>
-Difficulty: 1 months
+Difficulty: 2 months
 <p>
-The first order of business is to provide a simple commandline utility
+The first part is a simple commandline utility
 that lists the snapshots of a particular directory or file,
 in a way that could be extended to work with
 any kind of snapshot (zumastor, netapp, samba, ...).
-That should only take a week or two.
+That should only take a couple weeks.
+It should run fine even on systems that do not have Gnome or KDE installed.
 <p>
-The next order of business is to use that utility inside Nautilus
-and/or Konqueror plugins to let a user right click a file,
-choose 'Previous Versions', and see the old versions of the file.
+The next part is to extend Nautilus and/or Konqueror to let a 
+user right click a file, choose 'Previous Versions', 
+and see the old versions of the file.
 This shouldn't require any C/C++ coding at all.
-Here's one <a href="http://tech.shantanugoel.com/2008/03/09/ubuntu-tip-extending-nautilus-scripting-your-way-to-ui-bliss.html">tutorial on how to extend Nautilus</a>.
+There are even tutorials showing how to write plugin scripts
+<a href="http://tech.shantanugoel.com/2008/03/09/ubuntu-tip-extending-nautilus-scripting-your-way-to-ui-bliss.html">for Nautilus</a> and
+<a href="http://developer.kde.org/documentation/tutorials/dot/servicemenus.html">for Konqueror</a>, which should help a lot.
+<p>
 There are already several such snapshot plugins for Nautilus 
 (see e.g. <a href="http://opensolaris.org/os/project/jds/tasks/zfs_nautilus/">here</a>), 
 but they are specific to a single type of snapshot, whereas we
 want to support several.
+<p>
+This part of the idea is also listed <a href="http://techbase.kde.org/index.php?title=Projects/Summer_of_Code/2008/Ideas#Dolphin">on KDE's SoC ideas page</a>.
+(And it should be listed on Gnome's too, probably.)
 </ul>
 
 <hr>
