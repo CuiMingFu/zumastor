@@ -3,7 +3,7 @@
 
 VERSION="2.6.24-12.22"
 ZUMAREVISION="r1464"
-PKGVERSION="$VERSION~zumappa-$ZUMAREVISION"
+PKGVERSION="$VERSION~zumappa$ZUMAREVISION"
 MIRROR="http://mirrors.kernel.org/ubuntu"
 
 WORKDIR=`mktemp -d`
@@ -51,6 +51,6 @@ rm $autopatch
 touch debian/binary-custom.d/zumastor/rules
 touch debian/binary-custom.d/zumastor/vars
 
-#DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION
-#dpkg-buildpackage
+DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
+dpkg-buildpackage
 echo "Results in $WORKDIR"
