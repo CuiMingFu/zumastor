@@ -1,7 +1,8 @@
-diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll_rw_blk.c
---- linux-2.6.24.2/block/ll_rw_blk.c	2008-02-10 21:51:11.000000000 -0800
-+++ linux-2.6.24.2-newbiothrottle/block/ll_rw_blk.c	2008-02-13 20:16:48.478711235 -0800
-@@ -3210,9 +3210,9 @@
+diff --git a/block/ll_rw_blk.c b/block/ll_rw_blk.c
+index 30b62ce..62e01c1 100644
+--- a/block/ll_rw_blk.c
++++ b/block/ll_rw_blk.c
+@@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
   */
  static inline void __generic_make_request(struct bio *bio)
  {
@@ -13,12 +14,12 @@ diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll
  	dev_t old_dev;
  	int err = -EIO;
  
-@@ -3221,6 +3221,13 @@
+@@ -3221,6 +3221,13 @@ static inline void __generic_make_request(struct bio *bio)
  	if (bio_check_eod(bio, nr_sectors))
  		goto end_io;
  
 +	if (q && q->metric && !bio->bi_queue) {
-+		int need = bio->bi_throttle = q->metric(bio);
++		int need = bio->bi_max_vecs;
 +		bio->bi_queue = q;
 +		/* FIXME: potential race if atomic_sub is called in the middle of condition check */
 +		wait_event(q->throttle_wait, atomic_read(&q->available) >= need);
@@ -27,7 +28,7 @@ diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll
  	/*
  	 * Resolve the mapping until finished. (drivers are
  	 * still free to implement/resolve their own stacking
-@@ -3231,10 +3238,9 @@
+@@ -3231,10 +3238,9 @@ static inline void __generic_make_request(struct bio *bio)
  	 */
  	old_sector = -1;
  	old_dev = 0;
@@ -39,7 +40,7 @@ diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll
  		if (!q) {
  			printk(KERN_ERR
  			       "generic_make_request: Trying to access "
-@@ -3282,8 +3288,10 @@
+@@ -3282,8 +3288,10 @@ end_io:
  			goto end_io;
  		}
  
@@ -52,33 +53,23 @@ diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll
  }
  
  /*
-diff -ur linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-newbiothrottle/drivers/md/dm.c
---- linux-2.6.24.2/drivers/md/dm.c	2008-02-10 21:51:11.000000000 -0800
-+++ linux-2.6.24.2-newbiothrottle/drivers/md/dm.c	2008-02-13 20:14:06.377223116 -0800
-@@ -889,6 +889,22 @@
- 	return r;
- }
+diff --git a/drivers/md/dm.c b/drivers/md/dm.c
+index 66746dd..28a42f6 100644
+--- a/drivers/md/dm.c
++++ b/drivers/md/dm.c
+@@ -793,6 +793,11 @@ static int __split_bio(struct mapped_device *md, struct bio *bio)
+  * CRUD END
+  *---------------------------------------------------------------*/
  
 +static unsigned dm_metric(struct bio *bio)
 +{
-+	return bio->bi_vcnt;
++	return 1;
 +}
 +
-+unsigned dm_inflight_total(struct dm_target *target)
-+{
-+	struct mapped_device *md;
-+	request_queue_t *queue;
-+	md = dm_table_get_md(target->table);
-+	queue = md->queue;
-+	dm_put(md);
-+	return (queue->capacity - atomic_read(&queue->available));
-+}
-+EXPORT_SYMBOL_GPL(dm_inflight_total);
-+
- /*-----------------------------------------------------------------
-  * An IDR is used to keep track of allocated minor numbers.
-  *---------------------------------------------------------------*/
-@@ -967,6 +983,7 @@
+ /*
+  * The request function that just remaps the bio built up by
+  * dm_merge_bvec.
+@@ -951,6 +956,7 @@ out:
  
  static struct block_device_operations dm_blk_dops;
  
@@ -86,7 +77,7 @@ diff -ur linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-newbiothrottle/drivers/md
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -1009,6 +1026,11 @@
+@@ -993,6 +999,11 @@ static struct mapped_device *alloc_dev(int minor)
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
@@ -98,7 +89,7 @@ diff -ur linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-newbiothrottle/drivers/md
  	md->queue->backing_dev_info.congested_fn = dm_any_congested;
  	md->queue->backing_dev_info.congested_data = md;
  	blk_queue_make_request(md->queue, dm_request);
-@@ -1571,6 +1593,7 @@
+@@ -1555,6 +1566,7 @@ int dm_suspended(struct mapped_device *md)
  {
  	return test_bit(DMF_SUSPENDED, &md->flags);
  }
@@ -106,41 +97,49 @@ diff -ur linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-newbiothrottle/drivers/md
  
  int dm_noflush_suspending(struct dm_target *ti)
  {
-diff -ur linux-2.6.24.2/include/linux/bio.h linux-2.6.24.2-newbiothrottle/include/linux/bio.h
---- linux-2.6.24.2/include/linux/bio.h	2008-02-10 21:51:11.000000000 -0800
-+++ linux-2.6.24.2-newbiothrottle/include/linux/bio.h	2008-02-13 20:14:06.377223116 -0800
-@@ -111,6 +111,9 @@
- 	bio_end_io_t		*bi_end_io;
+diff --git a/fs/bio.c b/fs/bio.c
+index acaf663..26dba1a 100644
+--- a/fs/bio.c
++++ b/fs/bio.c
+@@ -1028,6 +1028,13 @@ void bio_endio(struct bio *bio, int error)
+ 
+ 	if (bio_get_endio(bio))
+ 		(bio_get_endio(bio))(bio, error);
++
++	if (!bio->bi_size) {
++		struct request_queue *q = bio->bi_queue;
++		atomic_add(bio->bi_max_vecs, &q->available);
++		bio->bi_queue = NULL; /* just in case */
++		wake_up(&q->throttle_wait);
++	}
+ }
+ 
+ void bio_pair_release(struct bio_pair *bp)
+diff --git a/include/linux/bio.h b/include/linux/bio.h
+index 2bede12..42d9d09 100644
+--- a/include/linux/bio.h
++++ b/include/linux/bio.h
+@@ -116,6 +116,7 @@ struct bio {
+ 	bio_end_io_t		*bi_endio;
  	atomic_t		bi_cnt;		/* pin count */
  
 +	struct request_queue	*bi_queue;	/* for throttling */
-+	unsigned		bi_throttle;	/* throttle metric */
-+
  	void			*bi_private;
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
-diff -ur linux-2.6.24.2/include/linux/blkdev.h linux-2.6.24.2-newbiothrottle/include/linux/blkdev.h
---- linux-2.6.24.2/include/linux/blkdev.h	2008-02-10 21:51:11.000000000 -0800
-+++ linux-2.6.24.2-newbiothrottle/include/linux/blkdev.h	2008-02-13 20:14:06.377223116 -0800
-@@ -384,6 +384,10 @@
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index d18ee67..045a560 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
+@@ -384,6 +384,10 @@ struct request_queue
  	struct work_struct	unplug_work;
  
  	struct backing_dev_info	backing_dev_info;
-+	unsigned (*metric)(struct bio *bio);	/* bio throttle metric */
++	unsigned (*metric)(struct bio *bio);	/* (stub) bio throttle metric */
 +	wait_queue_head_t	throttle_wait;
 +	atomic_t		available;
 +	unsigned		capacity;
  
  	/*
  	 * The queue owner gets to use this for whatever they like.
-diff -ur linux-2.6.24.2/include/linux/device-mapper.h linux-2.6.24.2-newbiothrottle/include/linux/device-mapper.h
---- linux-2.6.24.2/include/linux/device-mapper.h	2008-02-10 21:51:11.000000000 -0800
-+++ linux-2.6.24.2-newbiothrottle/include/linux/device-mapper.h	2008-02-13 20:14:06.377223116 -0800
-@@ -196,6 +196,7 @@
- struct gendisk *dm_disk(struct mapped_device *md);
- int dm_suspended(struct mapped_device *md);
- int dm_noflush_suspending(struct dm_target *ti);
-+unsigned dm_inflight_total(struct dm_target *target);
- 
- /*
-  * Geometry functions.
+diff --git a/include/linux/device-mapper.h b/include/linux/device-mapper.h
