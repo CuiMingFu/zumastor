@@ -2,7 +2,7 @@
 # Build a 2.6.24 kernel package for Zumastor
 
 VERSION="2.6.24-12.22"
-ZUMAREVISION="r1464"
+ZUMAREVISION=`svn info ../../ | grep ^Revision:  | cut -d\  -f2`
 PKGVERSION="$VERSION~zumappa$ZUMAREVISION"
 MIRROR="http://mirrors.kernel.org/ubuntu"
 
@@ -27,7 +27,7 @@ done
 mkdir debian/binary-custom.d/zumastor debian/binary-custom.d/zumastor/patchset
 cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.i386
 echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.i386
-cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.amd64
+cp $CWD/../config/2.6.24.2-amd64-full debian/binary-custom.d/zumastor/config.amd64
 echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.amd64
 patchnum=0
 for patch in $CWD/../../ddsnap/patches/2.6.24.2/*
@@ -52,5 +52,5 @@ touch debian/binary-custom.d/zumastor/rules
 touch debian/binary-custom.d/zumastor/vars
 
 DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
-dpkg-buildpackage
+dpkg-buildpackage -rfakeroot
 echo "Results in $WORKDIR"
