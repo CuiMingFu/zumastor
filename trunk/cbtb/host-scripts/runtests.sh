@@ -65,6 +65,7 @@ do
   testlog="${LOGDIR}/${LOGPREFIX}log"
   MACADDR=$MACADDR IPADDR=$IPADDR IFACE=$IFACE \
     MACADDR2= IPADDR2= IFACE2= \
+    MACADDR3= IPADDR3= IFACE3= \
     timeout -14 3600 ${top}/test-zuma-dapper-i386.sh $f >${testlog} 2>&1
   testrc=$?
   files="$testlog $files"
