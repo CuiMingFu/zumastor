@@ -52,9 +52,6 @@ diff -ur linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-newbiothrottle/block/ll
  }
  
  /*
-Only in linux-2.6.24.2-newbiothrottle/block: ll_rw_blk.c~
-Only in linux-2.6.24.2-newbiothrottle/block: ll_rw_blk.c.orig
-Only in linux-2.6.24.2-newbiothrottle/block: ll_rw_blk.c.rej
 diff -ur linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-newbiothrottle/drivers/md/dm.c
 --- linux-2.6.24.2/drivers/md/dm.c	2008-02-10 21:51:11.000000000 -0800
 +++ linux-2.6.24.2-newbiothrottle/drivers/md/dm.c	2008-02-13 20:14:06.377223116 -0800
