@@ -25,10 +25,16 @@ do
   patch -p5 < $patchfile
 done
 mkdir debian/binary-custom.d/zumastor debian/binary-custom.d/zumastor/patchset
+
 cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.i386
 echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.i386
+
+cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.lpia
+echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.lpia
+
 cp $CWD/../config/2.6.24.2-amd64-full debian/binary-custom.d/zumastor/config.amd64
 echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.amd64
+
 patchnum=0
 for patch in $CWD/../../ddsnap/patches/2.6.24.2/*
 do
