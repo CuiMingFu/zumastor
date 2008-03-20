@@ -1,0 +1,11 @@
+--- /tmp/tmp.YjnTYt2912/a/linux-2.6.24/debian/rules.d/0-common-vars.mk	2008-03-19 17:17:05.000000000 -0700
++++ /tmp/tmp.Gfkxyp1329/b/linux-2.6.24/debian/rules.d/0-common-vars.mk	2008-03-19 17:16:31.000000000 -0700
+@@ -113,7 +113,7 @@
+ endif
+ 
+ #all_custom_flavours = xen rt ume lpiacompat lpia
+-all_custom_flavours = lpia rt lpiacompat xen
++all_custom_flavours = lpia rt lpiacompat xen zumastor
+ 
+ # Checks if a var is overriden by the custom rules. Called with var and
+ # flavour as arguments.
