@@ -1,0 +1,1691 @@
+#!/bin/bash
+# Zumastor Linux Storage Server
+# Copyright (c) 2006 Google Inc.
+# Author: Daniel Phillips <phillips@google.com>
+# Licensed under the GNU GPL version 2
+
+. /lib/zumastor/common || { echo "$0: unable to load common zumastor functions"; exit 1; }
+. /lib/zumastor/ddfake
+
+function read_and_inc {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r filename=$1
+	local -r inc=$2
+	local num new
+	# we only use even numbers for master snapshots (odd for mounting downstream)
+	read num <$filename || num=0
+	new=$((num + 1))
+	[[ $((new % 2)) -eq 0 ]] || let new++
+	echo $new > $filename || return 1
+	echo $num
+}
+
+function drop_snapshot {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local -r server=$SERVERS/$vol
+	local usecount
+
+	log "dropping snapshot for $vol($snap)"
+	usecount=$(ddsnap usecount $server $snap) || { log "couldn't get usecount for vol '$vol' snap '$snap'"; return 1; }
+	if [[ $usecount -eq 0 ]]; then
+		remove_device $vol $snap
+		ddsnap delete $server $snap || { log "failed to delete snapshot '$vol($snap)'"; return 1; }
+		return 0
+	fi
+	if [[ $usecount -gt 1 ]]; then
+		ddsnap usecount $server $snap -1 >/dev/null || { log "couldn't decrease usecount for vol '$vol' snap '$snap'"; return 1; }
+		return 0
+	fi
+	remove_device $vol $snap || { log "remove device failed for $vol($snap) "; return 1; }
+
+	# FIXME we wait for the usecount to hit zero
+	while true; do
+		usecount=$(ddsnap usecount $server $snap) || { log "couldn't get usecount for vol '$vol' snap '$snap'"; return 1; }
+		verify_valid_number $usecount || { log "usecount didn't return valid number '$usecount'"; return 1; }
+		[[ $usecount -eq 0 ]] && break
+		sleep 0.2
+	done
+		
+	ddsnap delete $server $snap || log "failed to delete snapshot '$vol($snap)'"
+}
+
+function umount_drop_snapshot {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local -r server=$SERVERS/$vol
+
+	umount_device $vol $snap || { log "error umounting $vol($snap)"; return 1; }
+
+	drop_snapshot $vol $snap || return 1
+}
+
+function get_vol_type {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ -d $VOLUMES/$vol/master ]] && echo "master" && return 0
+	[[ -d $VOLUMES/$vol/source ]] && echo "source"
+}
+
+function update_symlinks {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r kind=$2
+	local mount=$(mount_name $vol -1)
+	local type=$(get_vol_type $vol)
+	local snapmount count=0 id
+	local -a idlist
+
+	read -a idlist < $VOLUMES/$vol/$type/snapshots/$kind
+	for snap in $(seq $((${#idlist[@]} - 1)) -1 0); do
+		id=${idlist[$snap]}
+		snapmount=$(mount_name $vol $id)
+		ln -sfn $(basename $snapmount) $(snap_path $vol)/$kind.$count
+		let count++
+	done
+}
+
+# new_snapshot <volume name> <kind>
+#  Create a new snapshot for <volume>'s interval <kind> and rotate out old
+#  snapshots as necessary.  Called from the zumastor master when triggered with
+#  an interval.
+function new_snapshot {
+	[ $# -eq 2 ] || [ $# -eq 3 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r kind=$2
+	local type=$(get_vol_type $vol)
+	[[ $type == "master" ]] || [[ $type == "source" ]] || { echo "$0: please define master or source first"; return 1; }
+	local -r maxfile=$VOLUMES/$vol/$type/schedule/$kind
+	local -r listfile=$VOLUMES/$vol/$type/snapshots/$kind
+	local -a snapshots
+	local max next num oldest
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot
+
+	echo "new '$kind' snapshot requested for volume '$vol'"
+
+	if [[ $type == "source" ]] || [[ $kind != "/manual" ]]; then
+		[[ -f $maxfile ]] || { echo "$0: '$maxfile' does not exist, doing nothing"; return 1; }
+		read max <$maxfile
+		[ $max ] || { echo "$0: '$maxfile' is empty, doing nothing"; return 1; }
+		[ $max -gt 0 ] || { echo "$0: '$maxfile' contains zero, doing nothing"; return 1; }
+	fi
+
+	if [ -f $listfile ]; then
+		read -a snapshots <$listfile
+	else
+		snapshots=()
+	fi
+	num=${#snapshots[@]}
+
+	if [[ $type == "master" ]]; then
+		local -r master=$VOLUMES/$vol/master
+		next=$(read_and_inc $master/next 2) || { echo "snapshot number error: $master/next"; return 1; }
+		echo "new snapshot will be '$next'"
+		create_snapshot $vol $next || { echo "snapshot creation failed for $next"; return 1; }
+		create_device $vol $next || { echo "device creation failed for $next"; return 1; }
+		[[ $kind == "/manual" ]] && return 0
+	else
+		[ $# -eq 3 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+		local -r next=$3
+		[[ $num -ge 1 ]] && last=${snapshots[$((num - 1))]}
+		[[ $last == $next ]] && { echo "no newly replicated snapshot"; return 0; }
+		usecount_increment $vol $next || { echo "can't increment usecount of snapshot $next"; return 1; }
+	fi
+
+	snapshots[$num]=$next
+	[[ -f $mountsnap ]] && mount_device $vol $next
+
+	if [[ $num -ge $max ]]; then
+		oldest=${snapshots[0]}
+		echo "remove oldest $kind snapshot $oldest"
+		unset snapshots[0]
+	fi
+	echo ${snapshots[@]} >$listfile
+	echo "'$kind' snapshot list is now: ${snapshots[*]}"
+	[[ -f $mountsnap ]] && update_symlinks $vol $kind
+	# unmount/delete a snapshot may take a while. We do it after updating
+	# symlinks to reduce the window that a symlink points to nowhere
+	[[ -z $oldest ]] || umount_drop_snapshot $vol $oldest
+	[[ -f $dotsnapshot ]] && umount -l ${mpoint}/.snapshot && mount --rbind $snapmp ${mpoint}/.snapshot
+}
+
+# new_target_snapshot <volume> <hostname>
+#   Create a snapshot for <volume> for the replication to target <hostname> and
+#   send the new snapshot number to the target's pipe.  Called by the zumastor
+#   master daemon (run_master) when triggered with "target"
+function new_target_snapshot {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r hostname=$2
+	local -r target_fifo=$VOLUMES/$vol/targets/$hostname/trigger
+	local -r sock=${SERVERS}/$vol
+	local -r master=$VOLUMES/$vol/master
+
+	[ -e $target_fifo ] || { log "target trigger for $hostname does not exist"; return 1; }
+
+	# create snapshot
+	# write id down the trigger
+
+	next=$(read_and_inc $master/next 2) || { log "ssn error: $master/next"; return 1; }
+
+	log "new snapshot will be '$next'"
+
+	# need to create the device in order for ddsnap transmit to work
+	create_snapshot $vol $next
+	create_device $vol $next
+
+	send_to_fifo -n $target_fifo $next && return 0
+	drop_snapshot $vol $next && return 1
+}
+
+function run_remote  {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r host=$1
+	local -r command=$2
+
+	# FIXME TODO input checking
+
+	if [[ $host = "localhost" ]]; then
+		echo $command | bash
+	else
+		# run "sh" to prevent "stdin: is not a tty" stderr output
+		echo $command | $SSH_COMMAND $host bash
+	fi
+}
+
+function usecount_increment {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local -r server=$SERVERS/$vol
+
+	# FIXME TODO input chekcing
+	ddsnap usecount $server $snap 1 >&/dev/null || return 1
+	return 0
+}
+
+# replicate_snapshot
+# called from target zumastor daemon (run_target)
+function replicate_snapshot {
+	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local snap=$3
+	local -r target_dir=$VOLUMES/$vol/targets/$host
+	local -r send_file=$target_dir/send
+	local -r remote_file=$send_file.remote
+	local -r hold_file=$target_dir/hold
+	local -r server=$SERVERS/$vol
+	local -r volume_file=$target_dir/name
+	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol
+
+	read -d" " old_snap 2>/dev/null <$hold_file
+	read remote_vol <$volume_file || return 1
+
+	log "replication beginning from snapshot '$old_snap' to '$snap' on volume '$vol' for '$host'"
+
+	output=$(run_remote $host "cat $VOLUMES/$remote_vol/source/hostname")
+	if [[ $? -ne 0 ]] || [[ $output != $MYHOSTNAME ]]; then
+		log "set '$MYHOSTNAME' as source for '$remote_vol' on '$host' first!"
+		return 1
+	fi
+	if ! verify_existing_snap $vol $snap; then
+		log "send snapshot '$snap' invalid, cycle failing"
+		return 3 # tells it not to retry sending
+	fi
+	# fallback to full volume if we lost the snapshot upstream (deleted manually or squash)
+	if [[ $old_snap ]] && ! verify_existing_snap $vol $old_snap; then
+		log "verify $old_snap failed, falling back to full volume"
+		old_snap=
+	fi
+
+	run_remote $host "zumastor receive start $remote_vol" > $remote_file
+	[[ $? -ne 0 ]] && { log "starting remote snapshot receive failed"; return 1; }
+	read port remote_hold remote_send remote_addr < $remote_file
+
+	if [[ $remote_hold == "-1" ]]; then # remote has no hold, must do initial
+		[[ $old_snap ]] && drop_snapshot $vol $old_snap
+		remote_hold=
+		old_snap=
+	elif [[ $remote_hold != $old_snap ]]; then # check for race between updating downstream hold file and upstream
+		if verify_existing_snap $vol $remote_hold; then
+			log "downstream holding valid snapshot '$remote_hold', using it instead of '$old_snap'"
+			[[ -e "/dev/mapper/$vol($remote_hold)" ]] || create_device $vol $remote_hold
+			if [[ $remote_hold == $snap ]]; then # trying to resend finished replication cycle
+				log "trying to resume already completed snapshot '$snap', success"
+				echo $snap >$hold_file && rm $remote_file
+				[[ $old_snap ]] && drop_snapshot $vol $old_snap
+				return 0
+			fi
+			old_snap=$remote_hold
+		else
+			log "downstream holding invalid snapshot '$remote_hold', falling back to full volume"
+			old_snap= remote_addr=
+		fi
+	fi
+	if [[ $remote_send ]] && [[ $remote_send != $snap ]] && [[ $remote_send != $remote_hold ]]; then
+		if verify_existing_snap $vol $remote_send; then
+			log "downstream has partial replication of '$remote_send', using it instead of '$snap'"
+			[[ -e "/dev/mapper/$vol($remote_send)" ]] || create_device $vol $remote_send
+			drop_snapshot $vol $snap
+			snap=$remote_send ret=13
+		else
+			log "downstream has partial replication of invalid '$remote_send', falling back to full volume"
+			old_snap= remote_addr=
+		fi
+	fi
+
+	[[ $remote_addr ]] && [[ $remote_send != $remote_hold ]] && resume=" --resume $remote_addr"
+
+	if [[ -e $target_dir/test_fullvolume ]] && [[ -z $resume ]] ; then
+		log "full volume replication test"
+		[[ $old_snap ]] && drop_snapshot $vol $old_snap
+		old_snap=
+	fi
+
+	log "remote listen started on port $port, transmitting snapshot $snap$resume"
+	# send the changes since the last snapshot via ddsnap transmit
+	ddsnap transmit $server $host:$port -r -g 6 $old_snap $snap$resume -p $send_file
+	if [[ $? -ne 0 ]]; then
+		log "transmit $server $host:$port $old_snap $snap$resume failed"
+		return 1
+	fi
+
+	log "sending snapshot complete, notifying downstream host"
+	run_remote $host "zumastor receive done $remote_vol"
+	[[ $? -ne 0 ]] && { log "zumastor receive done $remote_vol failed"; return 1; }
+
+	#[[ $snap -eq 5 ]] && restart_plug
+	# !!! FIXME TODO this is racy, we should save state by journaling
+	log "setting hold snapshot to $snap"
+	mv $send_file $hold_file
+	echo $snap > $hold_file # to remove progress status
+	rm $remote_file 2>/dev/null
+
+	[[ $old_snap ]] && drop_snapshot $vol $old_snap
+	return $ret
+}
+
+function restart_plug {
+	echo "TESTING"
+	/etc/init.d/zumastor restart
+	exit
+}
+
+function create_snapmount {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r cron=${CRONS}/$vol
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap # if mount snapshot
+	local type=$(get_vol_type $vol)
+	[[ $type == "master" ]] || [[ $type == "source" ]] || { echo "$0: please define master or source first"; return 1; }
+	local snapmp id
+
+	touch $cron || return 1
+	snapmp=$(snap_path $vol)
+	mkdir -p $snapmp
+	if [[ -f $mountsnap ]]; then
+		for id in $(cat $VOLUMES/$vol/$type/snapshots/* 2>/dev/null); do
+			echo "Mounting snapshot '$vol($id)'"
+			mount_device $vol $id
+		done
+		for kind in $(ls $VOLUMES/$vol/$type/snapshots/ 2>/dev/null); do
+			update_symlinks $vol $kind
+		done
+	fi
+	return 0
+}
+
+function run_master {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r fifo=$VOLUMES/$vol/master/trigger
+	local -r log=${LOGS}/$vol/master.log
+	local kind mpoint snapmp
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap # if mount snapshot
+	local -r export=$VOLUMES/$vol/filesystem/export # if export snapshots over NFS
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot # if snapshots appear under .snapshot of origin volume
+
+	[ -r $fifo ] && [ -p $fifo ] || { echo "$0: master snapshot trigger '$fifo' is missing"; return 1; }
+
+	# daemonize (close stdin, stdout, stderr)
+	exec 0</dev/null 1>/dev/null 2>/dev/null
+
+	mount_device $vol -1 rw
+	mpoint=$(mount_name $vol -1)
+	create_snapmount $vol >>$log 2>&1 || return 1
+	if [[ -f $mountsnap ]] && [[ -f $dotsnapshot ]]; then
+		mkdir -p ${mpoint}/.snapshot
+		mount --rbind $snapmp ${mpoint}/.snapshot
+		if [[ -f $export ]]; then  # need to export .snapshot for it to be accessible over nfs
+			fsid=`echo "${mpoint}/.snapshot" | cksum | awk '{ printf "%d", ($1/2) }'`
+			exportfs -oro -ofsid=$fsid *:${mpoint}/.snapshot
+		fi
+	fi
+
+	# we reopen the log for each write so rotation works
+	pid=""
+	while true; do
+		if [[ $pid == "" ]]; then
+			pid=$!
+			log "starting master snapshot daemon for volume '$vol'" $log
+		fi
+		# this is now overloaded to support two types of requests to create snapshots:
+		# <kind> - which triggers a periodic snapshot (hourly, daily, etc)
+		# target <hostname> - which triggers a snapshot for replication
+		[[ -r $fifo ]] || { log "pipe $fifo does not exist" $log; exit 1; }
+		read kind <$fifo || { log "error when reading pipe $?" $log; sleep 1; continue; }
+		if [[ $kind =~ ^target/ ]]; then
+			new_target_snapshot $vol ${kind/target\//} >> $log 2>&1
+		else
+			new_snapshot $vol $kind >> $log 2>&1
+		fi
+		if [[ $(num_snapshots $vol) -ge $MAX_SNAPSHOTS ]]; then
+			# must have leaked snapshots.  TODO notify admin
+			log "error: snapshot limit reached, further progress not possible!"
+		fi
+	done &
+}
+
+function now {
+	date +%s
+}
+
+function run_target {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1 host=$2
+	local -t target_dir=$VOLUMES/$vol/targets/$host
+	local -r fifo=$target_dir/trigger
+	local -r period_file=$target_dir/period
+	local -r log=${LOGS}/$vol/target-${host}.log
+	local -r master_fifo=$VOLUMES/$vol/master/trigger
+	local snap="" period starttime newperiod delay status
+	local -r source_holdfile=$VOLUMES/$vol/source/hold
+	local -r target_holdfile=$VOLUMES/$vol/targets/$host/hold
+	local repsnap oldsnap
+
+	[ -r $fifo ] && [ -p $fifo ] || { log "target replication trigger '$fifo' is missing" $log; return 1; }
+
+	[[ -e $period_file ]] && read period <$period_file || log "no period specified" $log
+
+	if [[ ! -z $period ]]; then
+		if verify_valid_number $period; then
+			(zumastor replicate $vol $host --nowait >> $log 2>&1 &) # double fork to prevent sigchld interrupting read
+		else
+			log "invalid period '$period' specified" $log
+			return 1
+		fi
+	fi
+
+	# daemonize (close stdin, stdout, stderr)
+	exec 0</dev/null 1>/dev/null 2>/dev/null
+
+	pid=""
+	while true; do
+		[[ $pid == "" ]] && pid=$! && log "start daemon volume '$vol', target '$host'" $log
+		# !!! FIXME TODO Implement skipping to most recent snapshot if there is a backlog
+		log "waiting for new snapshot..." $log
+
+		# wrap in a while loop because read will fail is ERESTARTSYS when the
+		# sleeping child exits
+		while [[ $snap == "" ]]; do
+			read snap <$fifo && break || log "couldn't read from $fifo"
+			sleep 1
+		done
+
+		if [[ $snap == -1 ]] && [[ ! -e $master_fifo ]] && [[ -f $source_holdfile ]]; then
+			repsnap=
+			oldsnap=-1
+			# this is an intermediate node of a chanined replication,
+			# so use the newest completely replicated snapshot
+			read -d" " repsnap 2>/dev/null <$source_holdfile
+			if [[ -z $repsnap ]]; then
+				log "no fully replicated snapshot available, skip the replication" $log
+			else
+				# check if this is a newer snapshot
+				read -d" " oldsnap 2>/dev/null <$target_holdfile
+				if [[ $repsnap -le $oldsnap ]]; then
+					log "no newer replicated snapshot, skip the replication" $log
+				else
+					usecount_increment $vol $repsnap && snap=$repsnap
+				fi
+			fi
+		fi
+
+		pkill -f "zumastor replicate $vol $host --delay"
+		starttime=$(now)
+
+		if [[ $snap != -1 ]]; then
+			replicate_snapshot $vol $host $snap >> $log 2>&1
+			status=$?
+			if [[ $status -eq 0 ]]; then #success 
+				log "successfully replicated snapshot $snap" $log
+				snap=""
+			elif [[ $status -eq 13 ]]; then
+				log "successfully replicated resumed snapshot" $log
+				snap=""
+			elif [[ $status -eq 3 ]]; then
+				log "replication error on snapshot $snap, not retrying" $log
+				drop_snapshot $vol $snap >>$log 2>&1
+				snap="" # FIXME perhaps we should trigger a new replication cycle here
+			else
+				log "replicate error on snapshot $snap: $?" $log
+				# FIXME TODO add retry code here, for now we retry forever
+				sleep 1
+				continue
+			fi
+		else
+			snap=""
+		fi
+
+		read newperiod <$period_file 2>/dev/null || newperiod=
+		if [[ $newperiod != $period ]]; then
+			log "updated" $log
+			period=$newperiod
+			verify_valid_number $period || period=""
+			if [[ -z $period ]]; then
+				log "entering manual mode" $log
+			else
+				log "setting period to $period" $log
+			fi
+		fi
+
+		if [[ ! -z $period ]]; then
+			delay=$(( $(now) - $starttime ))
+			if [[ $delay -lt $period ]]; then
+				delay=$(( $period - $delay ))
+			else
+				delay=0
+			fi
+			# background this so the master and target daemons can't both block
+			log "scheduling replication cycle in ${delay}s" $log
+			(zumastor replicate $vol $host --delay $delay --nowait >> $log 2>&1 &) # double fork to prevent sigchld interrupting read
+		fi
+	done &
+}
+
+function clear_snapmount {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r cron=${CRONS}/$vol
+	local -r mountsnap=$VOLUMES/$vol/filesystem/mountsnap
+	local type=$(get_vol_type $vol)
+	local id snapmp
+
+	rm -f $cron
+	if [[ -f $mountsnap ]]; then
+		for id in `cat $VOLUMES/$vol/$type/snapshots/* 2>/dev/null`; do
+			umount_device $vol $id
+		done
+	fi
+	snapmp=$(snap_path $vol)
+	rm -f $snapmp/hourly.* $snapmp/daily.* $snapmp/weekly.* $snapmp/monthly.* >&/dev/null
+	[[ $snapmp = ${SNAPMOUNTS}/$vol ]] && rmdir $snapmp 2>/dev/null
+
+}
+
+function stop_master {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r log=${LOGS}/$vol/master.log
+
+	log "stop master called, umounting volume" $log
+	umount_device $vol -1 2>/dev/null
+	clear_snapmount $vol >>$log 2>&1
+	log "killing master daemon" $log
+	pkill -f "zumastor start master $vol$" || return 1
+}
+
+function stop_nag {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r log=${LOGS}/$vol/source.log
+
+	pkill -f "ddsnap delta listen /dev/mapper/$vol 0.0.0.0"
+	pkill -f "zumastor start source $vol$"
+	pkill -f "zumastor receive done $vol "
+	clear_snapmount $vol >>$log 2>&1
+	sync
+}
+
+function stop_target {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local -r log=${LOGS}/$vol/target-${host}.log
+
+	log "stopping target" $log
+	pkill -f "zumastor replicate $vol $host --delay"
+	pkill -f "zumastor start target $vol $host$" || return 1
+	pkill -f "ddsnap transmit $SERVERS/$vol $host:"
+	return 0
+}
+
+function define_volume {
+	[ $# -eq 3 ] || [ $# -eq 4 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r device=$VOLUMES/$vol/device
+	local -r odev=$2
+	local -r sdev=$3
+	local -r mdev=$4
+
+	ln -sf $odev $device/origin  || return 1
+	ln -sf $sdev $device/snapstore || return 1
+	[ -z $mdev ] || ln -sf $mdev $device/meta || return 1
+
+	start_volume $vol || { echo start failed; return 1; }
+	create_device $vol -1 || { echo create failed; return 1; }
+}
+
+function forget_volume {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r path=$VOLUMES/$vol
+	local -r sock=${SERVERS}/$vol
+	local id host targets
+
+	for host in $VOLUMES/$vol/targets/*; do
+		host=${host/*\//} # basename without a subshell
+		[[ $host == "*" ]] && continue # in case it didn't expand
+		forget_target $vol $host
+	done
+
+	[ -d $VOLUMES/$vol/source ] && forget_source $vol
+
+	forget_master $vol
+
+	stop_volume $vol || return 1
+
+	rm -f ${MOUNTS}/$vol ${SNAPMOUNTS}/$vol
+	rmdir $path/targets
+	rm -rf $path/device
+	rm -rf $path/filesystem
+	rm -f $path/cachesize
+
+	rmdir $path || return 1
+}
+
+function define_target {
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local -r name=$3
+	local -r period=$4
+	local -r path=$VOLUMES/$vol/targets/$host
+	local new=0
+
+	if [[ ! -e $path ]]; then
+		new=1
+		if [[ $(($(used_snapshots $vol) + $SNAPSHOTS_PER_TARGET)) -gt $MAX_SNAPSHOTS ]]; then
+			echo error: target would exceed volume snapshot limit of $MAX_SNAPSHOTS
+			return 1
+		fi
+		mkdir $path || return 1
+		mkfifo $path/trigger || return 1
+	fi
+
+	echo $name >$path/name || return 1
+	if [[ -z $period ]]; then
+		rm $path/period 2> /dev/null
+		[[ $new == 0 ]] && pkill -f "zumastor replicate $vol $host --delay"
+	else
+		echo $period > $path/period || return 1
+		if [[ $new == 0 ]]; then
+			pkill -f "zumastor replicate $vol $host --delay"
+			zumastor replicate $vol $host --delay $period --nowait & # FIXME calculate delay based on last replication time
+		fi
+			
+	fi
+
+	[[ test_fullvolume -eq 1 ]] && echo 1 > $path/test_fullvolume
+	[[ $new -ne 1 ]] || zumastor start target $vol $host
+}
+
+function forget_target {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local -r path=$VOLUMES/$vol/targets/$host
+	local -r holdfile=$path/hold
+	local -r sendfile=$path/send
+	local snap
+
+	zumastor stop target $vol $host
+
+	# clean up the hold snapshot
+	[[ -r $holdfile ]] && read snap <$holdfile 2>/dev/null
+	[[ $snap ]] && drop_snapshot $vol $snap
+
+	# clean up the send snapshot
+	snap=""
+	[[ -r $sendfile ]] && read -d" " snap <$sendfile 2>/dev/null
+	[[ $snap ]] && drop_snapshot $vol $snap
+
+	rm -rf $path || return 1
+}
+
+function forget_source {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local hold
+
+	zumastor stop source $vol
+	# !!! FIXME TODO clean up replication in progress
+	read hold 2>/dev/null <$VOLUMES/$vol/source/hold
+	if [[ $hold ]]; then
+		drop_snapshot $vol $hold
+		umount_device $vol $(($hold + 1))
+		drop_snapshot $vol $(($hold + 1))
+	fi
+
+	for id in `cat $VOLUMES/$vol/source/snapshots/* 2>/dev/null`; do
+		remove_device $vol $id
+	done
+	rm -rf $VOLUMES/$vol/source || return 1
+}
+
+function define_master {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r path=$VOLUMES/$vol
+
+	if [[ -d $VOLUMES/$vol/source ]]; then
+		prompt_continue "$vol is currently a downstream volume, convert to master?"
+		rm -rf $VOLUMES/$vol/source
+	fi
+
+	mkdir $path/master || return 1
+	mkdir $path/master/schedule || return 1
+
+	mkdir $path/master/snapshots || return 1
+	mkfifo $path/master/trigger || return 1
+	zumastor start master $vol || return 1
+}
+
+function set_schedule {
+	[ $# -eq 4 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r type=$2
+	local -r kind=$3
+	local -r count=$4
+	local -r path=$VOLUMES/$vol
+
+	if [ $count -gt 0 ]; then
+		echo $count >$path/$type/schedule/$kind || return 1
+	else
+		rm -f $path/$type/schedule/$kind
+	fi
+}
+
+function forget_master {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r path=$VOLUMES/$vol
+
+	# FIXME TODO clean up cron-created snapshots
+	stop_master $vol
+	[ -d $path/master ] && rm -rf $path/master
+}
+
+function set_source {
+	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local -r port=$3
+	local -r name=$4
+	local -r period=$5
+	local -r path=$VOLUMES/$vol
+	local -r mysize=$(ddsnap status $SERVERS/$vol --size) || return 1
+	local -r oldhost=$(cat $path/source/hostname 2>/dev/null)
+	local size rempath new=yes
+
+	if [[ -d $path/master ]]; then
+		prompt_continue "volume '$vol' is currently a master, convert to a downstream volume?"
+		forget_master $vol
+	fi
+
+	rempath=$VOLUMES/$vol/targets/$MYHOSTNAME/trigger
+	size=$(run_remote $host "ddsnap status $SERVERS/$name --size")
+	[[ $size -gt $mysize ]] && { echo "upstream volume ($size) is larger than local ($mysize), cannot set source" ; return 1; }
+
+	if [[ -e $path/source ]]; then
+		[[ $oldhost != $MYHOSTNAME ]] && prompt_continue "source already set to '$oldhost', change to '$host'"
+		new=no
+	fi
+
+	[[ $new == "yes" ]] && { mkdir -p $path/source || return 1; }
+
+	# check if the port has already been used
+	rm -f $path/source/port 2>/dev/null
+	grep -x "$port" $VOLUMES/*/source/port >&/dev/null && { echo "port $port already been used"; return 1; }
+	echo $port > $path/source/port || return 1
+	echo $host > $path/source/hostname || return 1
+	echo $name >$path/source/name || return 1
+
+	mkdir -p $path/source/schedule || return 1
+	mkdir -p $path/source/snapshots || return 1
+	mkdir -p $path/source/pending || return 1
+
+	if [[ -z $period ]]; then
+		rm $path/source/period 2>/dev/null || return 0
+	else
+		echo $period > $path/source/period || return 1
+	fi
+}
+
+function trigger_snapshot {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r kind=$2
+	local -r fifo=$VOLUMES/$vol/master/trigger
+
+	send_to_fifo $fifo $kind || return 1
+}
+
+function trigger_replication {
+	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local snap=$3
+	local -r target_fifo=$VOLUMES/$vol/targets/$host/trigger
+	local -r master_fifo=$VOLUMES/$vol/master/trigger
+
+	if [[ ! -z $snap ]]; then
+		# increase reference count to pin snapshot
+		usecount_increment $vol $snap
+		# send specified snapshot
+		send_to_fifo $target_fifo $snap || return 1
+	elif [[ -e $master_fifo ]]; then
+		# no snapshot specified, asking the master for a new one
+		send_to_fifo $master_fifo "target/$host" || return 1
+	else
+		# This is an intermediate node of a chained replication. Currently, run_target 
+		# daemon synchronizes all of the replication, so let it do the job.
+		send_to_fifo $target_fifo -1 || return 1
+	fi
+}
+
+# replication_cycle -
+# called on a downstream host after each ddsnap listen cycle
+function replication_cycle {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r next=$2
+	local -r sock=${SERVERS}/$vol
+	local -r path=${VOLUMES}/$vol
+	local -r holdfile=$path/source/hold
+	local -r log=${LOGS}/$vol/source.log
+	local -r mount=$((next + 1))
+	local -r mountpoint=$(mount_name $vol -1)
+	local hold oldmount kind
+
+	read hold 2>/dev/null <$holdfile
+	[[ -z $hold ]] && hold=initial || oldmount=$((hold + 1))
+
+	log "replication cycle beginning - snapshot ($hold, $next)..." $log
+
+	log "creating snapshots..." $log
+	verify_existing_snap $vol $next || create_snapshot $vol $next >> $log 2>&1 || { log "error creating new snapshot '$next'" $log; return 1; }
+	verify_existing_snap $vol $mount || create_snapshot $vol $mount >> $log 2>&1
+
+	log "creating devices..." $log
+	create_device $vol $next >> $log 2>&1
+	create_device $vol $mount >> $log 2>&1
+
+	# disabled to work around the case where many origin write failures make the system go unresponsive
+	#log "setting snapshot unquashable..." $log
+	#set_priority $vol $next 127 >> $log 2>&1
+
+	# FIXME TODO - we have to umount -l first, because umount always removes the topmost
+	# filesystem :(, so we need to freeze access here
+	if [[ $hold != "initial" ]]; then
+		# NFS suspend when nfs server is running
+		[[ -w /proc/fs/nfsd/suspend ]] && echo "foo" > /proc/fs/nfsd/suspend
+		log "umounting snapshot $oldmount" $log
+		umount -l $mountpoint >> $log 2>&1
+	fi
+
+	if [[ $hold != "initial" ]]; then
+		# NFS resume when nfs server is running
+		[[ -w /proc/fs/nfsd/suspend ]] && cat /proc/fs/nfsd/suspend > /dev/null 2>&1
+		drop_snapshot $vol $hold >> $log 2>&1
+		drop_snapshot $vol $oldmount >> $log 2>&1
+	fi
+
+	log "setting holdfile to $next" $log
+	echo $next > $holdfile
+
+	log "mounting $vol($mount)" $log
+	mount_device $vol $mount unqualified >> $log 2>&1
+
+	for kind in $(ls $path/source/pending 2>/dev/null); do
+		new_snapshot $vol $kind $mount >> $log 2>&1
+	done
+	rm $path/source/pending/*
+
+	log "cycle complete" $log
+	return 0 # we only fail if create fails
+}
+
+# nag_daemon
+# daemon that runs in an endless loop, "nagging" upstream for replication
+# data by writing "wakeup" to the target trigger to implement data "pull"
+function nag_daemon {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r path=$VOLUMES/$vol
+	local -r log=${LOGS}/$vol/nag.log
+	local period
+	local kind
+	local host
+
+	read remote_vol <$path/source/name || return 1
+	read host <$path/source/hostname || return 1
+	read period 2>/dev/null <$path/source/period
+
+	create_snapmount $vol >>$log 2>&1 || return 1
+	[[ $period -gt 0 ]] || { log "no polling period specified for $vol, nothing to do" $log; return 0; }
+
+	# daemonize (close stdin, stdout, stderr)
+	exec 0</dev/null 1>/dev/null 2>/dev/null
+
+	pid=""
+	while true; do
+		if [[ $pid == "" ]]; then
+			pid=$!
+			log "nag daemon starting for volume '$vol'" $log
+		fi
+
+		log "sending wakeup for volume $remote_vol on $host:" $log
+		run_remote $host "zumastor replicate $remote_vol $MYHOSTNAME --nowait" >> $log 2>&1 &
+		sleep $period
+	done &
+}
+
+# dereference any symlinks in argumant
+function dereference_symlinks {
+	local entry
+	entry=$1
+	while [[ -L $entry ]] ; do
+		entry=`readlink $entry`
+	done
+	echo $entry
+}
+
+function usage {
+    echo "Usage: $0 {define|forget|start|stop|snapshot|replicate|status} [<subarguments>...]"
+}
+
+[[ $1 == "--version" ]] || [[ $1 == "-V" ]] && { cat $CONFIG/version ; exit; }
+[[ $1 == "--help" ]] || [[ $1 == "-h" ]] && { usage; exit 0; }
+[[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
+[[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
+[[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ $1 == "replicate" ]] || [[ ! -e $LOCKFILE ]] || { echo "$0: $LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
+[[ -n $1 ]] && [[ `whoami` != "root" ]] && ( [[ $1 == "define" ]] || [[ $1 == "forget" ]] || [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "snapshot" ]] || [[ $1 == "replicate" ]] ) && { echo "Error: this command requires root privileges"; exit 1; }
+
+case $1 in
+define)
+	case $2 in
+	volume)
+		declare name="$0 $1 $2"
+		declare args metadev init zero
+		declare blocksize=4k
+		declare chunksize=16k
+		declare cachesize
+		declare mountpoint snappath
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-z|--zero] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [-h|--help]"
+
+		shift 2
+		args=`getopt -ob:c:m:hizk:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,zero,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
+
+		eval set -- "$args" # remove getopt quotes and set new arguments
+
+		until [[ $1 = -- ]] ; do
+			case "$1" in
+			-h|--help)
+				echo "$usage"
+				echo "  -h, --help              show this help"
+				echo "  -i, --initialize        initialize the snapstore (will overwrite data on snapstore)"
+				echo "  -z, --zero              initialize the origin (will overwrite data on origin with zeros!!!)"
+				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
+				echo "  -b, --blocksize <size>  user-specified block size (default is $blocksize)"
+				echo "  -c, --chunksize <size>  user-specified chunk size (default is $chunksize)"
+				echo "  -k, --cachesize <size>  sets snapstore index size (default is system-dependent)"
+				echo "  -o, --mountopts <list>	sets mount options for the volume (no default)"
+				echo "  -p, --mountpoint <dir>  sets the volume mountpoint (default is $MOUNTS/<vol>)"
+				echo "  -s, --snappath <dir>  	sets the volume snapshot mountpoint (default is $SNAPMOUNTS/<vol>)"
+				exit;;
+
+			-i|--initialize) init="yes";;
+			-z|--zero) zero="yes";;
+			-m|--metadev) metadev=$2; shift 1;;
+			-b|--blocksize) blocksize=$2; shift 1;;
+			-c|--chunksize) chunksize=$2; shift 1;;
+			-k|--cachesize) cachesize=$2; shift 1;;
+			-o|--mountopts) mountopts=$2; shift 1;;
+			-p|--mountpoint) mountpoint=$2; shift 1;;
+			-s|--snappath) snappath=$2; shift 1;;
+			*) echo whoops; exit 9;;
+			esac
+			shift 1
+		done
+		shift # remove --
+		[[ $# = 3 ]] || { echo "$usage"; exit 2; }
+		declare vol=$1
+		declare origin=$(dereference_symlinks $2)
+		declare snapstore=$(dereference_symlinks $3)
+
+		verify_valid_volname $vol || { echo "$0: invalid volume name '$vol'"; exit 1; }
+		verify_managed_vol $vol && { echo "$0: volume '$vol' is already configured"; exit 1; }
+		verify_valid_device $origin || { echo "$0: invalid device '$origin'"; exit 1; }
+		verify_valid_device $snapstore || { echo "$0: invalid device '$snapstore'"; exit 1; }
+
+		declare -r path=$VOLUMES/$vol
+		mkdir -p $LOGS/$vol
+		mkdir $path || { echo "$0: volume '$vol' is already configured"; exit 1; }
+		mkdir $path/device $path/targets $path/filesystem || { echo "$0: volume '$vol' configure error"; exit 1; }
+		if [[ ! -z $mountpoint ]]; then
+			verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
+			echo $mountpoint >$path/filesystem/mountpoint
+			ln -sf $mountpoint $MOUNTS/$vol
+		fi
+		[[ -z $mountopts ]] || echo $mountopts >$path/filesystem/mountopts
+		if [[ ! -z $snappath ]]; then
+			verify_valid_mountpoint $snappath || { echo "$0: invalid snapshot mountpoint '$snappath'"; exit 1; }
+			[[ -z $snappath ]] || echo $snappath >$path/filesystem/snappath
+			ln -sf $snappath $SNAPMOUNTS/$vol
+		fi
+
+		[[ -z $metadev ]] || verify_valid_device $metadev || { echo "$0: invalid device '$metadev'"; exit 1; }
+		[[ -z $cachesize ]] || echo $cachesize >$path/cachesize
+		[[ -z $init ]] || ddsnap initialize --yes -c $chunksize $snapstore $origin $metadev || { echo "$0: initialize volume '$vol' failed"; exit 1; }
+		[[ -z $zero ]] || dd if=/dev/zero of=$origin bs=512 count=`blockdev --getsz $origin` || { echo "$0: zero volume '$vol' failed"; exit 1; }
+
+		define_volume $vol $origin $snapstore $metadev || { echo "$0: define volume '$vol' failed"; exit 1; }
+		exit ;;
+	target)
+		declare cmd="$0 $1 $2"
+		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-t|--test test_feature>][-h|--help]"
+		declare test_fullvolume=0
+		declare period name
+
+		shift 2
+		args=`getopt -ot:p:n:h -l test:,help,period:,name: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
+		eval set -- "$args"  # remove getopt quotes and set new arguments
+		until [[ $1 = -- ]]; do
+			case "$1" in
+			-h|--help) echo $usage; exit;;
+			-p|--period) period=$2; shift 1;;
+			-n|--name)
+				name=$2
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
+				shift 1;;
+			-t|--test)
+				case "$2" in
+					fullvolume) test_fullvolume=1;;
+					*) echo "invalid test options"; exit 9;;
+				esac
+				shift 1;;
+			*) echo whoops; exit 9;;
+			esac
+			shift 1
+		done
+		shift # remove --
+
+		[[ $# -eq 2 ]] || { echo $usage; exit 2; }
+		declare vol=$1 host=$2
+		[[ -z $name ]] && name=$vol
+
+		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 1; }
+		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 1; }
+
+		define_target $vol $host $name $period
+		exit $? ;;
+	master)
+		declare args
+		declare mountsnap="yes" export samba dotsnapshot
+		declare -a token value
+		declare name="$0 $1 $2"
+		declare usage="Usage: $name <vol> [-e|--export] [-s|--dotsnapshot] [-n|--no-snapmount] [-p|--samba] [-h|--help]"
+
+		shift 2
+		args=`getopt -ohynesp -l help,no-snapmount,export,dotsnapshot,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
+
+		eval set -- "$args" # remove getopt quotes and set new arguments
+
+		until [[ $1 = -- ]]; do
+			case "$1" in
+			-h|--help)
+				echo "usage: $name <vol> [Options]"
+				echo "Options"
+				echo "  -n, --no-snapmount       don't mount snapshots"
+				echo "  -e, --export             export snapshot directories over nfs"
+				echo "  -s, --dotsnapshot        display snapshots under the .snapshot directory of the origin volume"
+				echo "  -p, --samba              support previous version feature of samba"
+				echo "  -y, --yes                answer yes to all prompts"
+				exit;;
+			-n|--no-snapmount) mountsnap="no";;
+			-e|--export) export="yes";;
+			-s|--dotsnapshot) dotsnapshot="yes";;
+			-p|--samba) samba="yes";;
+			-y|--yes) yes_to_all=1;;
+			*) echo whoops; exit 9;;
+			esac
+			shift 1
+		done
+
+		shift # remove --
+		[[ $# = 1 ]] || { echo "usage: $name <vol> [Options]"; exit 2; }
+		declare vol=$1
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		declare -r fpath=$VOLUMES/$vol/filesystem
+		rm -f $fpath/mountsnap $fpath/export $fpath/dotsnapshot $fpath/samba  # reset the configuration
+		[[ $export = "yes" ]] && echo $export > $fpath/export
+		[[ $samba = "yes" ]] && echo $samba > $fpath/samba
+		[[ $mountsnap = "yes" ]] && echo $mountsnap > $fpath/mountsnap
+		[[ $dotsnapshot = "yes" ]] && echo $dotsnapshot > $fpath/dotsnapshot
+		if [[ ! $mountsnap = "yes" ]] && [[ $export = "yes" || $samba = "yes" || $dotsnapshot = "yes" ]]; then
+			echo "WARNING: --no-snapmount option specified, --export, --samba, and --dotsnapshot options will be ignored!"
+		fi
+
+		if [ ! -e $VOLUMES/$vol/master ]; then
+			define_master $vol || exit $?
+		fi
+		
+		exit 0 ;;
+	source)
+		declare mountsnap="no"
+		declare period args cmd="$0 $1 $2"
+		declare usage="usage: $cmd <vol> <host>[:port] [-p|--period <period>] [-n|--name] [-m|--mount-snap] [-y|--yes]"
+		shift 2
+		args=`getopt -op:yn:m -l help,period:,yes,name:,mount-snap -n"$cmd" -- "$@"` || \
+			{ echo $usage; exit 2; }
+		eval set -- "$args"  # remove getopt quotes and set new arguments
+		until [[ $1 = -- ]]; do
+			case "$1" in
+			--help) echo $usage; exit;;
+			-p|--period)
+				verify_valid_number $2 || { echo "$cmd: error '$2' is not a valid period"; exit 3; }
+				period=$2
+				shift 1;;
+			-n|--name)
+				name=$2
+				verify_valid_volname $name || { echo "$cmd: invalid remote volume name '$name'"; exit 1; }
+				shift 1;;
+			-m|--mount-snap)
+				 mountsnap="yes";;
+			-y|--yes) yes_to_all=1;;
+			*) echo whoops2; exit 9;;
+			esac
+			shift 1
+		done
+		shift # remove --
+		[[ $# -eq 2 ]] || { echo $usage; exit 6; }
+		declare vol=$1 host=$2
+		declare port=${host/*:/}
+		[[ -z $name ]] && name=$vol
+
+		# check to see if port was specified, if so, strip it off the host
+		if [[ $host != $port ]]; then
+			host=${host/:*/}
+		else
+			# otherwise automatically pick up an unused one
+			port=$DEFAULT_PORT
+			while $(grep -x "$port" $VOLUMES/*/source/port >&/dev/null); do
+				let port++
+			done
+		fi
+
+		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 4; }
+		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 5; }
+
+		declare -r fpath=$VOLUMES/$vol/filesystem
+		rm -f $fpath/mountsnap
+		[[ $mountsnap = "yes" ]] && echo $mountsnap > $fpath/mountsnap
+
+		set_source $vol $host $port $name $period
+		exit $? ;;
+	schedule)
+		declare args kind count delta=0
+		declare -a token value
+		declare name="$0 $1 $2"
+		declare usage="Usage: $name <vol> [-h|--hourly <n>] [-d|--daily <n>] [-w|--weekly <n>] [-m|--monthly <n>] [-c|--custom <name> <n>] [--help]"
+
+		shift 2
+		args=`getopt -oh:d:w:m:c: -l help,hourly:,daily:,weekly:,monthly:,custom: -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		eval set -- "$args" # remove getopt quotes and set new arguments
+		until [[ $1 = -- ]]; do
+			kind=
+			count=$2
+			case "$1" in
+			--help)
+				echo "usage: $name <vol> [Options]"
+				echo "  -h, --hourly <n>         set hourly snapshot limit"
+				echo "  -d, --daily <n>          set daily snapshot limit"
+				echo "  -w, --weekly <n>         set weekly snapshot limit"
+				echo "  -m, --monthly <n>        set monthly snapshot limit"
+				echo "  -c, --custom <name>,<n>  set snapshot limit for custom rotation named <name>"
+				exit;;
+			-h|--hourly) kind=hourly;;
+			-d|--daily) kind=daily;;
+			-w|--weekly) kind=weekly;;
+			-m|--monthly) kind=monthly;;
+			-c|--custom) kind=${count/,*/}
+				find_in $kind hourly daily weekly monthly /manual && { echo "illegal custom snapshot rotation '$kind'"; exit 1; }
+				verify_valid_volname $kind || { echo "$0: invalid custom rotation name '$kind'"; exit 1; }
+				count=${count/*,/};;
+			*) echo whoops; exit 9;;
+			esac
+			verify_valid_number $count || { echo $count is not a valid $kind limit; exit 1; }
+			find_in $kind ${token[@]} && { echo "duplicate rotation '$kind'"; exit 1; }
+			token+=($kind)
+			value+=($count)
+			shift 2
+		done
+
+		shift # remove --
+		[[ $# = 1 ]] || { echo "usage: $name <vol> [Options]"; exit 2; }
+		declare vol=$1
+		declare path=$VOLUMES/$vol
+		declare type
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		# a machine can either be a master or a source, but not both
+		[[ -d $path/master ]] && type="master"
+		[[ -d $path/source ]] && type="source"
+		[[ $type == "master" ]] || [[ $type == "source" ]] || { echo "$0: please define master or source first"; exit 1; }
+
+		# check if we attempting to violate the snapshot limit
+		for (( i=0; i < ${#token[@]}; i++)) do
+			kind=${token[i]}
+			count=${value[i]}
+			let delta+=$(($count - $(cat $VOLUMES/$vol/$type/schedule/$kind 2>/dev/null || echo 0)))
+		done
+		if [[ $(($(used_snapshots $vol) + $delta)) -gt $MAX_SNAPSHOTS ]]; then
+			echo error: $type configuration would exceed snapshots limit of $MAX_SNAPSHOTS
+			exit 3
+		fi
+
+		for (( i=0; i < ${#token[@]}; i++)) do
+			set_schedule $vol $type ${token[i]} ${value[i]} || exit $?
+		done
+
+		exit $? ;;
+	*)
+		echo "usage: $0 define volume|target|master|source"
+		exit 2 ;;
+	esac
+	;;
+forget)
+	case $2 in
+	volume)
+		[ $# -eq 3 ] || { echo "usage: $0 forget volume <vol>"; exit 2; }
+		declare vol=$3
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		forget_volume $vol
+		exit $? ;;
+	target)
+		[ $# -eq 4 ] || { echo "usage: $0 forget target <vol> <host>"; exit 2; }
+		declare vol=$3
+		declare host=$4
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
+
+		forget_target $vol $host
+		exit $? ;;
+	source)
+		[ $# -eq 3 ] || { echo "usage: $0 forget source <vol>"; exit 2; }
+		declare vol=$3
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		forget_source $vol
+		exit $? ;;
+	*)
+		echo "usage: $0 forget volume|target|source"
+		exit 2 ;;
+	esac
+	;;
+start)
+	case $2 in
+	master)
+		[ $# -eq 3 ] || { echo "usage: $0 start master <vol>"; exit 2; }
+		declare vol=$3
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		run_master $vol
+		exit $? ;;
+	target)
+		[ $# -eq 4 ] || { echo "usage: $0 start target <vol> <host>"; exit 2; }
+		declare vol=$3
+		declare host=$4
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
+
+		run_target $vol $host
+		exit $? ;;
+	source)
+		[ $# -eq 3 ] || { echo "usage: $0 start source <vol>"; exit 2; }
+		declare vol=$3
+		declare holdfile=$VOLUMES/$vol/source/hold
+		declare log=${LOGS}/$vol/source.log
+		declare snap=$(cat $holdfile 2>/dev/null)
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		if [[ ! -z $snap ]]; then
+			let snap++ # we mount snap + 1
+			log "mounting $vol($snap) on source start" $log
+			mount_device $vol $snap unqualified >> $log 2>&1
+		fi
+
+		nag_daemon $vol
+		exit $? ;;
+	volume)
+		[ $# -eq 3 ] || { echo "usage: $0 start volume <vol>"; exit 2; }
+		declare vol=$3
+		declare progressfile=$VOLUMES/$vol/source/apply
+		declare holdfile=$VOLUMES/$vol/source/hold
+		declare server=$SERVERS/$vol
+		declare id
+
+		start_volume $vol
+		create_device $vol -1 || exit 1
+		declare list=$(get_managed_snapshots $vol) || exit 1
+		for id in $list; do
+			# don't call create_device if the device has already been created
+			dmsetup info $vol\($id\) >& /dev/null || create_device $vol $id
+		done
+		for id in $(ddsnap status $server --list); do
+			usecount=$(ddsnap usecount $server $id)
+			[[ $usecount -eq 0 ]] && echo "warning: detected unreferenced snapshot: $id"
+		done
+		if [[ -x $VOLUMES/$vol/source ]] && [[ -e $progressfile ]] ; then
+			declare sent hold send_chunk send_addr
+			read hold 2>/dev/null < $holdfile
+			read sent send_chunk send_addr 2>/dev/null <$progressfile
+			if [[ ${send_chunk/*\//} -eq ${send_chunk/\/*/} ]] && [[ $sent -ne $hold ]]; then
+				echo "recover from interrupted replication_cycle"
+				replication_cycle $vol $sent && rm $progressfile
+				echo "recover done"
+			fi
+		fi
+		exit $? ;;
+	*)
+		echo "usage: $0 start master|target|source|volume"
+		exit 2 ;;
+	esac
+	;;
+stop)
+	case $2 in
+	master)
+		[ $# -eq 3 ] || { echo "usage: $0 stop master <vol>"; exit 2; }
+		declare vol=$3
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		stop_master $vol
+		exit $? ;;
+	target)
+		[ $# -eq 4 ] || { echo "usage: $0 stop target <vol> <host>"; exit 2; }
+		declare vol=$3
+		declare host=$4
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+		verify_valid_host $host || { echo "$0: invalid host '$host'"; exit 1; }
+
+		stop_target $vol $host || exit 1
+		exit $? ;;
+	source)
+		[ $# -eq 3 ] || { echo "usage: $0 stop source <vol>"; exit 2; }
+		declare vol=$3
+		declare holdfile=$VOLUMES/$vol/source/hold
+		declare log=${LOGS}/$vol/source.log
+		declare snap=$(($(cat $holdfile 2>/dev/null) + 1))
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+		stop_nag $vol
+
+		if [[ ! -z $snap ]]; then
+			log "umounting $vol($snap) on source stop" $log
+			umount_device $vol $snap unqualified >> $log 2>&1
+		fi
+
+		exit $? ;;
+	*)
+		echo "usage: $0 stop master|target|source"
+		exit 2 ;;
+	esac
+	;;
+snapshot)
+	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "usage: $0 snapshot <vol> [kind]"; exit 2; }
+	declare vol=$2
+	declare kind=$3
+	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+
+	declare path=$VOLUMES/$vol
+	declare type=$(get_vol_type $vol)
+	[[ $type == "master" ]] || [[ $type == "source" ]] || { echo "$0: please define master or source first"; exit 1; }
+
+	declare maxfile=$VOLUMES/$vol/$type/schedule/$kind
+	if [[ $# -eq 3 ]]; then
+		[[ -e $maxfile ]] || { echo "$0: unknown snapshot rotation '$kind'"; exit 1; }
+	else
+		kind="/manual"
+	fi
+	
+	if [[ $type == "master" ]]; then
+		trigger_snapshot $vol $kind
+	else
+		echo yes >$VOLUMES/$vol/source/pending/$kind
+	fi
+	exit $?
+	;;
+replicate)
+	declare name="$0 $1"
+	declare usage="Usage: $name <vol> [<host>] [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
+	declare snap delay
+	declare wait=0
+
+	shift 1
+	args=`getopt -os:d:hinw -l size:,delay:,help,nowait,wait -n"$name" -- "$@"` || { echo $usage; exit 2; }
+
+	eval set -- "$args" # remove getopt quotes and set new arguments
+
+	until [[ $1 = -- ]] ; do
+		case "$1" in
+		-h|--help)
+			echo $usage
+			echo "  -h, --help            show this help"
+			echo "  -s, --snapnum <snap>  send specified snapshot (otherwise take a new snapshot)"
+			echo "  -d, --delay <seconds> wait specified number of seconds before replicating (default is 0)"
+			echo "  -n, --nowait          don't wait for replication to complete"
+			echo "  -w, --wait            wait for replication to complete (default)"
+			exit;;
+		-s|--snapnum) snap=$2; shift 1;;
+		-d|--delay) delay=$2; shift 1;;
+		-n|--nowait) wait=0;;
+		-w|--wait) wait=1;;
+		*) echo whoops; exit 9;;
+		esac
+		shift 1
+	done
+	shift # remove --
+	[[ $# -eq 1 ]] || [[ $# -eq 2 ]] || { echo $usage; exit 2; }
+	declare vol=$1
+	declare host=$2
+	declare -r target_dir=$VOLUMES/$vol/targets/$host
+	declare hold newhold
+
+	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+	[[ -z $snap ]] || verify_existing_snap $vol $snap || { echo "$0: invalid snapshot '$snap' for volume '$vol'"; exit 1; }
+	if [[ ! -z $delay ]]; then
+		verify_valid_number $delay || { echo "$0: invalid delay '$delay' specified"; exit 1; }
+		sleep $delay
+	fi
+
+	# If no host was specified and we're a target for this volume, run
+	# the "zumastor replicate" on the source.
+	if [[ -z "$host" ]]; then
+		[[ -z "$snap" ]] || { echo "$0: can't specify a snapshot or delay here!"; exit 1; }
+		[[ -z "$delay" ]] || { echo "$0: can't specify a snapshot or delay here!"; exit 1; }
+		if [[ -f $VOLUMES/$vol/source/hostname ]]; then
+			read host <$VOLUMES/$vol/source/hostname
+			[[ $wait -eq 0 ]] && rwait="--nowait"
+			[[ $wait -ne 0 ]] && rwait="--wait"
+			run_remote $host "zumastor replicate $vol $MYHOSTNAME $rwait"
+			exit $?
+		fi
+		echo $usage
+		exit 2
+	fi
+
+	verify_existing_target $vol $host || { echo "$0: host '$host' is not a target for volume '$vol'"; exit 1; }
+
+	# Get the current hold file contents.
+	hold=`cat $target_dir/hold 2>/dev/null`
+
+	# <snap> is optional and a new snapshot is taken if omitted
+	trigger_replication $vol $host $snap
+
+	[[ $? -ne 0 ]] || [[ $wait -eq 0 ]] && exit
+
+	# Wait for the replicate to finish.
+	while /bin/true; do
+		newhold=`cat $target_dir/hold 2>/dev/null`
+		# If the hold file changed, the transfer finished. 
+		if [[ "$newhold" != "" ]] && [[ "$newhold" != "$hold" ]]; then
+			break;
+		fi
+		sleep 5
+	done
+
+	exit
+	;;
+status)
+	declare name="$0 $1"
+	declare showfull="" showuse=0 snapshots
+	declare usage="Usage: $0 status [<vol> [<snap>]] [--full] [--usage]"
+
+	shift 1
+	args=`getopt -ofhu -l full,help,usage -n"$name" -- "$@"` || { echo $usage; exit 2; }
+
+	eval set -- "$args" # remove getopt quotes and set new arguments
+	until [[ $1 = -- ]] ; do
+		case "$1" in
+		-h|--help)
+			echo $usage
+			echo "  -h, --help            show this help"
+			echo "  -f, --full            show full rather than abbreviated paths"
+			echo "  -u, --usage           show detailed snapshot usage"
+			exit;;
+		-f|--full) showfull="-f";;
+		-u|--usage) showuse=1;;
+		*) echo whoops; exit 9;;
+		esac
+		shift 1
+	done
+	shift # remove --
+
+	# zero arguments means to call tree for now
+	if [ $# -lt 1 ]; then
+		declare vol
+
+		# for debugging
+		pushd $VOLUMES >/dev/null
+		[[ `ls | wc -l` -gt 0 ]] && for vol in *; do
+			echo VOLUME $vol:
+			if [[ -e $SERVERS/$vol ]]; then
+				if snapshots=$(num_snapshots $vol); then
+					echo Status: running
+					[[ $snapshots -eq $MAX_SNAPSHOTS ]] && echo Warning: all $MAX_SNAPSHOTS snapshots exhausted!
+					[[ $showuse -eq 1 ]] && ddsnap status $SERVERS/$vol 
+				else
+					echo Status: failed
+				fi
+			else
+				echo Status: not running
+			fi
+			echo "Configuration:"
+			treeprint $showfull $VOLUMES/$vol
+			echo
+		done 2> /dev/null
+		popd >/dev/null
+		echo RUN STATUS:
+		treeprint $showfull $RUNPATH
+		exit $?
+	else
+		declare vol=$1
+		declare snap=$2
+		declare sock=${SERVERS}/$vol
+
+		verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+		if [ ! -z $snap ]; then
+			verify_existing_snap $vol $snap || { echo "$0: invalid snapshot '$snap' for volume '$vol'"; exit 1; }
+			showuse=1
+		fi
+		if [ $showuse -eq 1 ]; then
+			ddsnap status $sock $snap
+		fi
+		if [ -z $snap ]; then
+			treeprint $showfull $VOLUMES/$vol
+		fi
+		exit $?
+	fi
+	;;
+receive)
+	# called via upstream host's ssh command to start/stop listen
+	[[ $# -eq 3 ]] || { echo "usage: $0 receive {start|done} <vol>}"; exit 2; }
+	declare startstop=$2
+	declare vol=$3
+	declare holdfile=$VOLUMES/$vol/source/hold
+	declare progressfile=$VOLUMES/$vol/source/apply
+	declare portfile=$VOLUMES/$vol/source/port
+	declare log=${LOGS}/$vol/delta.log
+	declare hold send_snap send_chunk send_addr port count=0 status
+
+	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+	read send_snap send_chunk send_addr 2>/dev/null <$progressfile
+
+	# kill listen first in case it is already listening (previous replication interrupted)
+	while pkill -f "ddsnap delta listen /dev/mapper/$vol 0.0.0.0"; do
+		sleep $count
+		let count++
+		[[ $count -gt 10 ]] && { echo "couldn't kill listener"; exit 1; }
+	done
+
+	case $startstop in
+	start)
+		read hold 2>/dev/null <$holdfile
+		if [[ $hold ]]; then
+			verify_existing_snap $vol $hold
+			status=$?
+			# Return -1 for non-existing/squashed hold snapshot, letting upstream roll
+			# back to fullvolume replication. Don't start replication for any other errors.
+			case $status in
+			0) ;; # snapshot is in good state
+			1) log "hold snapshot $hold does not exist" $log && hold=-1 ;;
+			2) log "hold snapshot $hold was squashed" $log && hold=-1 ;;
+			*) log "fail to obtain the state of snapshot $hold" $log && exit 2
+			esac
+		else
+			hold=-1
+		fi
+		[[ $hold = $send_snap ]] && { send_snap= send_addr=; }
+		[[ -f $portfile ]] || { echo "source of volume $vol not define yet"; exit 1; }
+		read port < $portfile
+		echo $port $hold $send_snap $send_addr
+
+		# FIXME TODO - for now we listen on 0.0.0.0 and we don't check where
+		# the request came from, in the future, to avoid doing something
+		# wrong, such as replicatin from 2 hosts, check the $SSH_CLIENT
+		# environment variable
+		ddsnap delta listen /dev/mapper/$vol 0.0.0.0:$port -l $log -o $progressfile
+		if [[ $? -ne 0 ]]; then
+			log "failed to start listen" $log
+			echo "failed to start listen"
+			exit 2
+		fi ;;
+	done)
+		verify_valid_number $send_snap || { echo "snapnum '$send_snap' is not valid"; exit 2; }
+		[[ ${send_chunk/*\//} -eq ${send_chunk/\/*/} ]] || { echo "replication not complete ($send_chunk chunks)"; exit 3; }
+		replication_cycle $vol $send_snap && rm $progressfile ;;
+	esac
+	exit
+	;;
+remount)
+	[[ $# -eq 3 ]] || [[ $# -eq 4 ]] || { echo "usage: $0 remount <vol> <directory> [<mount options>]"; exit 2; }
+	declare vol=$2
+	declare mountpoint=$3
+	declare mountopts=$4
+	declare mount=$(mount_name $vol -1)
+	declare -r mpath=$VOLUMES/$vol/filesystem
+	declare mflag="unqualified"
+
+	verify_managed_vol $vol || { echo "$0: volume '$vol' is not a managed volume"; exit 1; }
+	mountstate=`mounted_vol_status $vol`
+	[[ $mountpoint = "-" ]] || verify_valid_mountpoint $mountpoint || { echo "$0: invalid mountpoint '$mountpoint'"; exit 1; }
+	mkdir -p $mpath
+	# If mountpoint specified, update it.
+	[[ $mountpoint = "-" ]] || [[ $mountpoint = $mount ]] || echo $mountpoint >$mpath/mountpoint
+	# If mount options specified, update them.
+	[[ -z $mountopts ]] || [[ $mountopts = "-" ]] || echo $mountopts >$mpath/mountopts
+	# If mount options to be removed, do so.
+	[[ $mountopts = "-" ]] && rm -f $mpath/mountopts
+
+	# If it's not mounted, we're done.
+	[[ $mountstate = "unmounted" ]] && exit 0
+
+	# Override ro/rw if specified options reverse it.
+	[[ $mountopts =~ \<ro\> ]] && mountstate="ro"
+	[[ $mountopts =~ \<rw\> ]] && mountstate="rw"
+
+	# If we're not changing the mountpoint, use remount, else unmount and
+	# remount it.
+	if [[ $mountpoint = "-" || $mountpoint = $mount ]]; then
+		remount_device $vol -1 $mountstate
+	else
+		umount_device $vol -1 2>/dev/null
+		mount_device $vol -1 $mountstate
+	fi
+	exit $?
+	;;
+resize)
+	declare args cmd="$0 $1"
+	declare orgsize=0 snapsize=0 metasize=0
+	declare usage="usage: $cmd <vol> [-o|--origin <size>] [-s|--snapshot <size>] [-m|--metadata <size>]"
+
+	shift 1
+	args=`getopt -oho:s:m: -l help,origin:,snapshot:,metadata: -n"$cmd" -- "$@"` || \
+		{ echo $usage; exit 2; }
+	eval set -- "$args"  # remove getopt quotes and set new arguments
+	until [[ $1 = -- ]]; do
+		case "$1" in
+		-h|--help)
+			echo $usage
+			exit;;
+		-o|--origin) orgsize=$2; shift 1;;
+		-s|--snapshot) snapsize=$2; shift 1;;
+		-m|--metadata) metasize=$2; shift 1;;
+		*) echo whoops; exit 9;;
+		esac
+		shift 1
+	done
+	shift # remove --
+	[[ $# -eq 1 ]] || { echo $usage; exit 2; }
+	declare vol=$1
+	declare server=$SERVERS/$vol
+	ddsnap resize $server -o $orgsize -s $snapsize -m $metasize
+	[[ $? -eq 0 ]] || { echo "ddsnap resizing request failed"; exit 1; }
+	if [[ $orgsize != 0 ]]; then
+		umount_remove_device $vol -1 || { echo "Fail to remove the old origin block device"; exit 1; }
+		create_device $vol -1 || { echo "Fail to create the new origin block device"; exit 1; }
+	fi
+	exit 0
+	;;
+revert)
+	[[ $# -eq 3 ]] || { echo "usage: $0 revert <vol> <snapshot>"; exit 2; }
+	declare vol=$2
+	declare snap=$3
+	declare server=$SERVERS/$vol
+	declare mount=$(mount_name $vol -1)
+
+	mountpoint -q $mount && { echo "please first stop zumastor master before reverting"; exit 1; }
+	ddsnap revert $server $snap
+	exit $?
+esac
+
+[ $# -gt 0 ] && echo "Error in command: $@"
+usage
+exit 2

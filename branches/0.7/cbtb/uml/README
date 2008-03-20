@@ -1,0 +1,56 @@
+Running the cbtb tests locally, before you submit:
+
+
+Be on a 32-bit kernel, or a very recently patched 64-bit kernel (bugs in
+ptrace affect 32-bit UML on 64-bit hosts).  
+
+Configured sudo so you can use it.  Speed and avoiding extra layers and
+software like fakechroot that aren't yet widely available.
+
+Make sure you have an ssh key in your ssh daemon.  ssh-add
+
+Add CONCURRENCY_LEVEL := 2 or more to /etc/kernel-pkg.conf to speed up
+kernel builds on multi-core systems).  Kernels and packages are built in the
+host environment, so the host must be a Debian-derived system, and probably
+no newer than Debian/etch and have the zumastor/ddsnap/kernel build
+dependencies installed.  See builddepends.sh. 
+
+For fast compiles install ccache using local disk and symlink gcc to it:
+   apt-get install ccache
+   [if on NFS] ln -s /somelocalfilesystem ~/.ccache
+   ln -sf /usr/bin/ccache /usr/local/bin/gcc
+
+
+cd cbtb/uml
+time ./smoke-etch.sh
+PASS snapshot-zumastor-2045G.sh
+FAIL replication-zumastor.sh
+
+
+On second run (reusing cached upstream debian packages and pre-built
+template image):
+real    7m30.537s
+user    1m36.805s
+sys     1m14.491s
+
+
+Running just a single test:
+
+time ARCH=i386 DIST=etch tunbr ./test-zuma-uml.sh ../tests/1/snapshot-zumastor-xfs-2045G.sh
+ ...
++ exit 0
+Set 'tap3' nonpersistent
+Stopping DNS forwarder and DHCP server: dnsmasq.
+Starting DNS forwarder and DHCP server: dnsmasq.
+
+real    1m9.012s
+user    0m9.302s
+sys     0m14.317s
+echo $?
+
+
+Runnning a dual-node test, and waiting at test completion for a
+[Return] so the developer may debug interactively.
+
+time ARCH=i386 DIST=etch tunbr tunbr ./test-zuma-uml.sh \
+  ../tests/2/replication-zumastor.sh ../tests/wait.sh

@@ -1,0 +1,578 @@
+#!/bin/bash
+# Zumastor Linux Storage Server
+# Copyright (c) 2006 Google Inc.
+# Author: Daniel Phillips <phillips@google.com>
+# Licensed under the GNU GPL version 2
+
+declare -r VOLUMES=/var/lib/zumastor/volumes
+declare -r RUNPATH=/var/run/zumastor
+declare -r LOGS=/var/log/zumastor
+declare -r RUNFILE=$RUNPATH/running
+declare -r LOCKFILE=$RUNPATH/locking
+declare -r CONFIG=/etc/zumastor
+
+# these can be modified here
+# may read from a config file in the future
+declare -r AGENTS=$RUNPATH/agents
+declare -r SERVERS=$RUNPATH/servers
+declare -r MOUNTS=$RUNPATH/mount
+declare -r SNAPMOUNTS=$RUNPATH/snapshot
+declare -r CRONS=$RUNPATH/cron
+declare -r DEFAULT_PORT=$(cat $CONFIG/defaultport)
+declare -r SSH_COMMAND=$(cat $CONFIG/ssh_command)
+
+# FIXME TODO - this is where we decide the hostname must be the fqdn of the
+# machine.  This has to be consistent so one machine can identify itself to
+# the other.  We do this rather than trying to resolve hostnames.
+declare -r MYHOSTNAME=`uname -n`
+
+# constants for determining if a configurtion is valid
+declare -r MAX_SNAPSHOTS=64
+declare -r SNAPSHOTS_PER_TARGET=2 # hold and send
+declare -r SNAPSHOTS_FOR_SOURCE=4 # only three are necessary if do things in the right order
+
+# TODO: hunt down and clear all code surrounding calls to this function
+# before deleting it
+declare yes_to_all
+function prompt_continue {
+	[[ $yes_to_all ]] && return 0
+	return 1
+}
+
+# log <filename> <message>
+# uses global variable pid, sets it if its not set
+# allows setting pid when daemonized
+function log {
+        local msg=$1 file=$2
+
+        [[ $pid == "" ]] && pid=$$
+
+        logmsg="`date` $0[$pid]: $msg"
+        if [[ $file == "" ]]
+        then
+          echo $logmsg
+        else
+          echo $logmsg >> $file
+        fi
+}
+
+function find_in {
+	[ $# -ge 1 ] || { echo "$0: too few arguments ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r item=$1
+	local -ra array=(${@:2})
+
+	for memb in ${array[@]}; do
+		[[ $memb = $item ]] && return 0
+	done
+
+	return 1
+}
+
+function verify_valid_volname {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+
+	# allow anything of nonzero length made of printable characters except slashes or spaces
+	[[ $vol ]] || return 1
+	echo "$vol" | grep -E '([^[:print:]]|/| )' >/dev/null && return 1
+
+	return 0
+}
+
+function verify_valid_device {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r dev=$1
+
+	# allow anything made of printable characters starting with a slash
+	[[ $dev ]] || return 1
+	echo "$dev" | grep -E '(^[^/]|[^[:print:]])' >/dev/null && return 1
+
+	return 0
+}
+
+function verify_valid_host {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r host=$1
+
+	# allow anything of nonzero length made of printable characters except
+	# slashes or spaces, or more than one colon
+	[[ $host ]] || return 1
+	echo "$host" | grep -E '([^[:print:]]|/| |:.*:)' >/dev/null && return 1
+
+	return 0
+}
+
+function verify_valid_mountpoint {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r mpoint=$1
+
+	mkdir -p $mpoint
+	# Has to be a directory.
+	[[ -d $mpoint ]] || return 1
+	return 0
+}
+
+function verify_valid_number {
+	[[ $# = 1 && $1 && ! $1 =~ [^0-9] ]]
+}
+
+function verify_managed_vol {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+
+	# make sure the name is in the database
+	[[ -d $VOLUMES/$vol ]]
+}
+
+function verify_existing_target {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r host=$2
+	local -r fifo=$VOLUMES/$vol/targets/$host/trigger
+
+	verify_managed_vol $vol || return 1
+	verify_valid_host $host || return 1
+	[ -r $fifo ] && [ -p $fifo ] && return 0;
+
+	return 1
+}
+
+function verify_existing_snap {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local -r sock=${SERVERS}/$vol
+
+	verify_managed_vol $vol || return 1
+	verify_valid_number $snap || return 1
+	ddsnap status --state $sock $snap
+}
+
+function volume_name {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+
+	if [[ $id = -1 ]]; then
+		echo $vol
+	else
+		echo $vol\($id\)
+	fi
+}
+
+function start_volume {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r info=$VOLUMES/$vol
+	local -r cachesizefile=$info/cachesize
+	local -r sdev=$info/device/snapstore
+	local -r odev=$info/device/origin
+	local mdev=$info/device/meta
+	local -r agent=${AGENTS}/$vol
+	local -r server=${SERVERS}/$vol
+	local -r agentlog=${LOGS}/${vol}/agent.log
+	local -r serverlog=${LOGS}/${vol}/server.log
+	local cachesize cacheopt
+
+	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
+	[[ -h $mdev ]] || mdev=""	
+
+	read cachesize 2>/dev/null <$cachesizefile
+	[[ -z $cachesize ]] || cacheopt=" --cachesize $cachesize"
+
+	ddsnap agent -l $agentlog $agent || return 1
+	ddsnap server -p ${RUNPATH}/${vol}-server.pid -l $serverlog$cacheopt $sdev $odev $mdev $agent $server || return 1
+}
+
+function stop_volume {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r info=$VOLUMES/$vol
+	local -r cachesizefile=$info/cachesize
+	local -r sdev=$info/device/snapstore
+	local -r odev=$info/device/origin
+	local mdev=$info/device/meta
+	local -r agent=${AGENTS}/$vol
+	local -r server=${SERVERS}/$vol
+	local -r agentlog=${LOGS}/${vol}/agent.log
+	local -r serverlog=${LOGS}/${vol}/server.log
+	local -r pidfile=${RUNPATH}/${vol}-server.pid
+	local cachesize cacheopt
+
+	read cachesize 2>/dev/null <$cachesizefile
+	[[ -z $cachesize ]] || cacheopt=" --cachesize $cachesize"
+
+	for id in $(ddsnap status $server --list 2>/dev/null) $(get_managed_snapshots $vol); do
+		umount_remove_device $vol $id || return 1
+	done
+	umount_remove_device $vol -1 || return 1
+
+	# see if the meta device symlink exists, otherwise set mdev variable to empty string	
+	[[ -h $mdev ]] && mdev="$mdev " || mdev=""
+
+	pkill -f "ddsnap server -p $pidfile -l $serverlog$cacheopt $sdev $odev ${mdev}$agent $server$"
+	pkill -f "ddsnap agent -l $agentlog $agent$"
+	rm -f $agent $server $pidfile
+	return 0
+}
+
+# create_device <vol> <id>
+# Given a volume <vol> and snapshot id <id>, create the device mapper entry
+# for the specified snapshot device
+function create_device {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r info=$VOLUMES/$vol
+	local -r agent=${AGENTS}/$vol
+	local -r server=${SERVERS}/$vol
+	local -r sdev=$info/device/snapstore
+	local -r odev=$info/device/origin
+	local -r name=$(volume_name $vol $id)
+
+	if [[ $id -gt -1 ]]; then
+		ddsnap status --state $server $id
+		case $? in
+		0) ;; # success
+		1) log "error: snapshot $name not found"; return 1 ;;
+		2) log "error: snapshot $name squashed"; return 1 ;;
+		9) log "error: checking snapshot state"; return 1 ;;
+		*) log "error: unknown state return code $?"; return 1 ;;
+		esac
+		size=$(ddsnap status $server --size $id) || return 1
+	else
+		size=$(ddsnap status $server --size) || return 1
+	fi 
+
+	echo 0 $size ddsnap $sdev $odev $agent $id | dmsetup create $name >/dev/null 2>&1 || { log "error: dmsetup returned $?"; return 1; }
+}
+
+# create_snapshot <vol> <id>
+# Given a volume <vol> and snapshot id <id>, set a new snapshot with tag <id>
+# If id -1 is provided, return error
+function create_snapshot {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r server=${SERVERS}/$vol
+	local status filesystem=$(</proc/mounts awk "(\$1 == \"/dev/mapper/$vol\") { print \$3 }")
+
+	# only create snapshot for non-origin
+	[[ $id -eq -1 ]] && echo should not be creating device for origin && return 1
+
+	[[ $filesystem = "xfs" ]] && xfs_freeze -f $(mount_name $vol -1)
+	ddsnap create $server $id >/dev/null 2>/dev/null
+	status=$?
+	[[ $filesystem = "xfs" ]] && xfs_freeze -u $(mount_name $vol -1)
+	# flush origin device to prevent the race between origin writes and snapshot create
+	blockdev --flushbufs /dev/mapper/$vol
+	return $status
+}
+
+function mounted_vol_status {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r name=$(volume_name $vol -1)
+	local -r device=/dev/mapper/$name
+
+	# Is it mounted?
+	mline=`mount | grep -w $device` || { echo "unmounted"; return 1; }
+	# It's mounted.  Is it rw or ro?
+	echo $mline | grep -w rw >/dev/null 2>&1 && { echo "rw"; return 0; }
+	echo "ro"
+	return 0
+}
+
+function snap_path {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snappath=$VOLUMES/$vol/filesystem/snappath
+	local snapmount=${SNAPMOUNTS}/$vol
+	[[ -f $snappath ]] && read snapmount <$snappath
+	echo $snapmount
+}
+
+function mount_name {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r server=$SERVERS/$vol
+	local -r mountpoint=$VOLUMES/$vol/filesystem/mountpoint
+	local mpoint=${MOUNTS}/$vol
+
+	[[ -f $mountpoint ]] && read mpoint <$mountpoint
+	if [[ $id != -1 ]]; then
+		ctime=`ddsnap list $server | awk '($2=="'$id'") { print $11,$12,$13,$14 }'`
+		stime=`date -d "$ctime" +%Y.%m.%d-%H.%M.%S`
+		mpoint=$(snap_path $vol)/$stime
+	fi
+	echo $mpoint
+}
+
+function samba_name {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r mount=$2
+	local -r mpoint=$(mount_name $vol -1)
+	ctime=`basename $mount`
+	echo ${mpoint}/@GMT-$ctime
+}
+
+# mount_device <vol> <id>
+# Given a volume <vol> and snapshot id <id>, mount the device
+function mount_device {
+	[[ $# -ge 2 ]] && [[ $# -le 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r name=$(volume_name $vol $id)
+	local -r device=/dev/mapper/$name
+	local mount=$(mount_name $vol $id)
+	local options=ro
+	local mntopts=${VOLUMES}/$vol/filesystem/mountopts
+	local -r samba=$VOLUMES/$vol/filesystem/samba
+	local -r export=$VOLUMES/$vol/filesystem/export
+
+	# to support mounting arbitrary snapshots to the unqualified volume mountpoint
+	[[ $3 == "unqualified" ]] && mount=$(mount_name $vol -1)
+	[[ $3 == "rw" ]] && options="rw"
+	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
+
+	mountpoint -q $mount && return 0
+	test -d $mount || mkdir $mount || return 1
+
+	# additional mount options
+	if [[ -r $mntopts ]]; then
+		read opts <$mntopts
+		options="$options,$opts"
+	fi
+
+	# mount ro, umount, and re-mount to work around free blocks bug in ext3
+	mount -o "ro,$options" $device $mount || { sleep 3; mount -o "ro,$options" $device $mount || return 1; }
+	umount $device && \
+	mount -o $options $device $mount || \
+		{ echo "unable to mount $device on $mount"; return 1; }
+
+	# samba hook: bind mount the snapshot if samba option is specified
+	if [[ -f $samba ]] && [[ id -ne -1 ]]; then
+		local -r samba_mount=$(samba_name $vol $mount)
+		mkdir -p $samba_mount
+		mount --bind $mount $samba_mount
+	fi
+	# nfs hook: export the snapshot volume
+	[[ -f $export ]] && [[ id -ne -1 ]] && export_snap $vol $id
+}
+
+# nfs server hook: export the snapshot volume with unique fsid
+function export_snap {
+	[[ $# -ge 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r snap=$2
+	local -r mount=$(mount_name $vol $snap)
+	local vfsid fsid dmount dfsid
+	local -r dotsnapshot=$VOLUMES/$vol/filesystem/dotsnapshot
+
+	# FIXME: we should only export snapshots whose origin volume is exported.
+	# The problem is we can't learn this from exports because users may export a 
+	# dir linked to the origin volume and export_snap may be run before nfs starts
+	# FIXME: cksum has high collision rate. Should use $volid$snapid once they are implemented
+	fsid=`echo "$vol$snap" | cksum | awk '{ printf "%d", ($1/2) }'`
+	exportfs -o"ro,fsid=$fsid,crossmnt,nohide" *:$mount
+	if [[ -f $dotsnapshot ]]; then
+		dmount=$(mount_name $vol -1)/.snapshot/$(basename $mount)
+		dfsid=`echo "$dmount" | cksum | awk '{ printf "%d", ($1/2) }'`
+		exportfs -o"ro,fsid=$dfsid,crossmnt,nohide" *:$dmount
+	fi
+}
+
+function umount_device {
+	[[ $# -eq 2 ]] || [[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r option=$3
+	local -r name=$(volume_name $vol $id)
+	local -r mount=$(mount_name $vol $id)
+	local -r dmount=$(mount_name $vol -1)/.snapshot/$(basename $mount)
+
+	# samba hook: umount the bind mount
+	if [[ $id -ne -1 ]]; then
+		local -r samba_mount=$(samba_name $vol $mount)
+		mountpoint -q $samba_mount && umount $samba_mount && rmdir $samba_mount
+		# nfs server hook: unexport the snapshot volume
+		exportfs -u *:$mount 2> /dev/null
+		exportfs -u *:$dmount 2> /dev/null
+	else
+		mountpoint -q ${mount}/.snapshot && umount -l ${mount}/.snapshot
+		exportfs -u *:${mount}/.snapshot 2> /dev/null
+	fi
+	umount $option /dev/mapper/$name 2> /dev/null
+	[[ $id -ne -1 || $mount = ${MOUNTS}/$vol ]] && rmdir $mount 2> /dev/null
+	return 0
+}
+
+# remount_device <vol> <id> [rw]
+# Given a volume <vol> and snapshot id <id>, remount the device with -o remount
+function remount_device {
+	[[ $# -eq 3 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r state=$3
+	local -r name=$(volume_name $vol $id)
+	local -r device=/dev/mapper/$name
+	local mount=$(mount_name $vol $id)
+	local mntopts=${VOLUMES}/$vol/filesystem/mountopts
+	local opts options="remount"
+
+	[[ -r $device ]] || { echo "unable to open device $device"; return 1; }
+
+	# Get mount options if any
+	[[ -r $mntopts ]] && read opts <$mntopts
+	[[ -z $opts ]] || options="$options,$opts"
+
+	# Do the remount
+	mount -o $options $device $mount || \
+		{ echo "unable to remount $device on $mount"; return 1; }
+}
+
+function remove_device {
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r name=$(volume_name $vol $id)
+	local output
+
+	# return if the device does not exist
+	dmsetup info $name >& /dev/null || return 0
+	# FIXME: remove the sleep-retry after fixing device mapper create, see issue 78
+	for i in `seq 5`; do
+		dmsetup remove $name && return 0
+		sleep 1
+	done
+	return 1
+}
+
+function umount_remove_device {
+	[[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r name=$(volume_name $vol $id)
+	
+	[[ -e /dev/mapper/$name ]] || return 0
+	umount_device $vol $id 2> /dev/null
+	# continue if this is not a real device
+	dmsetup info $name >& /dev/null || return 0
+	remove_device $vol $id 2> /dev/null
+	if [[ $? -ne 0 ]]; then
+		echo "Device '$name' still in use"
+		echo "Please shut down or kill any process accessing it, then run this command again" 
+		return 1
+	fi
+}
+
+# get_manged_snapshots <volume name>
+#   Outputs a list of snapshot numbers manged by zumastor for the given volume
+#   This is useful to iterate over rather than (ddsnap status --list)
+#   Called from zumastor init script.
+function get_managed_snapshots {
+	[ $# -eq 1 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local snappath snap
+
+	cat $VOLUMES/$vol/master/snapshots/* 2>/dev/null
+	cat $VOLUMES/$vol/source/snapshots/* 2>/dev/null
+	for snappath in $VOLUMES/$vol/targets/*/{hold,send} $VOLUMES/$vol/source/{hold,send}; do
+		[[ -e $snappath ]] && { read -d" " snap <$snappath; echo $snap; }
+	done
+	[[ -e $VOLUMES/$vol/source/hold ]] && echo $(( `cat $VOLUMES/$vol/source/hold` + 1 ))
+}
+
+# set_priority <vol> <id> <priority>
+# sets the provided <priority> on snapshot <id> on volume <vol>
+# If id -1 is provided, or an invalid priority or snapshot, return error
+function set_priority {
+	[ $# -eq 3 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local -r id=$2
+	local -r priority=$3
+	local -r server=${SERVERS}/$vol
+
+	verify_valid_number $id || { echo "invalid snapshot id $id"; return 1; }
+
+	if [[ $priority -lt -128 || $priority -gt 127 ]]; then
+		echo "refusing to set invalid priority '$priority' for '$vol($id)'"
+		return 1
+	fi
+
+	ddsnap priority $server $id $priority || return 1
+}
+
+function touch_atomic {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r file=$1
+	local tmpfile=$file.$$
+
+	touch $tmpfile
+	ln $tmpfile $file 2>/dev/null || { rm $tmpfile; return 1; }
+	rm $tmpfile
+}
+
+function used_snapshots {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local file num total
+
+	total=$(($SNAPSHOTS_PER_TARGET * $(ls $VOLUMES/$vol/targets 2>/dev/null|wc -l))) # two snapshots per downstream target
+	[[ -e $VOLUMES/$vol/source ]] && total=$(($total + $SNAPSHOTS_FOR_SOURCE))
+	for file in $VOLUMES/$vol/master/schedule/*; do
+		[[ -e $file ]] && read num <$file && [[ $num -gt 0 ]] && total=$(($total + $num))
+	done
+	echo $total
+}
+
+function num_snapshots {
+	[[ $# -eq 1 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r vol=$1
+	local output
+
+	output=$(ddsnap status $SERVERS/$vol --list) || { echo "error getting snapshot list"; return 1; }
+	echo $output | wc -w
+}
+
+declare -r tree_indent="   "
+function treeprint {
+	local full=""
+	[[ $1 == "-f" ]] && full="-f" && shift
+	[[ $# -eq 1 ]] || [[ $# -eq 2 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r path=$1 string=$2
+	local -r device=$(stat -c %d $path)
+	pushd $path >/dev/null
+	for file in *; do 
+		[[ ! -e $file ]] || [[ $file == "trigger" ]] && continue
+		[[ $full == "-f" ]] && echo -n "$string$PWD/$file" || echo -n "$string$file"
+		if [[ -h $file ]]; then
+			echo " -> $(readlink $file)"
+			[[ $path = "snapshot" ]] && treeprint $full $(readlink $file) "$tree_indent$string"
+			continue
+		fi
+		[[ -f $file ]] && [[ -s $file ]] && echo ": $(cat $file)" && continue
+		[[ -d $file ]] && [[ $(stat -c %d $file) == $device ]] && echo && treeprint $full $file "$tree_indent$string" && continue
+		echo
+	done
+	popd >/dev/null
+}
+
+function send_to_fifo {
+	local nonblock
+	[[ $1 == "-n" ]] && { nonblock=yes; shift; }
+	[ $# -eq 2 ] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	local -r fifo=$1
+	local -r data=$2
+
+	if [[ $nonblock == "yes" ]]; then
+		echo $data | /lib/zumastor/nblock_write $fifo || { echo "error writing to $fifo"; return 1; }
+	else
+		[[ -e $fifo ]] || { echo "$fifo does not exist"; return 1; }
+		[[ -p $fifo ]] || { echo "$fifo not a fifo"; return 1; }
+		[[ -w $fifo ]] || { echo "$fifo not writable"; return 1; }
+		echo $data >$fifo || { echo "error writing to $fifo"; return 1; }
+	fi
+}

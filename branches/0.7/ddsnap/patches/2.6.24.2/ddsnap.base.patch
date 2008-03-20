@@ -1,0 +1,61 @@
+diff -ru linux-2.6.24.2/drivers/md/Kconfig linux-2.6.24.2-ddsnap.base/drivers/md/Kconfig
+--- linux-2.6.24.2/drivers/md/Kconfig	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/drivers/md/Kconfig	2008-02-13 11:08:14.000000000 -0800
+@@ -288,4 +288,13 @@
+ 	---help---
+ 	Generate udev events for DM events.
+ 
++config DM_DDSNAP
++	tristate "Distributed Data Snapshot target (EXPERIMENTAL)"
++	depends on BLK_DEV_DM && EXPERIMENTAL
++	---help---
++	  This device-mapper target allows you to take multiple simultaneous
++	  read/write snapshots of a clustered or non-clustered block devices.
++	  If unsure, say N.
++
++
+ endif # MD
+diff -ru linux-2.6.24.2/drivers/md/Makefile linux-2.6.24.2-ddsnap.base/drivers/md/Makefile
+--- linux-2.6.24.2/drivers/md/Makefile	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/drivers/md/Makefile	2008-02-13 11:08:14.000000000 -0800
+@@ -41,6 +41,7 @@
+ obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
+ obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
+ obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
++obj-$(CONFIG_DM_DDSNAP)		+= dm-ddsnap.o
+ 
+ quiet_cmd_unroll = UNROLL  $@
+       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
+diff -ru linux-2.6.24.2/include/linux/prctl.h linux-2.6.24.2-ddsnap.base/include/linux/prctl.h
+--- linux-2.6.24.2/include/linux/prctl.h	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/include/linux/prctl.h	2008-02-13 11:08:14.000000000 -0800
+@@ -63,4 +63,8 @@
+ #define PR_GET_SECCOMP	21
+ #define PR_SET_SECCOMP	22
+ 
++/* set process less throttleL: see PF_LESS_THROTTLE */
++#define PR_SET_LESS_THROTTLE           23
++#define PR_SET_MEMALLOC			24
++
+ #endif /* _LINUX_PRCTL_H */
+diff -ru linux-2.6.24.2/kernel/sys.c linux-2.6.24.2-ddsnap.base/kernel/sys.c
+--- linux-2.6.24.2/kernel/sys.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/kernel/sys.c	2008-02-13 11:08:14.000000000 -0800
+@@ -1741,7 +1741,16 @@
+ 		case PR_SET_SECCOMP:
+ 			error = prctl_set_seccomp(arg2);
+ 			break;
+-
++		case PR_SET_LESS_THROTTLE: {
++			current->flags |= PF_LESS_THROTTLE;
++			return 0;
++		}
++			
++		case PR_SET_MEMALLOC: {
++			current->flags |= PF_MEMALLOC;
++			printk("set PF_MEMALLOC for process %s[%i]\n", current->comm, current->pid);
++			return 0;
++		}
+ 		default:
+ 			error = -EINVAL;
+ 			break;

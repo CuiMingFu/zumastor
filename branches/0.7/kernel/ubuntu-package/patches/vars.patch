@@ -1,0 +1,11 @@
+diff -ruNp /tmp/tmp.waGPZq9262/a/linux/debian/binary-custom.d/zumastor/vars /tmp/tmp.waGPZq9262/b/linux/debian/binary-custom.d/zumastor/vars
+--- /tmp/tmp.waGPZq9262/a/linux/debian/binary-custom.d/zumastor/vars	1969-12-31 16:00:00.000000000 -0800
++++ /tmp/tmp.waGPZq9262/b/linux/debian/binary-custom.d/zumastor/vars	2008-03-19 17:10:10.000000000 -0700
+@@ -0,0 +1,7 @@
++arch="i386 amd64 lpia"
++supported="Generic"
++target="Zumastor Kernel"
++desc="Zumastor server edition"
++bootloader="grub"
++provides="kvm-api-4, redhat-cluster-modules"
++section_image="universe/base"

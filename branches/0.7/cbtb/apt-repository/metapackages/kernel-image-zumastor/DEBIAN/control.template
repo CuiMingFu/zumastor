@@ -1,0 +1,10 @@
+Package: kernel-image-zumastor
+Essential: no
+Priority: extra
+Section: metapackages
+Maintainer: Zumastor Autobuild <zumabuild@google.com>
+Architecture: i386
+Version: VERSION
+Depends: KERNEL_PACKAGE
+Description: Zumastor Kernel Image
+  Zumastor kernel package

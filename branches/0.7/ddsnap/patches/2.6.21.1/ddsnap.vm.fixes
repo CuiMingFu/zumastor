@@ -1,0 +1,2251 @@
+diff -purN linux-2.6.21.1.old/drivers/md/Kconfig linux-2.6.21.1.new/drivers/md/Kconfig
+--- linux-2.6.21.1.old/drivers/md/Kconfig	2007-07-19 16:19:04.000000000 -0700
++++ linux-2.6.21.1.new/drivers/md/Kconfig	2007-07-19 16:26:43.000000000 -0700
+@@ -278,6 +278,13 @@ config DM_DDSNAP
+ 	  read/write snapshots of a clustered or non-clustered block devices.
+ 	  If unsure, say N.
+ 
++config DM_DDSNAP_SWAP
++	bool "Allow DDSNAP to reserve memory for networking"
++	depends on DM_DDSNAP
++	default y
++	select SLAB_FAIR
++	select NETVM
++
+ endmenu
+ 
+ endif
+diff -purN linux-2.6.21.1.old/drivers/net/e1000/e1000_main.c linux-2.6.21.1.new/drivers/net/e1000/e1000_main.c
+--- linux-2.6.21.1.old/drivers/net/e1000/e1000_main.c	2007-07-19 16:19:04.000000000 -0700
++++ linux-2.6.21.1.new/drivers/net/e1000/e1000_main.c	2007-07-19 16:26:45.000000000 -0700
+@@ -4409,12 +4409,8 @@ e1000_clean_rx_irq_ps(struct e1000_adapt
+ 			pci_unmap_page(pdev, ps_page_dma->ps_page_dma[j],
+ 					PAGE_SIZE, PCI_DMA_FROMDEVICE);
+ 			ps_page_dma->ps_page_dma[j] = 0;
+-			skb_fill_page_desc(skb, j, ps_page->ps_page[j], 0,
+-			                   length);
++			skb_add_rx_frag(skb, j, ps_page->ps_page[j], 0, length);
+ 			ps_page->ps_page[j] = NULL;
+-			skb->len += length;
+-			skb->data_len += length;
+-			skb->truesize += length;
+ 		}
+ 
+ 		/* strip the ethernet crc, problem is we're using pages now so
+@@ -4620,7 +4616,7 @@ e1000_alloc_rx_buffers_ps(struct e1000_a
+ 			if (j < adapter->rx_ps_pages) {
+ 				if (likely(!ps_page->ps_page[j])) {
+ 					ps_page->ps_page[j] =
+-						alloc_page(GFP_ATOMIC);
++						netdev_alloc_page(netdev);
+ 					if (unlikely(!ps_page->ps_page[j])) {
+ 						adapter->alloc_rx_buff_failed++;
+ 						goto no_buffers;
+diff -purN linux-2.6.21.1.old/drivers/net/sky2.c linux-2.6.21.1.new/drivers/net/sky2.c
+--- linux-2.6.21.1.old/drivers/net/sky2.c	2007-07-19 16:19:05.000000000 -0700
++++ linux-2.6.21.1.new/drivers/net/sky2.c	2007-07-19 16:26:45.000000000 -0700
+@@ -1090,7 +1090,7 @@ static struct sk_buff *sky2_rx_alloc(str
+ 	skb_reserve(skb, ALIGN(p, RX_SKB_ALIGN) - p);
+ 
+ 	for (i = 0; i < sky2->rx_nfrags; i++) {
+-		struct page *page = alloc_page(GFP_ATOMIC);
++		struct page *page = netdev_alloc_page(sky2->netdev);
+ 
+ 		if (!page)
+ 			goto free_partial;
+@@ -1982,8 +1982,8 @@ static struct sk_buff *receive_copy(stru
+ }
+ 
+ /* Adjust length of skb with fragments to match received data */
+-static void skb_put_frags(struct sk_buff *skb, unsigned int hdr_space,
+-			  unsigned int length)
++static void skb_put_frags(struct sky2_port *sky2, struct sk_buff *skb,
++			  unsigned int hdr_space, unsigned int length)
+ {
+ 	int i, num_frags;
+ 	unsigned int size;
+@@ -2000,15 +2000,11 @@ static void skb_put_frags(struct sk_buff
+ 
+ 		if (length == 0) {
+ 			/* don't need this page */
+-			__free_page(frag->page);
++			netdev_free_page(sky2->netdev, frag->page);
+ 			--skb_shinfo(skb)->nr_frags;
+ 		} else {
+ 			size = min(length, (unsigned) PAGE_SIZE);
+-
+-			frag->size = size;
+-			skb->data_len += size;
+-			skb->truesize += size;
+-			skb->len += size;
++			skb_add_rx_frag(skb, i, frag->page, 0, size);
+ 			length -= size;
+ 		}
+ 	}
+@@ -2037,7 +2033,7 @@ static struct sk_buff *receive_new(struc
+ 	sky2_rx_map_skb(sky2->hw->pdev, re, hdr_space);
+ 
+ 	if (skb_shinfo(skb)->nr_frags)
+-		skb_put_frags(skb, hdr_space, length);
++		skb_put_frags(sky2, skb, hdr_space, length);
+ 	else
+ 		skb_put(skb, length);
+ 	return skb;
+diff -purN linux-2.6.21.1.old/include/linux/gfp.h linux-2.6.21.1.new/include/linux/gfp.h
+--- linux-2.6.21.1.old/include/linux/gfp.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/linux/gfp.h	2007-07-19 16:26:51.000000000 -0700
+@@ -35,17 +35,21 @@ struct vm_area_struct;
+ #define __GFP_HIGH	((__force gfp_t)0x20u)	/* Should access emergency pools? */
+ #define __GFP_IO	((__force gfp_t)0x40u)	/* Can start physical IO? */
+ #define __GFP_FS	((__force gfp_t)0x80u)	/* Can call down to low-level FS? */
++
+ #define __GFP_COLD	((__force gfp_t)0x100u)	/* Cache-cold page required */
+ #define __GFP_NOWARN	((__force gfp_t)0x200u)	/* Suppress page allocation failure warning */
+ #define __GFP_REPEAT	((__force gfp_t)0x400u)	/* Retry the allocation.  Might fail */
+ #define __GFP_NOFAIL	((__force gfp_t)0x800u)	/* Retry for ever.  Cannot fail */
++
+ #define __GFP_NORETRY	((__force gfp_t)0x1000u)/* Do not retry.  Might fail */
+ #define __GFP_NO_GROW	((__force gfp_t)0x2000u)/* Slab internal usage */
+ #define __GFP_COMP	((__force gfp_t)0x4000u)/* Add compound page metadata */
+ #define __GFP_ZERO	((__force gfp_t)0x8000u)/* Return zeroed page on success */
++
+ #define __GFP_NOMEMALLOC ((__force gfp_t)0x10000u) /* Don't use emergency reserves */
+ #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
+ #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
++#define __GFP_EMERGENCY  ((__force gfp_t)0x80000u) /* Use emergency reserves */
+ 
+ #define __GFP_BITS_SHIFT 20	/* Room for 20 __GFP_FOO bits */
+ #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
+@@ -54,7 +58,8 @@ struct vm_area_struct;
+ #define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
+ 			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
+ 			__GFP_NOFAIL|__GFP_NORETRY|__GFP_NO_GROW|__GFP_COMP| \
+-			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE)
++			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE| \
++			__GFP_EMERGENCY)
+ 
+ /* This equals 0, but use constants in case they ever change */
+ #define GFP_NOWAIT	(GFP_ATOMIC & ~__GFP_HIGH)
+diff -purN linux-2.6.21.1.old/include/linux/mmzone.h linux-2.6.21.1.new/include/linux/mmzone.h
+--- linux-2.6.21.1.old/include/linux/mmzone.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/linux/mmzone.h	2007-07-19 16:26:51.000000000 -0700
+@@ -178,7 +178,7 @@ enum zone_type {
+ 
+ struct zone {
+ 	/* Fields commonly accessed by the page allocator */
+-	unsigned long		pages_min, pages_low, pages_high;
++	unsigned long		pages_emerg, pages_min, pages_low, pages_high;
+ 	/*
+ 	 * We don't know if the memory that we're going to allocate will be freeable
+ 	 * or/and it will be released eventually, so to avoid totally wasting several
+@@ -562,6 +562,7 @@ int sysctl_min_unmapped_ratio_sysctl_han
+ 			struct file *, void __user *, size_t *, loff_t *);
+ int sysctl_min_slab_ratio_sysctl_handler(struct ctl_table *, int,
+ 			struct file *, void __user *, size_t *, loff_t *);
++void adjust_memalloc_reserve(int pages);
+ 
+ #include <linux/topology.h>
+ /* Returns the number of the current Node. */
+diff -purN linux-2.6.21.1.old/include/linux/sched.h linux-2.6.21.1.new/include/linux/sched.h
+--- linux-2.6.21.1.old/include/linux/sched.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/linux/sched.h	2007-07-19 16:26:51.000000000 -0700
+@@ -1184,6 +1184,10 @@ static inline void put_task_struct(struc
+ #define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
+ #define used_math() tsk_used_math(current)
+ 
++#define tsk_restore_flags(p, pflags, mask) \
++	do {	(p)->flags &= ~(mask); \
++		(p)->flags |= ((pflags) & (mask)); } while (0)
++
+ #ifdef CONFIG_SMP
+ extern int set_cpus_allowed(struct task_struct *p, cpumask_t new_mask);
+ #else
+diff -purN linux-2.6.21.1.old/include/linux/skbuff.h linux-2.6.21.1.new/include/linux/skbuff.h
+--- linux-2.6.21.1.old/include/linux/skbuff.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/linux/skbuff.h	2007-07-19 16:26:51.000000000 -0700
+@@ -285,7 +285,8 @@ struct sk_buff {
+ 				nfctinfo:3;
+ 	__u8			pkt_type:3,
+ 				fclone:2,
+-				ipvs_property:1;
++				ipvs_property:1,
++				emergency:1;
+ 	__be16			protocol;
+ 
+ 	void			(*destructor)(struct sk_buff *skb);
+@@ -330,10 +331,19 @@ struct sk_buff {
+ 
+ #include <asm/system.h>
+ 
++#define SKB_ALLOC_FCLONE	0x01
++#define SKB_ALLOC_RX		0x02
++
++#ifdef CONFIG_NETVM
++#define skb_emergency(skb)	unlikely((skb)->emergency)
++#else
++#define skb_emergency(skb)	false
++#endif
++
+ extern void kfree_skb(struct sk_buff *skb);
+ extern void	       __kfree_skb(struct sk_buff *skb);
+ extern struct sk_buff *__alloc_skb(unsigned int size,
+-				   gfp_t priority, int fclone, int node);
++				   gfp_t priority, int flags, int node);
+ static inline struct sk_buff *alloc_skb(unsigned int size,
+ 					gfp_t priority)
+ {
+@@ -343,7 +353,7 @@ static inline struct sk_buff *alloc_skb(
+ static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
+ 					       gfp_t priority)
+ {
+-	return __alloc_skb(size, priority, 1, -1);
++	return __alloc_skb(size, priority, SKB_ALLOC_FCLONE, -1);
+ }
+ 
+ extern void	       kfree_skbmem(struct sk_buff *skb);
+@@ -818,6 +828,9 @@ static inline void skb_fill_page_desc(st
+ 	skb_shinfo(skb)->nr_frags = i + 1;
+ }
+ 
++extern void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page,
++			    int off, int size);
++
+ #define SKB_PAGE_ASSERT(skb) 	BUG_ON(skb_shinfo(skb)->nr_frags)
+ #define SKB_FRAG_ASSERT(skb) 	BUG_ON(skb_shinfo(skb)->frag_list)
+ #define SKB_LINEAR_ASSERT(skb)  BUG_ON(skb_is_nonlinear(skb))
+@@ -1108,7 +1121,8 @@ static inline void __skb_queue_purge(str
+ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
+ 					      gfp_t gfp_mask)
+ {
+-	struct sk_buff *skb = alloc_skb(length + NET_SKB_PAD, gfp_mask);
++	struct sk_buff *skb =
++		__alloc_skb(length + NET_SKB_PAD, gfp_mask, SKB_ALLOC_RX, -1);
+ 	if (likely(skb))
+ 		skb_reserve(skb, NET_SKB_PAD);
+ 	return skb;
+@@ -1153,6 +1167,27 @@ static inline struct sk_buff *netdev_all
+ 	return __netdev_alloc_skb(dev, length, GFP_ATOMIC);
+ }
+ 
++extern struct page *__netdev_alloc_page(struct net_device *dev, gfp_t gfp_mask);
++extern void __netdev_free_page(struct net_device *dev, struct page *page);
++
++/**
++ *	netdev_alloc_page - allocate a page for ps-rx on a specific device
++ *	@dev: network device to receive on
++ *
++ * 	Allocate a new page node local to the specified device.
++ *
++ * 	%NULL is returned if there is no free memory.
++ */
++static inline struct page *netdev_alloc_page(struct net_device *dev)
++{
++	return __netdev_alloc_page(dev, GFP_ATOMIC);
++}
++
++static inline void netdev_free_page(struct net_device *dev, struct page *page)
++{
++	__netdev_free_page(dev, page);
++}
++
+ /**
+  *	skb_cow - copy header of skb when it is required
+  *	@skb: buffer to cow
+diff -purN linux-2.6.21.1.old/include/linux/slab.h linux-2.6.21.1.new/include/linux/slab.h
+--- linux-2.6.21.1.old/include/linux/slab.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/linux/slab.h	2007-07-19 16:26:51.000000000 -0700
+@@ -54,6 +54,7 @@ void *kmem_cache_alloc(struct kmem_cache
+ void *kmem_cache_zalloc(struct kmem_cache *, gfp_t);
+ void kmem_cache_free(struct kmem_cache *, void *);
+ unsigned int kmem_cache_size(struct kmem_cache *);
++unsigned int kmem_cache_objsize(struct kmem_cache *);
+ const char *kmem_cache_name(struct kmem_cache *);
+ int kmem_ptr_validate(struct kmem_cache *cachep, const void *ptr);
+ 
+@@ -74,6 +75,7 @@ void *__kmalloc(size_t, gfp_t);
+ void *__kzalloc(size_t, gfp_t);
+ void kfree(const void *);
+ unsigned int ksize(const void *);
++unsigned int kobjsize(size_t);
+ 
+ /**
+  * kcalloc - allocate memory for an array. The memory is set to zero.
+diff -purN linux-2.6.21.1.old/include/net/sock.h linux-2.6.21.1.new/include/net/sock.h
+--- linux-2.6.21.1.old/include/net/sock.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/include/net/sock.h	2007-07-19 16:26:52.000000000 -0700
+@@ -49,6 +49,7 @@
+ #include <linux/skbuff.h>	/* struct sk_buff */
+ #include <linux/mm.h>
+ #include <linux/security.h>
++#include <linux/log2.h>
+ 
+ #include <linux/filter.h>
+ 
+@@ -392,6 +393,7 @@ enum sock_flags {
+ 	SOCK_RCVTSTAMP, /* %SO_TIMESTAMP setting */
+ 	SOCK_LOCALROUTE, /* route locally only, %SO_DONTROUTE setting */
+ 	SOCK_QUEUE_SHRUNK, /* write queue has been shrunk recently */
++	SOCK_VMIO, /* the VM depends on us - make sure we're serviced */
+ };
+ 
+ static inline void sock_copy_flags(struct sock *nsk, struct sock *osk)
+@@ -414,6 +416,50 @@ static inline int sock_flag(struct sock 
+ 	return test_bit(flag, &sk->sk_flags);
+ }
+ 
++static inline int sk_has_vmio(struct sock *sk)
++{
++	return sock_flag(sk, SOCK_VMIO);
++}
++
++/*
++ * Guestimate the per request queue TX upper bound.
++ *
++ * Max packet size is 64k, and we need to reserve that much since the data
++ * might need to bounce it. Double it to be on the safe side.
++ */
++#define TX_RESERVE_PAGES DIV_ROUND_UP(2*65536, PAGE_SIZE)
++
++extern atomic_t vmio_socks;
++
++static inline int sk_vmio_socks(void)
++{
++	return atomic_read(&vmio_socks);
++}
++
++extern int rx_emergency_get(int bytes);
++extern int rx_emergency_get_overcommit(int bytes);
++extern void rx_emergency_put(int bytes);
++
++static inline
++int guess_kmem_cache_pages(struct kmem_cache *cachep, int nr_objs)
++{
++	int guess = DIV_ROUND_UP((kmem_cache_objsize(cachep) * nr_objs),
++			PAGE_SIZE);
++	guess += ilog2(guess);
++	return guess;
++}
++
++extern void sk_adjust_memalloc(int socks, int tx_reserve_pages);
++extern void skb_reserve_memory(int skb_reserve_bytes);
++extern void aux_reserve_memory(int aux_reserve_pages);
++extern int sk_set_vmio(struct sock *sk);
++extern int sk_clear_vmio(struct sock *sk);
++
++static inline gfp_t sk_allocation(struct sock *sk, gfp_t gfp_mask)
++{
++	return gfp_mask | (sk->sk_allocation & __GFP_EMERGENCY);
++}
++
+ static inline void sk_acceptq_removed(struct sock *sk)
+ {
+ 	sk->sk_ack_backlog--;
+@@ -480,6 +526,15 @@ static inline void sk_add_backlog(struct
+ 	skb->next = NULL;
+ }
+ 
++#ifndef CONFIG_NETVM
++static inline int sk_backlog_rcv(struct sock *sk, struct sk_buff *skb)
++{
++	return sk->sk_backlog_rcv(sk, skb);
++}
++#else
++extern int sk_backlog_rcv(struct sock *sk, struct sk_buff *skb);
++#endif
++
+ #define sk_wait_event(__sk, __timeo, __condition)		\
+ ({	int rc;							\
+ 	release_sock(__sk);					\
+@@ -695,7 +750,8 @@ static inline struct inode *SOCK_INODE(s
+ }
+ 
+ extern void __sk_stream_mem_reclaim(struct sock *sk);
+-extern int sk_stream_mem_schedule(struct sock *sk, int size, int kind);
++extern int sk_stream_mem_schedule(struct sock *sk, struct sk_buff *skb,
++		int size, int kind);
+ 
+ #define SK_STREAM_MEM_QUANTUM ((int)PAGE_SIZE)
+ 
+@@ -722,13 +778,13 @@ static inline void sk_stream_writequeue_
+ static inline int sk_stream_rmem_schedule(struct sock *sk, struct sk_buff *skb)
+ {
+ 	return (int)skb->truesize <= sk->sk_forward_alloc ||
+-		sk_stream_mem_schedule(sk, skb->truesize, 1);
++		sk_stream_mem_schedule(sk, skb, skb->truesize, 1);
+ }
+ 
+ static inline int sk_stream_wmem_schedule(struct sock *sk, int size)
+ {
+ 	return size <= sk->sk_forward_alloc ||
+-	       sk_stream_mem_schedule(sk, size, 0);
++	       sk_stream_mem_schedule(sk, NULL, size, 0);
+ }
+ 
+ /* Used by processes to "lock" a socket state, so that
+@@ -891,6 +947,9 @@ static inline int sk_filter(struct sock 
+ {
+ 	int err;
+ 	struct sk_filter *filter;
++
++	if (skb_emergency(skb) && !sk_has_vmio(sk))
++		return -EPERM;
+ 	
+ 	err = security_sock_rcv_skb(sk, skb);
+ 	if (err)
+@@ -1222,7 +1281,7 @@ static inline struct sk_buff *sk_stream_
+ 	int hdr_len;
+ 
+ 	hdr_len = SKB_DATA_ALIGN(sk->sk_prot->max_header);
+-	skb = alloc_skb_fclone(size + hdr_len, gfp);
++	skb = alloc_skb_fclone(size + hdr_len, sk_allocation(sk, gfp));
+ 	if (skb) {
+ 		skb->truesize += mem;
+ 		if (sk_stream_wmem_schedule(sk, skb->truesize)) {
+diff -purN linux-2.6.21.1.old/kernel/softirq.c linux-2.6.21.1.new/kernel/softirq.c
+--- linux-2.6.21.1.old/kernel/softirq.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/kernel/softirq.c	2007-07-19 16:26:52.000000000 -0700
+@@ -210,6 +210,8 @@ asmlinkage void __do_softirq(void)
+ 	__u32 pending;
+ 	int max_restart = MAX_SOFTIRQ_RESTART;
+ 	int cpu;
++	unsigned long pflags = current->flags;
++	current->flags &= ~PF_MEMALLOC;
+ 
+ 	pending = local_softirq_pending();
+ 	account_system_vtime(current);
+@@ -248,6 +250,7 @@ restart:
+ 
+ 	account_system_vtime(current);
+ 	_local_bh_enable();
++	tsk_restore_flags(current, pflags, PF_MEMALLOC);
+ }
+ 
+ #ifndef __ARCH_HAS_DO_SOFTIRQ
+diff -purN linux-2.6.21.1.old/mm/internal.h linux-2.6.21.1.new/mm/internal.h
+--- linux-2.6.21.1.old/mm/internal.h	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/internal.h	2007-07-19 16:26:53.000000000 -0700
+@@ -12,6 +12,7 @@
+ #define __MM_INTERNAL_H
+ 
+ #include <linux/mm.h>
++#include <linux/hardirq.h>
+ 
+ static inline void set_page_count(struct page *page, int v)
+ {
+@@ -37,4 +38,105 @@ static inline void __put_page(struct pag
+ extern void fastcall __init __free_pages_bootmem(struct page *page,
+ 						unsigned int order);
+ 
++#define ALLOC_HARDER		0x01 /* try to alloc harder */
++#define ALLOC_HIGH		0x02 /* __GFP_HIGH set */
++#define ALLOC_WMARK_MIN		0x04 /* use pages_min watermark */
++#define ALLOC_WMARK_LOW		0x08 /* use pages_low watermark */
++#define ALLOC_WMARK_HIGH	0x10 /* use pages_high watermark */
++#define ALLOC_NO_WATERMARKS	0x20 /* don't check watermarks at all */
++#define ALLOC_CPUSET		0x40 /* check for correct cpuset */
++
++/*
++ * get the deepest reaching allocation flags for the given gfp_mask
++ */
++static int inline gfp_to_alloc_flags(gfp_t gfp_mask)
++{
++	struct task_struct *p = current;
++	int alloc_flags = ALLOC_WMARK_MIN | ALLOC_CPUSET;
++	const gfp_t wait = gfp_mask & __GFP_WAIT;
++
++	/*
++	 * The caller may dip into page reserves a bit more if the caller
++	 * cannot run direct reclaim, or if the caller has realtime scheduling
++	 * policy or is asking for __GFP_HIGH memory.  GFP_ATOMIC requests will
++	 * set both ALLOC_HARDER (!wait) and ALLOC_HIGH (__GFP_HIGH).
++	 */
++	if (gfp_mask & __GFP_HIGH)
++		alloc_flags |= ALLOC_HIGH;
++
++	if (!wait) {
++		alloc_flags |= ALLOC_HARDER;
++		/*
++		 * Ignore cpuset if GFP_ATOMIC (!wait) rather than fail alloc.
++		 * See also cpuset_zone_allowed() comment in kernel/cpuset.c.
++		 */
++		alloc_flags &= ~ALLOC_CPUSET;
++	} else if (unlikely(rt_task(p)) && !in_interrupt())
++		alloc_flags |= ALLOC_HARDER;
++
++	if (likely(!(gfp_mask & __GFP_NOMEMALLOC))) {
++		if (gfp_mask & __GFP_EMERGENCY)
++			alloc_flags |= ALLOC_NO_WATERMARKS;
++		else if (!in_irq() && (p->flags & PF_MEMALLOC))
++			alloc_flags |= ALLOC_NO_WATERMARKS;
++		else if (!in_interrupt() &&
++				unlikely(test_thread_flag(TIF_MEMDIE)))
++			alloc_flags |= ALLOC_NO_WATERMARKS;
++	}
++
++	return alloc_flags;
++}
++
++#define MAX_ALLOC_RANK	16
++
++/*
++ * classify the allocation: 0 is hardest, 16 is easiest.
++ */
++static inline int alloc_flags_to_rank(int alloc_flags)
++{
++	int rank;
++
++	if (alloc_flags & ALLOC_NO_WATERMARKS)
++		return 0;
++
++	rank = alloc_flags & (ALLOC_WMARK_MIN|ALLOC_WMARK_LOW|ALLOC_WMARK_HIGH);
++	rank -= alloc_flags & (ALLOC_HARDER|ALLOC_HIGH);
++
++	return rank;
++}
++
++static __always_inline int gfp_to_rank(gfp_t gfp_mask)
++{
++	/*
++	 * Although correct this full version takes a ~3% performance hit
++	 * on the network test in aim9.
++	 *
++	 * return alloc_flags_to_rank(gfp_to_alloc_flags(gfp_mask));
++	 *
++	 * So we go cheat a little. We'll only focus on the correctness of
++	 * rank 0.
++	 */
++
++	if (likely(!(gfp_mask & __GFP_NOMEMALLOC))) {
++		if (gfp_mask & __GFP_EMERGENCY)
++			return 0;
++		else if (!in_irq() && (current->flags & PF_MEMALLOC))
++			return 0;
++		/*
++		 * We skip the TIF_MEMDIE test:
++		 *
++		 * if (!in_interrupt() && unlikely(test_thread_flag(TIF_MEMDIE)))
++		 * 	return 0;
++		 *
++		 * this will force an alloc but since we are allowed the memory
++		 * that will succeed. This will make this very rare occurence
++		 * very expensive when under severe memory pressure, but it
++		 * seems a valid tradeoff.
++		 */
++	}
++
++	/* Cheat by lumping everybody else in rank 1. */
++	return 1;
++}
++
+ #endif
+diff -purN linux-2.6.21.1.old/mm/Kconfig linux-2.6.21.1.new/mm/Kconfig
+--- linux-2.6.21.1.old/mm/Kconfig	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/Kconfig	2007-07-19 16:26:53.000000000 -0700
+@@ -163,3 +163,6 @@ config ZONE_DMA_FLAG
+ 	default "0" if !ZONE_DMA
+ 	default "1"
+ 
++config SLAB_FAIR
++	def_bool n
++	depends on SLAB
+diff -purN linux-2.6.21.1.old/mm/mempool.c linux-2.6.21.1.new/mm/mempool.c
+--- linux-2.6.21.1.old/mm/mempool.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/mempool.c	2007-07-19 16:26:53.000000000 -0700
+@@ -14,6 +14,7 @@
+ #include <linux/mempool.h>
+ #include <linux/blkdev.h>
+ #include <linux/writeback.h>
++#include "internal.h"
+ 
+ static void add_element(mempool_t *pool, void *element)
+ {
+@@ -229,6 +230,15 @@ repeat_alloc:
+ 	}
+ 	spin_unlock_irqrestore(&pool->lock, flags);
+ 
++	/* if we really had right to the emergency reserves try those */
++	if (gfp_to_alloc_flags(gfp_mask) & ALLOC_NO_WATERMARKS) {
++		if (gfp_temp & __GFP_NOMEMALLOC) {
++			gfp_temp &= ~(__GFP_NOMEMALLOC|__GFP_NOWARN);
++			goto repeat_alloc;
++		} else
++			gfp_temp |= __GFP_NOMEMALLOC|__GFP_NOWARN;
++	}
++
+ 	/* We must not sleep in the GFP_ATOMIC case */
+ 	if (!(gfp_mask & __GFP_WAIT))
+ 		return NULL;
+diff -purN linux-2.6.21.1.old/mm/page_alloc.c linux-2.6.21.1.new/mm/page_alloc.c
+--- linux-2.6.21.1.old/mm/page_alloc.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/page_alloc.c	2007-07-19 16:26:53.000000000 -0700
+@@ -99,7 +99,9 @@ static char * const zone_names[MAX_NR_ZO
+ #endif
+ };
+ 
++static DEFINE_SPINLOCK(min_free_lock);
+ int min_free_kbytes = 1024;
++int var_free_kbytes;
+ 
+ unsigned long __meminitdata nr_kernel_pages;
+ unsigned long __meminitdata nr_all_pages;
+@@ -912,14 +914,6 @@ failed:
+ 	return NULL;
+ }
+ 
+-#define ALLOC_NO_WATERMARKS	0x01 /* don't check watermarks at all */
+-#define ALLOC_WMARK_MIN		0x02 /* use pages_min watermark */
+-#define ALLOC_WMARK_LOW		0x04 /* use pages_low watermark */
+-#define ALLOC_WMARK_HIGH	0x08 /* use pages_high watermark */
+-#define ALLOC_HARDER		0x10 /* try to alloc harder */
+-#define ALLOC_HIGH		0x20 /* __GFP_HIGH set */
+-#define ALLOC_CPUSET		0x40 /* check for correct cpuset */
+-
+ #ifdef CONFIG_FAIL_PAGE_ALLOC
+ 
+ static struct fail_page_alloc_attr {
+@@ -1022,7 +1016,8 @@ int zone_watermark_ok(struct zone *z, in
+ 	if (alloc_flags & ALLOC_HARDER)
+ 		min -= min / 4;
+ 
+-	if (free_pages <= min + z->lowmem_reserve[classzone_idx])
++	if (free_pages <= min + z->lowmem_reserve[classzone_idx] +
++			z->pages_emerg)
+ 		return 0;
+ 	for (o = 0; o < order; o++) {
+ 		/* At the next order, this order's pages become unavailable */
+@@ -1210,6 +1205,7 @@ zonelist_scan:
+ 
+ 		page = buffered_rmqueue(zonelist, zone, order, gfp_mask);
+ 		if (page)
++			page->index = alloc_flags_to_rank(alloc_flags);
+ 			break;
+ this_zone_full:
+ 		if (NUMA_BUILD)
+@@ -1283,48 +1279,27 @@ restart:
+ 	 * OK, we're below the kswapd watermark and have kicked background
+ 	 * reclaim. Now things get more complex, so set up alloc_flags according
+ 	 * to how we want to proceed.
+-	 *
+-	 * The caller may dip into page reserves a bit more if the caller
+-	 * cannot run direct reclaim, or if the caller has realtime scheduling
+-	 * policy or is asking for __GFP_HIGH memory.  GFP_ATOMIC requests will
+-	 * set both ALLOC_HARDER (!wait) and ALLOC_HIGH (__GFP_HIGH).
+ 	 */
+-	alloc_flags = ALLOC_WMARK_MIN;
+-	if ((unlikely(rt_task(p)) && !in_interrupt()) || !wait)
+-		alloc_flags |= ALLOC_HARDER;
+-	if (gfp_mask & __GFP_HIGH)
+-		alloc_flags |= ALLOC_HIGH;
+-	if (wait)
+-		alloc_flags |= ALLOC_CPUSET;
++	alloc_flags = gfp_to_alloc_flags(gfp_mask);
+ 
+-	/*
+-	 * Go through the zonelist again. Let __GFP_HIGH and allocations
+-	 * coming from realtime tasks go deeper into reserves.
+-	 *
+-	 * This is the last chance, in general, before the goto nopage.
+-	 * Ignore cpuset if GFP_ATOMIC (!wait) rather than fail alloc.
+-	 * See also cpuset_zone_allowed() comment in kernel/cpuset.c.
+-	 */
+-	page = get_page_from_freelist(gfp_mask, order, zonelist, alloc_flags);
++	/* This is the last chance, in general, before the goto nopage. */
++	page = get_page_from_freelist(gfp_mask, order, zonelist,
++			alloc_flags & ~ALLOC_NO_WATERMARKS);
+ 	if (page)
+ 		goto got_pg;
+ 
+ 	/* This allocation should allow future memory freeing. */
+-
+ rebalance:
+-	if (((p->flags & PF_MEMALLOC) || unlikely(test_thread_flag(TIF_MEMDIE)))
+-			&& !in_interrupt()) {
+-		if (!(gfp_mask & __GFP_NOMEMALLOC)) {
++	if (alloc_flags & ALLOC_NO_WATERMARKS) {
+ nofail_alloc:
+-			/* go through the zonelist yet again, ignoring mins */
+-			page = get_page_from_freelist(gfp_mask, order,
++		/* go through the zonelist yet again, ignoring mins */
++		page = get_page_from_freelist(gfp_mask, order,
+ 				zonelist, ALLOC_NO_WATERMARKS);
+-			if (page)
+-				goto got_pg;
+-			if (gfp_mask & __GFP_NOFAIL) {
+-				congestion_wait(WRITE, HZ/50);
+-				goto nofail_alloc;
+-			}
++		if (page)
++			goto got_pg;
++		if (wait && (gfp_mask & __GFP_NOFAIL)) {
++			congestion_wait(WRITE, HZ/50);
++			goto nofail_alloc;
+ 		}
+ 		goto nopage;
+ 	}
+@@ -1333,6 +1308,10 @@ nofail_alloc:
+ 	if (!wait)
+ 		goto nopage;
+ 
++	/* Avoid recursion of direct reclaim */
++	if (p->flags & PF_MEMALLOC)
++		goto nopage;
++
+ 	cond_resched();
+ 
+ 	/* We now go into synchronous reclaim */
+@@ -1391,8 +1370,8 @@ nofail_alloc:
+ nopage:
+ 	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+-			" order:%d, mode:0x%x\n",
+-			p->comm, order, gfp_mask);
++			" order:%d, mode:0x%x, alloc_flags:0x%x, pflags:0x%lx\n",
++			p->comm, order, gfp_mask, alloc_flags, p->flags);
+ 		dump_stack();
+ 		show_mem();
+ 	}
+@@ -1605,9 +1584,9 @@ void show_free_areas(void)
+ 			"\n",
+ 			zone->name,
+ 			K(zone_page_state(zone, NR_FREE_PAGES)),
+-			K(zone->pages_min),
+-			K(zone->pages_low),
+-			K(zone->pages_high),
++			K(zone->pages_emerg + zone->pages_min),
++			K(zone->pages_emerg + zone->pages_low),
++			K(zone->pages_emerg + zone->pages_high),
+ 			K(zone_page_state(zone, NR_ACTIVE)),
+ 			K(zone_page_state(zone, NR_INACTIVE)),
+ 			K(zone->present_pages),
+@@ -3044,7 +3023,7 @@ static void calculate_totalreserve_pages
+ 			}
+ 
+ 			/* we treat pages_high as reserved pages. */
+-			max += zone->pages_high;
++			max += zone->pages_high + zone->pages_emerg;
+ 
+ 			if (max > zone->present_pages)
+ 				max = zone->present_pages;
+@@ -3094,14 +3073,15 @@ static void setup_per_zone_lowmem_reserv
+ }
+ 
+ /**
+- * setup_per_zone_pages_min - called when min_free_kbytes changes.
++ * __setup_per_zone_pages_min - called when min_free_kbytes changes.
+  *
+  * Ensures that the pages_{min,low,high} values for each zone are set correctly
+  * with respect to min_free_kbytes.
+  */
+-void setup_per_zone_pages_min(void)
++static void __setup_per_zone_pages_min(void)
+ {
+-	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
++	unsigned pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
++	unsigned pages_emerg = var_free_kbytes >> (PAGE_SHIFT - 10);
+ 	unsigned long lowmem_pages = 0;
+ 	struct zone *zone;
+ 	unsigned long flags;
+@@ -3113,11 +3093,13 @@ void setup_per_zone_pages_min(void)
+ 	}
+ 
+ 	for_each_zone(zone) {
+-		u64 tmp;
++		u64 tmp, tmp_emerg;
+ 
+ 		spin_lock_irqsave(&zone->lru_lock, flags);
+ 		tmp = (u64)pages_min * zone->present_pages;
+ 		do_div(tmp, lowmem_pages);
++		tmp_emerg = (u64)pages_emerg * zone->present_pages;
++		do_div(tmp_emerg, lowmem_pages);
+ 		if (is_highmem(zone)) {
+ 			/*
+ 			 * __GFP_HIGH and PF_MEMALLOC allocations usually don't
+@@ -3136,12 +3118,14 @@ void setup_per_zone_pages_min(void)
+ 			if (min_pages > 128)
+ 				min_pages = 128;
+ 			zone->pages_min = min_pages;
++			zone->pages_emerg = min_pages;
+ 		} else {
+ 			/*
+ 			 * If it's a lowmem zone, reserve a number of pages
+ 			 * proportionate to the zone's size.
+ 			 */
+ 			zone->pages_min = tmp;
++			zone->pages_emerg = tmp_emerg;
+ 		}
+ 
+ 		zone->pages_low   = zone->pages_min + (tmp >> 2);
+@@ -3153,6 +3137,42 @@ void setup_per_zone_pages_min(void)
+ 	calculate_totalreserve_pages();
+ }
+ 
++void setup_per_zone_pages_min(void)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&min_free_lock, flags);
++	__setup_per_zone_pages_min();
++	spin_unlock_irqrestore(&min_free_lock, flags);
++}
++
++/**
++ *	adjust_memalloc_reserve - adjust the memalloc reserve
++ *	@pages: number of pages to add
++ *
++ *	It adds a number of pages to the memalloc reserve; if
++ *	the number was positive it kicks kswapd into action to
++ *	satisfy the higher watermarks.
++ *
++ *	NOTE: there is only a single caller, hence no locking.
++ */
++void adjust_memalloc_reserve(int pages)
++{
++	var_free_kbytes += pages << (PAGE_SHIFT - 10);
++	BUG_ON(var_free_kbytes < 0);
++	setup_per_zone_pages_min();
++	if (pages > 0) {
++		struct zone *zone;
++		for_each_zone(zone)
++			wakeup_kswapd(zone, 0);
++	}
++	if (pages)
++		printk(KERN_DEBUG "Emergency reserve: %d\n",
++				var_free_kbytes);
++}
++
++EXPORT_SYMBOL_GPL(adjust_memalloc_reserve);
++
+ /*
+  * Initialise min_free_kbytes.
+  *
+@@ -3188,7 +3208,7 @@ static int __init init_per_zone_pages_mi
+ 		min_free_kbytes = 128;
+ 	if (min_free_kbytes > 65536)
+ 		min_free_kbytes = 65536;
+-	setup_per_zone_pages_min();
++	__setup_per_zone_pages_min();
+ 	setup_per_zone_lowmem_reserve();
+ 	return 0;
+ }
+diff -purN linux-2.6.21.1.old/mm/slab.c linux-2.6.21.1.new/mm/slab.c
+--- linux-2.6.21.1.old/mm/slab.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/slab.c	2007-07-19 16:26:53.000000000 -0700
+@@ -114,6 +114,7 @@
+ #include	<asm/cacheflush.h>
+ #include	<asm/tlbflush.h>
+ #include	<asm/page.h>
++#include	"internal.h"
+ 
+ /*
+  * DEBUG	- 1 for kmem_cache_create() to honour; SLAB_DEBUG_INITIAL,
+@@ -380,6 +381,7 @@ static void kmem_list3_init(struct kmem_
+ 
+ struct kmem_cache {
+ /* 1) per-cpu data, touched during every alloc/free */
++	int rank;
+ 	struct array_cache *array[NR_CPUS];
+ /* 2) Cache tunables. Protected by cache_chain_mutex */
+ 	unsigned int batchcount;
+@@ -1023,21 +1025,21 @@ static inline int cache_free_alien(struc
+ }
+ 
+ static inline void *alternate_node_alloc(struct kmem_cache *cachep,
+-		gfp_t flags)
++		gfp_t flags, int rank)
+ {
+ 	return NULL;
+ }
+ 
+ static inline void *____cache_alloc_node(struct kmem_cache *cachep,
+-		 gfp_t flags, int nodeid)
++		 gfp_t flags, int nodeid, int rank)
+ {
+ 	return NULL;
+ }
+ 
+ #else	/* CONFIG_NUMA */
+ 
+-static void *____cache_alloc_node(struct kmem_cache *, gfp_t, int);
+-static void *alternate_node_alloc(struct kmem_cache *, gfp_t);
++static void *____cache_alloc_node(struct kmem_cache *, gfp_t, int, int);
++static void *alternate_node_alloc(struct kmem_cache *, gfp_t, int);
+ 
+ static struct array_cache **alloc_alien_cache(int node, int limit)
+ {
+@@ -1628,6 +1630,7 @@ static void *kmem_getpages(struct kmem_c
+ 	if (!page)
+ 		return NULL;
+ 
++	cachep->rank = page->index;
+ 	nr_pages = (1 << cachep->gfporder);
+ 	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
+ 		add_zone_page_state(page_zone(page),
+@@ -2276,6 +2279,7 @@ kmem_cache_create (const char *name, siz
+ 	}
+ #endif
+ #endif
++	cachep->rank = MAX_ALLOC_RANK;
+ 
+ 	/*
+ 	 * Determine if the slab management is 'on' or 'off' slab.
+@@ -2942,7 +2946,7 @@ bad:
+ #define check_slabp(x,y) do { } while(0)
+ #endif
+ 
+-static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags)
++static void *cache_alloc_refill(struct kmem_cache *cachep, gfp_t flags, int rank)
+ {
+ 	int batchcount;
+ 	struct kmem_list3 *l3;
+@@ -2954,6 +2958,8 @@ static void *cache_alloc_refill(struct k
+ 	check_irq_off();
+ 	ac = cpu_cache_get(cachep);
+ retry:
++	if (unlikely(rank > cachep->rank))
++		goto force_grow;
+ 	batchcount = ac->batchcount;
+ 	if (!ac->touched && batchcount > BATCHREFILL_LIMIT) {
+ 		/*
+@@ -3009,14 +3015,16 @@ must_grow:
+ 	l3->free_objects -= ac->avail;
+ alloc_done:
+ 	spin_unlock(&l3->list_lock);
+-
+ 	if (unlikely(!ac->avail)) {
+ 		int x;
++force_grow:
+ 		x = cache_grow(cachep, flags | GFP_THISNODE, node, NULL);
+ 
+ 		/* cache_grow can reenable interrupts, then ac could change. */
+ 		ac = cpu_cache_get(cachep);
+-		if (!x && ac->avail == 0)	/* no objects in sight? abort */
++
++		/* no objects in sight? abort */
++		if (!x && (ac->avail == 0 || rank > cachep->rank))
+ 			return NULL;
+ 
+ 		if (!ac->avail)		/* objects refilled by interrupt? */
+@@ -3173,7 +3181,8 @@ static inline int should_failslab(struct
+ 
+ #endif /* CONFIG_FAILSLAB */
+ 
+-static inline void *____cache_alloc(struct kmem_cache *cachep, gfp_t flags)
++static inline void *____cache_alloc(struct kmem_cache *cachep,
++		gfp_t flags, int rank)
+ {
+ 	void *objp;
+ 	struct array_cache *ac;
+@@ -3184,17 +3193,29 @@ static inline void *____cache_alloc(stru
+ 		return NULL;
+ 
+ 	ac = cpu_cache_get(cachep);
+-	if (likely(ac->avail)) {
++	if (likely(ac->avail && rank <= cachep->rank)) {
+ 		STATS_INC_ALLOCHIT(cachep);
+ 		ac->touched = 1;
+ 		objp = ac->entry[--ac->avail];
+ 	} else {
+ 		STATS_INC_ALLOCMISS(cachep);
+-		objp = cache_alloc_refill(cachep, flags);
++		objp = cache_alloc_refill(cachep, flags, rank);
+ 	}
+ 	return objp;
+ }
+ 
++#ifdef CONFIG_SLAB_FAIR
++static __always_inline int slab_alloc_rank(gfp_t flags)
++{
++	return gfp_to_rank(flags);
++}
++#else
++static __always_inline int slab_alloc_rank(gfp_t flags)
++{
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_NUMA
+ /*
+  * Try allocating on another node if PF_SPREAD_SLAB|PF_MEMPOLICY.
+@@ -3202,7 +3223,8 @@ static inline void *____cache_alloc(stru
+  * If we are in_interrupt, then process context, including cpusets and
+  * mempolicy, may not apply and should not be used for allocation policy.
+  */
+-static void *alternate_node_alloc(struct kmem_cache *cachep, gfp_t flags)
++static void *alternate_node_alloc(struct kmem_cache *cachep,
++		gfp_t flags, int rank)
+ {
+ 	int nid_alloc, nid_here;
+ 
+@@ -3214,7 +3236,7 @@ static void *alternate_node_alloc(struct
+ 	else if (current->mempolicy)
+ 		nid_alloc = slab_node(current->mempolicy);
+ 	if (nid_alloc != nid_here)
+-		return ____cache_alloc_node(cachep, flags, nid_alloc);
++		return ____cache_alloc_node(cachep, flags, nid_alloc, rank);
+ 	return NULL;
+ }
+ 
+@@ -3226,7 +3248,7 @@ static void *alternate_node_alloc(struct
+  * allocator to do its reclaim / fallback magic. We then insert the
+  * slab into the proper nodelist and then allocate from it.
+  */
+-static void *fallback_alloc(struct kmem_cache *cache, gfp_t flags)
++static void *fallback_alloc(struct kmem_cache *cache, gfp_t flags, int rank)
+ {
+ 	struct zonelist *zonelist;
+ 	gfp_t local_flags;
+@@ -3253,7 +3275,7 @@ retry:
+ 			cache->nodelists[nid] &&
+ 			cache->nodelists[nid]->free_objects)
+ 				obj = ____cache_alloc_node(cache,
+-					flags | GFP_THISNODE, nid);
++					flags | GFP_THISNODE, nid, rank);
+ 	}
+ 
+ 	if (!obj && !(flags & __GFP_NO_GROW)) {
+@@ -3276,7 +3298,7 @@ retry:
+ 			nid = page_to_nid(virt_to_page(obj));
+ 			if (cache_grow(cache, flags, nid, obj)) {
+ 				obj = ____cache_alloc_node(cache,
+-					flags | GFP_THISNODE, nid);
++					flags | GFP_THISNODE, nid, rank);
+ 				if (!obj)
+ 					/*
+ 					 * Another processor may allocate the
+@@ -3297,7 +3319,7 @@ retry:
+  * A interface to enable slab creation on nodeid
+  */
+ static void *____cache_alloc_node(struct kmem_cache *cachep, gfp_t flags,
+-				int nodeid)
++				int nodeid, int rank)
+ {
+ 	struct list_head *entry;
+ 	struct slab *slabp;
+@@ -3310,6 +3332,8 @@ static void *____cache_alloc_node(struct
+ 
+ retry:
+ 	check_irq_off();
++	if (unlikely(rank > cachep->rank))
++		goto force_grow;
+ 	spin_lock(&l3->list_lock);
+ 	entry = l3->slabs_partial.next;
+ 	if (entry == &l3->slabs_partial) {
+@@ -3345,11 +3369,12 @@ retry:
+ 
+ must_grow:
+ 	spin_unlock(&l3->list_lock);
++force_grow:
+ 	x = cache_grow(cachep, flags | GFP_THISNODE, nodeid, NULL);
+ 	if (x)
+ 		goto retry;
+ 
+-	return fallback_alloc(cachep, flags);
++	return fallback_alloc(cachep, flags, rank);
+ 
+ done:
+ 	return obj;
+@@ -3373,6 +3398,7 @@ __cache_alloc_node(struct kmem_cache *ca
+ {
+ 	unsigned long save_flags;
+ 	void *ptr;
++	int rank = slab_alloc_rank(flags);
+ 
+ 	cache_alloc_debugcheck_before(cachep, flags);
+ 	local_irq_save(save_flags);
+@@ -3382,7 +3408,7 @@ __cache_alloc_node(struct kmem_cache *ca
+ 
+ 	if (unlikely(!cachep->nodelists[nodeid])) {
+ 		/* Node not bootstrapped yet */
+-		ptr = fallback_alloc(cachep, flags);
++		ptr = fallback_alloc(cachep, flags, rank);
+ 		goto out;
+ 	}
+ 
+@@ -3393,12 +3419,12 @@ __cache_alloc_node(struct kmem_cache *ca
+ 		 * to other nodes. It may fail while we still have
+ 		 * objects on other nodes available.
+ 		 */
+-		ptr = ____cache_alloc(cachep, flags);
++		ptr = ____cache_alloc(cachep, flags, rank);
+ 		if (ptr)
+ 			goto out;
+ 	}
+ 	/* ___cache_alloc_node can fall back to other nodes */
+-	ptr = ____cache_alloc_node(cachep, flags, nodeid);
++	ptr = ____cache_alloc_node(cachep, flags, nodeid, rank);
+   out:
+ 	local_irq_restore(save_flags);
+ 	ptr = cache_alloc_debugcheck_after(cachep, flags, ptr, caller);
+@@ -3407,23 +3433,23 @@ __cache_alloc_node(struct kmem_cache *ca
+ }
+ 
+ static __always_inline void *
+-__do_cache_alloc(struct kmem_cache *cache, gfp_t flags)
++__do_cache_alloc(struct kmem_cache *cache, gfp_t flags, int rank)
+ {
+ 	void *objp;
+ 
+ 	if (unlikely(current->flags & (PF_SPREAD_SLAB | PF_MEMPOLICY))) {
+-		objp = alternate_node_alloc(cache, flags);
++		objp = alternate_node_alloc(cache, flags, rank);
+ 		if (objp)
+ 			goto out;
+ 	}
+-	objp = ____cache_alloc(cache, flags);
++	objp = ____cache_alloc(cache, flags, rank);
+ 
+ 	/*
+ 	 * We may just have run out of memory on the local node.
+ 	 * ____cache_alloc_node() knows how to locate memory on other nodes
+ 	 */
+  	if (!objp)
+- 		objp = ____cache_alloc_node(cache, flags, numa_node_id());
++ 		objp = ____cache_alloc_node(cache, flags, numa_node_id(), rank);
+ 
+   out:
+ 	return objp;
+@@ -3431,9 +3457,9 @@ __do_cache_alloc(struct kmem_cache *cach
+ #else
+ 
+ static __always_inline void *
+-__do_cache_alloc(struct kmem_cache *cachep, gfp_t flags)
++__do_cache_alloc(struct kmem_cache *cachep, gfp_t flags, int rank)
+ {
+-	return ____cache_alloc(cachep, flags);
++	return ____cache_alloc(cachep, flags, rank);
+ }
+ 
+ #endif /* CONFIG_NUMA */
+@@ -3443,10 +3469,11 @@ __cache_alloc(struct kmem_cache *cachep,
+ {
+ 	unsigned long save_flags;
+ 	void *objp;
++	int rank = slab_alloc_rank(flags);
+ 
+ 	cache_alloc_debugcheck_before(cachep, flags);
+ 	local_irq_save(save_flags);
+-	objp = __do_cache_alloc(cachep, flags);
++	objp = __do_cache_alloc(cachep, flags, rank);
+ 	local_irq_restore(save_flags);
+ 	objp = cache_alloc_debugcheck_after(cachep, flags, objp, caller);
+ 	prefetchw(objp);
+@@ -3788,6 +3815,12 @@ unsigned int kmem_cache_size(struct kmem
+ }
+ EXPORT_SYMBOL(kmem_cache_size);
+ 
++unsigned int kmem_cache_objsize(struct kmem_cache *cachep)
++{
++	return cachep->buffer_size;
++}
++EXPORT_SYMBOL_GPL(kmem_cache_objsize);
++
+ const char *kmem_cache_name(struct kmem_cache *cachep)
+ {
+ 	return cachep->name;
+@@ -4485,3 +4518,9 @@ unsigned int ksize(const void *objp)
+ 
+ 	return obj_size(virt_to_cache(objp));
+ }
++
++unsigned int kobjsize(size_t size)
++{
++	return kmem_cache_objsize(kmem_find_general_cachep(size, 0));
++}
++EXPORT_SYMBOL_GPL(kobjsize);
+diff -purN linux-2.6.21.1.old/mm/slob.c linux-2.6.21.1.new/mm/slob.c
+--- linux-2.6.21.1.old/mm/slob.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/slob.c	2007-07-19 16:26:53.000000000 -0700
+@@ -240,6 +240,15 @@ unsigned int ksize(const void *block)
+ 	return ((slob_t *)block - 1)->units * SLOB_UNIT;
+ }
+ 
++unsigned int kobjsize(size_t size)
++{
++	if (size < PAGE_SIZE)
++		return size;
++
++	return PAGE_SIZE << find_order(size);
++}
++EXPORT_SYMBOL_GPL(kobjsize);
++
+ struct kmem_cache {
+ 	unsigned int size, align;
+ 	const char *name;
+@@ -321,6 +330,15 @@ unsigned int kmem_cache_size(struct kmem
+ }
+ EXPORT_SYMBOL(kmem_cache_size);
+ 
++unsigned int kmem_cache_objsize(struct kmem_cache *c)
++{
++	if (c->size < PAGE_SIZE)
++		return c->size + c->align;
++
++	return PAGE_SIZE << find_order(c->size);
++}
++EXPORT_SYMBOL_GPL(kmem_cache_objsize);
++
+ const char *kmem_cache_name(struct kmem_cache *c)
+ {
+ 	return c->name;
+diff -purN linux-2.6.21.1.old/mm/vmstat.c linux-2.6.21.1.new/mm/vmstat.c
+--- linux-2.6.21.1.old/mm/vmstat.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/mm/vmstat.c	2007-07-19 16:26:53.000000000 -0700
+@@ -513,9 +513,9 @@ static int zoneinfo_show(struct seq_file
+ 			   "\n        spanned  %lu"
+ 			   "\n        present  %lu",
+ 			   zone_page_state(zone, NR_FREE_PAGES),
+-			   zone->pages_min,
+-			   zone->pages_low,
+-			   zone->pages_high,
++			   zone->pages_emerg + zone->pages_min,
++			   zone->pages_emerg + zone->pages_low,
++			   zone->pages_emerg + zone->pages_high,
+ 			   zone->pages_scanned,
+ 			   zone->nr_scan_active, zone->nr_scan_inactive,
+ 			   zone->spanned_pages,
+diff -purN linux-2.6.21.1.old/net/core/dev.c linux-2.6.21.1.new/net/core/dev.c
+--- linux-2.6.21.1.old/net/core/dev.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/core/dev.c	2007-07-19 16:26:53.000000000 -0700
+@@ -1764,10 +1764,23 @@ int netif_receive_skb(struct sk_buff *sk
+ 	struct net_device *orig_dev;
+ 	int ret = NET_RX_DROP;
+ 	__be16 type;
++	unsigned long pflags = current->flags;
++
++	/* Emergency skb are special, they should
++	 *  - be delivered to SOCK_VMIO sockets only
++	 *  - stay away from userspace
++	 *  - have bounded memory usage
++	 *
++	 * Use PF_MEMALLOC as a poor mans memory pool - the grouping kind.
++	 * This saves us from propagating the allocation context down to all
++	 * allocation sites.
++	 */
++	if (skb_emergency(skb))
++		current->flags |= PF_MEMALLOC;
+ 
+ 	/* if we've gotten here through NAPI, check netpoll */
+ 	if (skb->dev->poll && netpoll_rx(skb))
+-		return NET_RX_DROP;
++		goto out;
+ 
+ 	if (!skb->tstamp.off_sec)
+ 		net_timestamp(skb);
+@@ -1778,7 +1791,7 @@ int netif_receive_skb(struct sk_buff *sk
+ 	orig_dev = skb_bond(skb);
+ 
+ 	if (!orig_dev)
+-		return NET_RX_DROP;
++		goto out;
+ 
+ 	__get_cpu_var(netdev_rx_stat).total++;
+ 
+@@ -1796,6 +1809,9 @@ int netif_receive_skb(struct sk_buff *sk
+ 	}
+ #endif
+ 
++	if (skb_emergency(skb))
++		goto skip_taps;
++
+ 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
+ 		if (!ptype->dev || ptype->dev == skb->dev) {
+ 			if (pt_prev)
+@@ -1804,6 +1820,7 @@ int netif_receive_skb(struct sk_buff *sk
+ 		}
+ 	}
+ 
++skip_taps:
+ #ifdef CONFIG_NET_CLS_ACT
+ 	if (pt_prev) {
+ 		ret = deliver_skb(skb, pt_prev, orig_dev);
+@@ -1816,15 +1833,27 @@ int netif_receive_skb(struct sk_buff *sk
+ 
+ 	if (ret == TC_ACT_SHOT || (ret == TC_ACT_STOLEN)) {
+ 		kfree_skb(skb);
+-		goto out;
++		goto unlock;
+ 	}
+ 
+ 	skb->tc_verd = 0;
+ ncls:
+ #endif
+ 
++	if (skb_emergency(skb))
++		switch(skb->protocol) {
++			case __constant_htons(ETH_P_ARP):
++			case __constant_htons(ETH_P_IP):
++			case __constant_htons(ETH_P_IPV6):
++			case __constant_htons(ETH_P_8021Q):
++				break;
++
++			default:
++				goto drop;
++		}
++
+ 	if (handle_bridge(&skb, &pt_prev, &ret, orig_dev))
+-		goto out;
++		goto unlock;
+ 
+ 	type = skb->protocol;
+ 	list_for_each_entry_rcu(ptype, &ptype_base[ntohs(type)&15], list) {
+@@ -1839,6 +1868,7 @@ ncls:
+ 	if (pt_prev) {
+ 		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+ 	} else {
++drop:
+ 		kfree_skb(skb);
+ 		/* Jamal, now you will not able to escape explaining
+ 		 * me how you were going to use this. :-)
+@@ -1846,8 +1876,10 @@ ncls:
+ 		ret = NET_RX_DROP;
+ 	}
+ 
+-out:
++unlock:
+ 	rcu_read_unlock();
++out:
++	tsk_restore_flags(current, pflags, PF_MEMALLOC);
+ 	return ret;
+ }
+ 
+diff -purN linux-2.6.21.1.old/net/core/skbuff.c linux-2.6.21.1.new/net/core/skbuff.c
+--- linux-2.6.21.1.old/net/core/skbuff.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/core/skbuff.c	2007-07-19 16:26:53.000000000 -0700
+@@ -141,28 +141,36 @@ EXPORT_SYMBOL(skb_truesize_bug);
+  *	%GFP_ATOMIC.
+  */
+ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
+-			    int fclone, int node)
++			    int flags, int node)
+ {
+ 	struct kmem_cache *cache;
+ 	struct skb_shared_info *shinfo;
+ 	struct sk_buff *skb;
+ 	u8 *data;
++	int emergency = 0;
+ 
+-	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
++	size = SKB_DATA_ALIGN(size);
++	cache = (flags & SKB_ALLOC_FCLONE)
++		? skbuff_fclone_cache : skbuff_head_cache;
++#ifdef CONFIG_NETVM
++	if (flags & SKB_ALLOC_RX)
++		gfp_mask |= __GFP_NOMEMALLOC|__GFP_NOWARN;
++#endif
+ 
++retry_alloc:
+ 	/* Get the HEAD */
+ 	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
+ 	if (!skb)
+-		goto out;
++		goto noskb;
+ 
+ 	/* Get the DATA. Size must match skb_add_mtu(). */
+-	size = SKB_DATA_ALIGN(size);
+ 	data = kmalloc_node_track_caller(size + sizeof(struct skb_shared_info),
+ 			gfp_mask, node);
+ 	if (!data)
+ 		goto nodata;
+ 
+ 	memset(skb, 0, offsetof(struct sk_buff, truesize));
++	skb->emergency = emergency;
+ 	skb->truesize = size + sizeof(struct sk_buff);
+ 	atomic_set(&skb->users, 1);
+ 	skb->head = data;
+@@ -179,7 +187,7 @@ struct sk_buff *__alloc_skb(unsigned int
+ 	shinfo->ip6_frag_id = 0;
+ 	shinfo->frag_list = NULL;
+ 
+-	if (fclone) {
++	if (flags & SKB_ALLOC_FCLONE) {
+ 		struct sk_buff *child = skb + 1;
+ 		atomic_t *fclone_ref = (atomic_t *) (child + 1);
+ 
+@@ -187,12 +195,31 @@ struct sk_buff *__alloc_skb(unsigned int
+ 		atomic_set(fclone_ref, 1);
+ 
+ 		child->fclone = SKB_FCLONE_UNAVAILABLE;
++		child->emergency = skb->emergency;
+ 	}
+ out:
+ 	return skb;
++
+ nodata:
+ 	kmem_cache_free(cache, skb);
+ 	skb = NULL;
++noskb:
++#ifdef CONFIG_NETVM
++	/* Attempt emergency allocation when RX skb. */
++	if (likely(!(flags & SKB_ALLOC_RX) || !sk_vmio_socks()))
++		goto out;
++
++	if (!emergency) {
++		if (rx_emergency_get(size)) {
++			gfp_mask &= ~(__GFP_NOMEMALLOC|__GFP_NOWARN);
++			gfp_mask |= __GFP_EMERGENCY;
++			emergency = 1;
++			goto retry_alloc;
++		}
++	} else
++		rx_emergency_put(size);
++#endif
++
+ 	goto out;
+ }
+ 
+@@ -215,7 +242,7 @@ struct sk_buff *__netdev_alloc_skb(struc
+ 	int node = dev->dev.parent ? dev_to_node(dev->dev.parent) : -1;
+ 	struct sk_buff *skb;
+ 
+-	skb = __alloc_skb(length + NET_SKB_PAD, gfp_mask, 0, node);
++ 	skb = __alloc_skb(length + NET_SKB_PAD, gfp_mask, SKB_ALLOC_RX, node);
+ 	if (likely(skb)) {
+ 		skb_reserve(skb, NET_SKB_PAD);
+ 		skb->dev = dev;
+@@ -223,6 +250,75 @@ struct sk_buff *__netdev_alloc_skb(struc
+ 	return skb;
+ }
+ 
++struct page *__netdev_alloc_page(struct net_device *dev, gfp_t gfp_mask)
++{
++	int node = dev->dev.parent ? dev_to_node(dev->dev.parent) : -1;
++	struct page *page;
++
++#ifdef CONFIG_NETVM
++	gfp_mask |= __GFP_NOMEMALLOC | __GFP_NOWARN;
++#endif
++
++	page = alloc_pages_node(node, gfp_mask, 0);
++
++#ifdef CONFIG_NETVM
++	if (!page && rx_emergency_get(PAGE_SIZE)) {
++		gfp_mask &= ~(__GFP_NOMEMALLOC | __GFP_NOWARN);
++		gfp_mask |= __GFP_EMERGENCY;
++		page = alloc_pages_node(node, gfp_mask, 0);
++		if (!page)
++			rx_emergency_put(PAGE_SIZE);
++	}
++#endif
++
++	return page;
++}
++
++void __netdev_free_page(struct net_device *dev, struct page *page)
++{
++#ifdef CONFIG_NETVM
++	if (unlikely(page->index == 0))
++		rx_emergency_put(PAGE_SIZE);
++#endif
++	__free_page(page);
++}
++
++void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page, int off,
++		int size)
++{
++	skb_fill_page_desc(skb, i, page, off, size);
++	skb->len += size;
++	skb->data_len += size;
++	skb->truesize += size;
++
++#ifdef CONFIG_NETVM
++	/*
++	 * Fix-up the emergency accounting; make sure all pages match
++	 * skb->emergency.
++	 *
++	 * This relies on the page rank (page->index) to be preserved between
++	 * the call to __netdev_alloc_page() and this call.
++	 */
++	if (skb_emergency(skb)) {
++		/*
++		 * If the page rank wasn't 0 (ALLOC_NO_WATERMARK) we can use
++		 * overcommit accounting, since we already have the memory.
++		 */
++		if (page->index != 0)
++			rx_emergency_get_overcommit(PAGE_SIZE);
++		atomic_set((atomic_t *)&page->index, 1);
++	} else if (unlikely(page->index == 0)) {
++		/*
++		 * Rare case; the skb wasn't allocated under pressure but
++		 * the page was. We need to return the page. This can offset
++		 * the accounting a little, but its a constant shift, it does
++		 * not accumulate.
++		 */
++		rx_emergency_put(PAGE_SIZE);
++	}
++#endif
++}
++
+ static void skb_drop_list(struct sk_buff **listp)
+ {
+ 	struct sk_buff *list = *listp;
+@@ -249,21 +345,40 @@ static void skb_clone_fraglist(struct sk
+ 		skb_get(list);
+ }
+ 
++static inline void skb_get_page(struct sk_buff *skb, struct page *page)
++{
++	get_page(page);
++	if (skb_emergency(skb))
++		atomic_inc((atomic_t *)&page->index);
++}
++
++static inline void skb_put_page(struct sk_buff *skb, struct page *page)
++{
++	if (skb_emergency(skb) &&
++			atomic_dec_and_test((atomic_t *)&page->index))
++		rx_emergency_put(PAGE_SIZE);
++	put_page(page);
++}
++
+ static void skb_release_data(struct sk_buff *skb)
+ {
+ 	if (!skb->cloned ||
+ 	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
+ 			       &skb_shinfo(skb)->dataref)) {
++		int size = skb->end - skb->head;
++
+ 		if (skb_shinfo(skb)->nr_frags) {
+ 			int i;
+ 			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+-				put_page(skb_shinfo(skb)->frags[i].page);
++				skb_put_page(skb, skb_shinfo(skb)->frags[i].page);
+ 		}
+ 
+ 		if (skb_shinfo(skb)->frag_list)
+ 			skb_drop_fraglist(skb);
+ 
+ 		kfree(skb->head);
++		if (skb_emergency(skb))
++			rx_emergency_put(size);
+ 	}
+ }
+ 
+@@ -384,6 +499,9 @@ struct sk_buff *skb_clone(struct sk_buff
+ 		n->fclone = SKB_FCLONE_CLONE;
+ 		atomic_inc(fclone_ref);
+ 	} else {
++		if (skb_emergency(skb))
++			gfp_mask |= __GFP_EMERGENCY;
++
+ 		n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
+ 		if (!n)
+ 			return NULL;
+@@ -419,6 +537,7 @@ struct sk_buff *skb_clone(struct sk_buff
+ #if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
+ 	C(ipvs_property);
+ #endif
++	C(emergency);
+ 	C(protocol);
+ 	n->destructor = NULL;
+ 	C(mark);
+@@ -512,6 +631,8 @@ static void copy_skb_header(struct sk_bu
+ 	skb_shinfo(new)->gso_type = skb_shinfo(old)->gso_type;
+ }
+ 
++#define skb_alloc_rx(skb) (skb_emergency(skb) ? SKB_ALLOC_RX : 0)
++
+ /**
+  *	skb_copy	-	create private copy of an sk_buff
+  *	@skb: buffer to copy
+@@ -535,8 +656,8 @@ struct sk_buff *skb_copy(const struct sk
+ 	/*
+ 	 *	Allocate the copy buffer
+ 	 */
+-	struct sk_buff *n = alloc_skb(skb->end - skb->head + skb->data_len,
+-				      gfp_mask);
++	struct sk_buff *n = __alloc_skb(skb->end - skb->head + skb->data_len,
++					gfp_mask, skb_alloc_rx(skb), -1);
+ 	if (!n)
+ 		return NULL;
+ 
+@@ -573,7 +694,8 @@ struct sk_buff *pskb_copy(struct sk_buff
+ 	/*
+ 	 *	Allocate the copy buffer
+ 	 */
+-	struct sk_buff *n = alloc_skb(skb->end - skb->head, gfp_mask);
++	struct sk_buff *n = __alloc_skb(skb->end - skb->head, gfp_mask,
++					skb_alloc_rx(skb), -1);
+ 
+ 	if (!n)
+ 		goto out;
+@@ -595,8 +717,9 @@ struct sk_buff *pskb_copy(struct sk_buff
+ 		int i;
+ 
+ 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+-			skb_shinfo(n)->frags[i] = skb_shinfo(skb)->frags[i];
+-			get_page(skb_shinfo(n)->frags[i].page);
++			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
++			skb_shinfo(n)->frags[i] = *frag;
++			skb_get_page(n, frag->page);
+ 		}
+ 		skb_shinfo(n)->nr_frags = i;
+ 	}
+@@ -640,6 +763,14 @@ int pskb_expand_head(struct sk_buff *skb
+ 
+ 	size = SKB_DATA_ALIGN(size);
+ 
++	if (skb_emergency(skb)) {
++		if (rx_emergency_get(size))
++			gfp_mask |= __GFP_EMERGENCY;
++		else
++			goto nodata;
++	} else
++		gfp_mask |= __GFP_NOMEMALLOC;
++
+ 	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+ 	if (!data)
+ 		goto nodata;
+@@ -650,7 +781,7 @@ int pskb_expand_head(struct sk_buff *skb
+ 	memcpy(data + size, skb->end, sizeof(struct skb_shared_info));
+ 
+ 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+-		get_page(skb_shinfo(skb)->frags[i].page);
++		skb_get_page(skb, skb_shinfo(skb)->frags[i].page);
+ 
+ 	if (skb_shinfo(skb)->frag_list)
+ 		skb_clone_fraglist(skb);
+@@ -724,8 +855,8 @@ struct sk_buff *skb_copy_expand(const st
+ 	/*
+ 	 *	Allocate the copy buffer
+ 	 */
+-	struct sk_buff *n = alloc_skb(newheadroom + skb->len + newtailroom,
+-				      gfp_mask);
++	struct sk_buff *n = __alloc_skb(newheadroom + skb->len + newtailroom,
++					gfp_mask, skb_alloc_rx(skb), -1);
+ 	int head_copy_len, head_copy_off;
+ 
+ 	if (!n)
+@@ -832,7 +963,7 @@ drop_pages:
+ 		skb_shinfo(skb)->nr_frags = i;
+ 
+ 		for (; i < nfrags; i++)
+-			put_page(skb_shinfo(skb)->frags[i].page);
++			skb_put_page(skb, skb_shinfo(skb)->frags[i].page);
+ 
+ 		if (skb_shinfo(skb)->frag_list)
+ 			skb_drop_fraglist(skb);
+@@ -1001,7 +1132,7 @@ pull_pages:
+ 	k = 0;
+ 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+ 		if (skb_shinfo(skb)->frags[i].size <= eat) {
+-			put_page(skb_shinfo(skb)->frags[i].page);
++			skb_put_page(skb, skb_shinfo(skb)->frags[i].page);
+ 			eat -= skb_shinfo(skb)->frags[i].size;
+ 		} else {
+ 			skb_shinfo(skb)->frags[k] = skb_shinfo(skb)->frags[i];
+@@ -1575,6 +1706,7 @@ static inline void skb_split_no_header(s
+ 			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
+ 
+ 			if (pos < len) {
++				struct page *page = skb_shinfo(skb)->frags[i].page;
+ 				/* Split frag.
+ 				 * We have two variants in this case:
+ 				 * 1. Move all the frag to the second
+@@ -1583,7 +1715,7 @@ static inline void skb_split_no_header(s
+ 				 *    where splitting is expensive.
+ 				 * 2. Split is accurately. We make this.
+ 				 */
+-				get_page(skb_shinfo(skb)->frags[i].page);
++				skb_get_page(skb1, page);
+ 				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
+ 				skb_shinfo(skb1)->frags[0].size -= len - pos;
+ 				skb_shinfo(skb)->frags[i].size	= len - pos;
+@@ -1909,7 +2041,8 @@ struct sk_buff *skb_segment(struct sk_bu
+ 		if (hsize > len || !sg)
+ 			hsize = len;
+ 
+-		nskb = alloc_skb(hsize + doffset + headroom, GFP_ATOMIC);
++		nskb = __alloc_skb(hsize + doffset + headroom, GFP_ATOMIC,
++				   skb_alloc_rx(skb), -1);
+ 		if (unlikely(!nskb))
+ 			goto err;
+ 
+@@ -1951,7 +2084,7 @@ struct sk_buff *skb_segment(struct sk_bu
+ 			BUG_ON(i >= nfrags);
+ 
+ 			*frag = skb_shinfo(skb)->frags[i];
+-			get_page(frag->page);
++			skb_get_page(nskb, frag->page);
+ 			size = frag->size;
+ 
+ 			if (pos < offset) {
+@@ -2011,6 +2144,9 @@ EXPORT_SYMBOL(kfree_skb);
+ EXPORT_SYMBOL(__pskb_pull_tail);
+ EXPORT_SYMBOL(__alloc_skb);
+ EXPORT_SYMBOL(__netdev_alloc_skb);
++EXPORT_SYMBOL(__netdev_alloc_page);
++EXPORT_SYMBOL(__netdev_free_page);
++EXPORT_SYMBOL(skb_add_rx_frag);
+ EXPORT_SYMBOL(pskb_copy);
+ EXPORT_SYMBOL(pskb_expand_head);
+ EXPORT_SYMBOL(skb_checksum);
+diff -purN linux-2.6.21.1.old/net/core/sock.c linux-2.6.21.1.new/net/core/sock.c
+--- linux-2.6.21.1.old/net/core/sock.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/core/sock.c	2007-07-19 16:26:53.000000000 -0700
+@@ -112,6 +112,7 @@
+ #include <linux/tcp.h>
+ #include <linux/init.h>
+ #include <linux/highmem.h>
++#include <linux/log2.h>
+ 
+ #include <asm/uaccess.h>
+ #include <asm/system.h>
+@@ -196,6 +197,158 @@ __u32 sysctl_rmem_default __read_mostly 
+ /* Maximal space eaten by iovec or ancilliary data plus some space */
+ int sysctl_optmem_max __read_mostly = sizeof(unsigned long)*(2*UIO_MAXIOV+512);
+ 
++static atomic_t rx_emergency_bytes;
++
++static int skb_reserve_bytes;
++static int aux_reserve_pages;
++
++static DEFINE_SPINLOCK(memalloc_lock);
++static int rx_net_reserve;
++atomic_t vmio_socks;
++EXPORT_SYMBOL_GPL(vmio_socks);
++
++/*
++ * is there room for another emergency packet?
++ * we account in power of two units to approx the slab allocator.
++ */
++static int __rx_emergency_get(int bytes, bool overcommit)
++{
++	int size = roundup_pow_of_two(bytes);
++	int nr = atomic_add_return(size, &rx_emergency_bytes);
++	int thresh = 2 * skb_reserve_bytes;
++	if (nr < thresh || overcommit)
++		return 1;
++
++	atomic_dec(&rx_emergency_bytes);
++	return 0;
++}
++
++int rx_emergency_get(int bytes)
++{
++	return __rx_emergency_get(bytes, false);
++}
++
++int rx_emergency_get_overcommit(int bytes)
++{
++	return __rx_emergency_get(bytes, true);
++}
++
++void rx_emergency_put(int bytes)
++{
++	int size = roundup_pow_of_two(bytes);
++	return atomic_sub(size, &rx_emergency_bytes);
++}
++
++/**
++ *	sk_adjust_memalloc - adjust the global memalloc reserve for critical RX
++ *	@socks: number of new %SOCK_VMIO sockets
++ *	@tx_resserve_pages: number of pages to (un)reserve for TX
++ *
++ *	This function adjusts the memalloc reserve based on system demand.
++ *	The RX reserve is a limit, and only added once, not for each socket.
++ *
++ *	NOTE:
++ *	   @tx_reserve_pages is an upper-bound of memory used for TX hence
++ *	   we need not account the pages like we do for RX pages.
++ */
++void sk_adjust_memalloc(int socks, int tx_reserve_pages)
++{
++	unsigned long flags;
++	int reserve = tx_reserve_pages;
++	int nr_socks;
++
++	spin_lock_irqsave(&memalloc_lock, flags);
++	nr_socks = atomic_add_return(socks, &vmio_socks);
++	BUG_ON(nr_socks < 0);
++
++	if (nr_socks) {
++		int skb_reserve_pages =
++			DIV_ROUND_UP(skb_reserve_bytes, PAGE_SIZE);
++		int rx_pages = 2 * skb_reserve_pages + aux_reserve_pages;
++		reserve += rx_pages - rx_net_reserve;
++		rx_net_reserve = rx_pages;
++	} else {
++		reserve -= rx_net_reserve;
++		rx_net_reserve = 0;
++	}
++
++	if (reserve)
++		adjust_memalloc_reserve(reserve);
++	spin_unlock_irqrestore(&memalloc_lock, flags);
++}
++EXPORT_SYMBOL_GPL(sk_adjust_memalloc);
++
++/*
++ * tiny helper functions to track the memory reserves
++ * needed because of modular ipv6
++ */
++void skb_reserve_memory(int bytes)
++{
++	skb_reserve_bytes += bytes;
++	sk_adjust_memalloc(0, 0);
++}
++EXPORT_SYMBOL_GPL(skb_reserve_memory);
++
++void aux_reserve_memory(int pages)
++{
++	aux_reserve_pages += pages;
++	sk_adjust_memalloc(0, 0);
++}
++EXPORT_SYMBOL_GPL(aux_reserve_memory);
++
++/**
++ *	sk_set_vmio - sets %SOCK_VMIO
++ *	@sk: socket to set it on
++ *
++ *	Set %SOCK_VMIO on a socket and increase the memalloc reserve
++ *	accordingly.
++ */
++int sk_set_vmio(struct sock *sk)
++{
++	int set = sock_flag(sk, SOCK_VMIO);
++#ifndef CONFIG_NETVM
++	BUG();
++#endif
++	if (!set) {
++		sk_adjust_memalloc(1, 0);
++		sock_set_flag(sk, SOCK_VMIO);
++		sk->sk_allocation |= __GFP_EMERGENCY;
++	}
++	return !set;
++}
++EXPORT_SYMBOL_GPL(sk_set_vmio);
++
++int sk_clear_vmio(struct sock *sk)
++{
++	int set = sock_flag(sk, SOCK_VMIO);
++	if (set) {
++		sk_adjust_memalloc(-1, 0);
++		sock_reset_flag(sk, SOCK_VMIO);
++		sk->sk_allocation &= ~__GFP_EMERGENCY;
++	}
++	return set;
++}
++EXPORT_SYMBOL_GPL(sk_clear_vmio);
++
++#ifdef CONFIG_NETVM
++int sk_backlog_rcv(struct sock *sk, struct sk_buff *skb)
++{
++	if (skb_emergency(skb)) {
++		int ret;
++		unsigned long pflags = current->flags;
++	       	/* these should have been dropped before queueing */
++		BUG_ON(!sk_has_vmio(sk));
++		current->flags |= PF_MEMALLOC;
++		ret = sk->sk_backlog_rcv(sk, skb);
++		tsk_restore_flags(current, pflags, PF_MEMALLOC);
++		return ret;
++	}
++
++	return sk->sk_backlog_rcv(sk, skb);
++}
++EXPORT_SYMBOL(sk_backlog_rcv);
++#endif
++
+ static int sock_set_timeout(long *timeo_p, char __user *optval, int optlen)
+ {
+ 	struct timeval tv;
+@@ -290,7 +443,7 @@ int sk_receive_skb(struct sock *sk, stru
+ 		 */
+ 		mutex_acquire(&sk->sk_lock.dep_map, 0, 1, _RET_IP_);
+ 
+-		rc = sk->sk_backlog_rcv(sk, skb);
++		rc = sk_backlog_rcv(sk, skb);
+ 
+ 		mutex_release(&sk->sk_lock.dep_map, 1, _RET_IP_);
+ 	} else
+@@ -868,6 +1021,7 @@ void sk_free(struct sock *sk)
+ 	struct sk_filter *filter;
+ 	struct module *owner = sk->sk_prot_creator->owner;
+ 
++	sk_clear_vmio(sk);
+ 	if (sk->sk_destruct)
+ 		sk->sk_destruct(sk);
+ 
+@@ -1244,7 +1398,7 @@ static void __release_sock(struct sock *
+ 			struct sk_buff *next = skb->next;
+ 
+ 			skb->next = NULL;
+-			sk->sk_backlog_rcv(sk, skb);
++			sk_backlog_rcv(sk, skb);
+ 
+ 			/*
+ 			 * We are in process context here with softirqs
+diff -purN linux-2.6.21.1.old/net/core/stream.c linux-2.6.21.1.new/net/core/stream.c
+--- linux-2.6.21.1.old/net/core/stream.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/core/stream.c	2007-07-19 16:26:53.000000000 -0700
+@@ -207,7 +207,7 @@ void __sk_stream_mem_reclaim(struct sock
+ 
+ EXPORT_SYMBOL(__sk_stream_mem_reclaim);
+ 
+-int sk_stream_mem_schedule(struct sock *sk, int size, int kind)
++int sk_stream_mem_schedule(struct sock *sk, struct sk_buff *skb, int size, int kind)
+ {
+ 	int amt = sk_stream_pages(size);
+ 
+@@ -224,7 +224,8 @@ int sk_stream_mem_schedule(struct sock *
+ 	/* Over hard limit. */
+ 	if (atomic_read(sk->sk_prot->memory_allocated) > sk->sk_prot->sysctl_mem[2]) {
+ 		sk->sk_prot->enter_memory_pressure();
+-		goto suppress_allocation;
++		if (!skb || (skb && !skb_emergency(skb)))
++			goto suppress_allocation;
+ 	}
+ 
+ 	/* Under pressure. */
+diff -purN linux-2.6.21.1.old/net/ipv4/ip_fragment.c linux-2.6.21.1.new/net/ipv4/ip_fragment.c
+--- linux-2.6.21.1.old/net/ipv4/ip_fragment.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/ip_fragment.c	2007-07-19 16:26:53.000000000 -0700
+@@ -743,6 +743,7 @@ void ipfrag_init(void)
+ 	ipfrag_secret_timer.function = ipfrag_secret_rebuild;
+ 	ipfrag_secret_timer.expires = jiffies + sysctl_ipfrag_secret_interval;
+ 	add_timer(&ipfrag_secret_timer);
++	skb_reserve_memory(sysctl_ipfrag_high_thresh);
+ }
+ 
+ EXPORT_SYMBOL(ip_defrag);
+diff -purN linux-2.6.21.1.old/net/ipv4/route.c linux-2.6.21.1.new/net/ipv4/route.c
+--- linux-2.6.21.1.old/net/ipv4/route.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/route.c	2007-07-19 16:26:54.000000000 -0700
+@@ -2884,6 +2884,21 @@ static int ipv4_sysctl_rtcache_flush_str
+ 	return 0;
+ }
+ 
++static int proc_dointvec_rt_size(ctl_table *table, int write, struct file *filp,
++		     void __user *buffer, size_t *lenp, loff_t *ppos)
++{
++	int ret;
++	int new_pages;
++	int old_pages = guess_kmem_cache_pages(ipv4_dst_ops.kmem_cachep,
++			*(int *)table->data);
++	ret = proc_dointvec(table,write,filp,buffer,lenp,ppos);
++	new_pages = guess_kmem_cache_pages(ipv4_dst_ops.kmem_cachep,
++			*(int *)table->data);
++	if (write && (new_pages - old_pages))
++		aux_reserve_memory(new_pages - old_pages);
++	return ret;
++}
++
+ ctl_table ipv4_route_table[] = {
+ 	{
+ 		.ctl_name 	= NET_IPV4_ROUTE_FLUSH,
+@@ -2926,7 +2941,7 @@ ctl_table ipv4_route_table[] = {
+ 		.data		= &ip_rt_max_size,
+ 		.maxlen		= sizeof(int),
+ 		.mode		= 0644,
+-		.proc_handler	= &proc_dointvec,
++		.proc_handler	= &proc_dointvec_rt_size,
+ 	},
+ 	{
+ 		/*  Deprecated. Use gc_min_interval_ms */
+@@ -3153,6 +3168,8 @@ int __init ip_rt_init(void)
+ 
+ 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
+ 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
++	aux_reserve_memory(guess_kmem_cache_pages(ipv4_dst_ops.kmem_cachep,
++				ip_rt_max_size));
+ 
+ 	devinet_init();
+ 	ip_fib_init();
+diff -purN linux-2.6.21.1.old/net/ipv4/sysctl_net_ipv4.c linux-2.6.21.1.new/net/ipv4/sysctl_net_ipv4.c
+--- linux-2.6.21.1.old/net/ipv4/sysctl_net_ipv4.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/sysctl_net_ipv4.c	2007-07-19 16:26:54.000000000 -0700
+@@ -18,6 +18,7 @@
+ #include <net/route.h>
+ #include <net/tcp.h>
+ #include <net/cipso_ipv4.h>
++#include <net/sock.h>
+ 
+ /* From af_inet.c */
+ extern int sysctl_ip_nonlocal_bind;
+@@ -186,6 +187,17 @@ static int strategy_allowed_congestion_c
+ 
+ }
+ 
++static int proc_dointvec_fragment(ctl_table *table, int write, struct file *filp,
++		     void __user *buffer, size_t *lenp, loff_t *ppos)
++{
++	int ret;
++	int old_thresh = *(int *)table->data;
++	ret = proc_dointvec(table,write,filp,buffer,lenp,ppos);
++	if (write)
++		skb_reserve_memory(*(int *)table->data - old_thresh);
++	return ret;
++}
++
+ ctl_table ipv4_table[] = {
+ 	{
+ 		.ctl_name	= NET_IPV4_TCP_TIMESTAMPS,
+@@ -291,7 +303,7 @@ ctl_table ipv4_table[] = {
+ 		.data		= &sysctl_ipfrag_high_thresh,
+ 		.maxlen		= sizeof(int),
+ 		.mode		= 0644,
+-		.proc_handler	= &proc_dointvec
++		.proc_handler	= &proc_dointvec_fragment
+ 	},
+ 	{
+ 		.ctl_name	= NET_IPV4_IPFRAG_LOW_THRESH,
+diff -purN linux-2.6.21.1.old/net/ipv4/tcp.c linux-2.6.21.1.new/net/ipv4/tcp.c
+--- linux-2.6.21.1.old/net/ipv4/tcp.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/tcp.c	2007-07-19 16:26:54.000000000 -0700
+@@ -1002,7 +1002,7 @@ static void tcp_prequeue_process(struct 
+ 	 * necessary */
+ 	local_bh_disable();
+ 	while ((skb = __skb_dequeue(&tp->ucopy.prequeue)) != NULL)
+-		sk->sk_backlog_rcv(sk, skb);
++		sk_backlog_rcv(sk, skb);
+ 	local_bh_enable();
+ 
+ 	/* Clear memory counter. */
+diff -purN linux-2.6.21.1.old/net/ipv4/tcp_output.c linux-2.6.21.1.new/net/ipv4/tcp_output.c
+--- linux-2.6.21.1.old/net/ipv4/tcp_output.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/tcp_output.c	2007-07-19 16:26:54.000000000 -0700
+@@ -2005,7 +2005,7 @@ void tcp_send_fin(struct sock *sk)
+ 	} else {
+ 		/* Socket is locked, keep trying until memory is available. */
+ 		for (;;) {
+-			skb = alloc_skb_fclone(MAX_TCP_HEADER, GFP_KERNEL);
++			skb = alloc_skb_fclone(MAX_TCP_HEADER, sk->sk_allocation);
+ 			if (skb)
+ 				break;
+ 			yield();
+@@ -2039,7 +2039,7 @@ void tcp_send_active_reset(struct sock *
+ 	struct sk_buff *skb;
+ 
+ 	/* NOTE: No TCP options attached and we never retransmit this. */
+-	skb = alloc_skb(MAX_TCP_HEADER, priority);
++	skb = alloc_skb(MAX_TCP_HEADER, sk_allocation(sk, priority));
+ 	if (!skb) {
+ 		NET_INC_STATS(LINUX_MIB_TCPABORTFAILED);
+ 		return;
+@@ -2112,7 +2112,8 @@ struct sk_buff * tcp_make_synack(struct 
+ 	__u8 *md5_hash_location;
+ #endif
+ 
+-	skb = sock_wmalloc(sk, MAX_TCP_HEADER + 15, 1, GFP_ATOMIC);
++	skb = sock_wmalloc(sk, MAX_TCP_HEADER + 15, 1,
++			sk_allocation(sk, GFP_ATOMIC));
+ 	if (skb == NULL)
+ 		return NULL;
+ 
+@@ -2370,7 +2371,7 @@ void tcp_send_ack(struct sock *sk)
+ 		 * tcp_transmit_skb() will set the ownership to this
+ 		 * sock.
+ 		 */
+-		buff = alloc_skb(MAX_TCP_HEADER, GFP_ATOMIC);
++		buff = alloc_skb(MAX_TCP_HEADER, sk_allocation(sk, GFP_ATOMIC));
+ 		if (buff == NULL) {
+ 			inet_csk_schedule_ack(sk);
+ 			inet_csk(sk)->icsk_ack.ato = TCP_ATO_MIN;
+@@ -2412,7 +2413,7 @@ static int tcp_xmit_probe_skb(struct soc
+ 	struct sk_buff *skb;
+ 
+ 	/* We don't queue it, tcp_transmit_skb() sets ownership. */
+-	skb = alloc_skb(MAX_TCP_HEADER, GFP_ATOMIC);
++	skb = alloc_skb(MAX_TCP_HEADER, sk_allocation(sk, GFP_ATOMIC));
+ 	if (skb == NULL)
+ 		return -1;
+ 
+diff -purN linux-2.6.21.1.old/net/ipv4/tcp_timer.c linux-2.6.21.1.new/net/ipv4/tcp_timer.c
+--- linux-2.6.21.1.old/net/ipv4/tcp_timer.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv4/tcp_timer.c	2007-07-19 16:26:54.000000000 -0700
+@@ -198,7 +198,7 @@ static void tcp_delack_timer(unsigned lo
+ 		NET_INC_STATS_BH(LINUX_MIB_TCPSCHEDULERFAILED);
+ 
+ 		while ((skb = __skb_dequeue(&tp->ucopy.prequeue)) != NULL)
+-			sk->sk_backlog_rcv(sk, skb);
++			sk_backlog_rcv(sk, skb);
+ 
+ 		tp->ucopy.memory = 0;
+ 	}
+diff -purN linux-2.6.21.1.old/net/ipv6/reassembly.c linux-2.6.21.1.new/net/ipv6/reassembly.c
+--- linux-2.6.21.1.old/net/ipv6/reassembly.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv6/reassembly.c	2007-07-19 16:26:54.000000000 -0700
+@@ -772,4 +772,5 @@ void __init ipv6_frag_init(void)
+ 	ip6_frag_secret_timer.function = ip6_frag_secret_rebuild;
+ 	ip6_frag_secret_timer.expires = jiffies + sysctl_ip6frag_secret_interval;
+ 	add_timer(&ip6_frag_secret_timer);
++	skb_reserve_memory(sysctl_ip6frag_high_thresh);
+ }
+diff -purN linux-2.6.21.1.old/net/ipv6/route.c linux-2.6.21.1.new/net/ipv6/route.c
+--- linux-2.6.21.1.old/net/ipv6/route.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv6/route.c	2007-07-19 16:26:54.000000000 -0700
+@@ -2391,6 +2391,21 @@ int ipv6_sysctl_rtcache_flush(ctl_table 
+ 		return -EINVAL;
+ }
+ 
++static int proc_dointvec_rt_size(ctl_table *table, int write, struct file *filp,
++		     void __user *buffer, size_t *lenp, loff_t *ppos)
++{
++	int ret;
++	int new_pages;
++	int old_pages = guess_kmem_cache_pages(ip6_dst_ops.kmem_cachep,
++			*(int *)table->data);
++	ret = proc_dointvec(table,write,filp,buffer,lenp,ppos);
++	new_pages = guess_kmem_cache_pages(ip6_dst_ops.kmem_cachep,
++			*(int *)table->data);
++	if (write && (new_pages - old_pages))
++		aux_reserve_memory(new_pages - old_pages);
++	return ret;
++}
++
+ ctl_table ipv6_route_table[] = {
+ 	{
+ 		.ctl_name	=	NET_IPV6_ROUTE_FLUSH,
+@@ -2414,7 +2429,7 @@ ctl_table ipv6_route_table[] = {
+ 		.data		=	&ip6_rt_max_size,
+ 		.maxlen		=	sizeof(int),
+ 		.mode		=	0644,
+-		.proc_handler	=	&proc_dointvec,
++         	.proc_handler	=	&proc_dointvec_rt_size,
+ 	},
+ 	{
+ 		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL,
+@@ -2499,6 +2514,8 @@ void __init ip6_route_init(void)
+ 
+ 	proc_net_fops_create("rt6_stats", S_IRUGO, &rt6_stats_seq_fops);
+ #endif
++	aux_reserve_memory(guess_kmem_cache_pages(ip6_dst_ops.kmem_cachep,
++				ip6_rt_max_size));
+ #ifdef CONFIG_XFRM
+ 	xfrm6_init();
+ #endif
+diff -purN linux-2.6.21.1.old/net/ipv6/sysctl_net_ipv6.c linux-2.6.21.1.new/net/ipv6/sysctl_net_ipv6.c
+--- linux-2.6.21.1.old/net/ipv6/sysctl_net_ipv6.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv6/sysctl_net_ipv6.c	2007-07-19 16:26:54.000000000 -0700
+@@ -15,6 +15,17 @@
+ 
+ #ifdef CONFIG_SYSCTL
+ 
++static int proc_dointvec_fragment(ctl_table *table, int write, struct file *filp,
++		     void __user *buffer, size_t *lenp, loff_t *ppos)
++{
++	int ret;
++	int old_thresh = *(int *)table->data;
++	ret = proc_dointvec(table,write,filp,buffer,lenp,ppos);
++	if (write)
++		skb_reserve_memory(*(int *)table->data - old_thresh);
++	return ret;
++}
++
+ static ctl_table ipv6_table[] = {
+ 	{
+ 		.ctl_name	= NET_IPV6_ROUTE,
+@@ -44,7 +55,7 @@ static ctl_table ipv6_table[] = {
+ 		.data		= &sysctl_ip6frag_high_thresh,
+ 		.maxlen		= sizeof(int),
+ 		.mode		= 0644,
+-		.proc_handler	= &proc_dointvec
++		.proc_handler	= &proc_dointvec_fragment
+ 	},
+ 	{
+ 		.ctl_name	= NET_IPV6_IP6FRAG_LOW_THRESH,
+diff -purN linux-2.6.21.1.old/net/ipv6/tcp_ipv6.c linux-2.6.21.1.new/net/ipv6/tcp_ipv6.c
+--- linux-2.6.21.1.old/net/ipv6/tcp_ipv6.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/ipv6/tcp_ipv6.c	2007-07-19 16:26:54.000000000 -0700
+@@ -579,7 +579,8 @@ static int tcp_v6_md5_do_add(struct sock
+ 	} else {
+ 		/* reallocate new list if current one is full. */
+ 		if (!tp->md5sig_info) {
+-			tp->md5sig_info = kzalloc(sizeof(*tp->md5sig_info), GFP_ATOMIC);
++			tp->md5sig_info = kzalloc(sizeof(*tp->md5sig_info),
++					sk_allocation(sk, GFP_ATOMIC));
+ 			if (!tp->md5sig_info) {
+ 				kfree(newkey);
+ 				return -ENOMEM;
+@@ -588,7 +589,8 @@ static int tcp_v6_md5_do_add(struct sock
+ 		tcp_alloc_md5sig_pool();
+ 		if (tp->md5sig_info->alloced6 == tp->md5sig_info->entries6) {
+ 			keys = kmalloc((sizeof (tp->md5sig_info->keys6[0]) *
+-				       (tp->md5sig_info->entries6 + 1)), GFP_ATOMIC);
++				       (tp->md5sig_info->entries6 + 1)),
++				       sk_allocation(sk, GFP_ATOMIC));
+ 
+ 			if (!keys) {
+ 				tcp_free_md5sig_pool();
+@@ -713,7 +715,7 @@ static int tcp_v6_parse_md5_keys (struct
+ 		struct tcp_sock *tp = tcp_sk(sk);
+ 		struct tcp_md5sig_info *p;
+ 
+-		p = kzalloc(sizeof(struct tcp_md5sig_info), GFP_KERNEL);
++		p = kzalloc(sizeof(struct tcp_md5sig_info), sk->allocation);
+ 		if (!p)
+ 			return -ENOMEM;
+ 
+@@ -1007,7 +1009,7 @@ static void tcp_v6_send_reset(struct soc
+ 	 */
+ 
+ 	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + tot_len,
+-			 GFP_ATOMIC);
++			 sk_allocation(sk, GFP_ATOMIC));
+ 	if (buff == NULL)
+ 		return;
+ 
+@@ -1088,10 +1090,12 @@ static void tcp_v6_send_ack(struct tcp_t
+ 	struct tcp_md5sig_key *key;
+ 	struct tcp_md5sig_key tw_key;
+ #endif
++	gfp_t gfp_mask = GFP_ATOMIC;
+ 
+ #ifdef CONFIG_TCP_MD5SIG
+ 	if (!tw && skb->sk) {
+ 		key = tcp_v6_md5_do_lookup(skb->sk, &skb->nh.ipv6h->daddr);
++		gfp_mask = sk_allocation(skb->sk, gfp_mask);
+ 	} else if (tw && tw->tw_md5_keylen) {
+ 		tw_key.key = tw->tw_md5_key;
+ 		tw_key.keylen = tw->tw_md5_keylen;
+@@ -1109,7 +1113,7 @@ static void tcp_v6_send_ack(struct tcp_t
+ #endif
+ 
+ 	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + tot_len,
+-			 GFP_ATOMIC);
++			 gfp_mask);
+ 	if (buff == NULL)
+ 		return;
+ 
+diff -purN linux-2.6.21.1.old/net/Kconfig linux-2.6.21.1.new/net/Kconfig
+--- linux-2.6.21.1.old/net/Kconfig	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/Kconfig	2007-07-19 16:26:53.000000000 -0700
+@@ -227,6 +227,9 @@ config WIRELESS_EXT
+ config FIB_RULES
+ 	bool
+ 
++config NETVM
++	def_bool n
++
+ endif   # if NET
+ endmenu # Networking
+ 
+diff -purN linux-2.6.21.1.old/net/netfilter/core.c linux-2.6.21.1.new/net/netfilter/core.c
+--- linux-2.6.21.1.old/net/netfilter/core.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/net/netfilter/core.c	2007-07-19 16:26:55.000000000 -0700
+@@ -184,9 +184,12 @@ next_hook:
+ 		ret = 1;
+ 		goto unlock;
+ 	} else if (verdict == NF_DROP) {
++drop:
+ 		kfree_skb(*pskb);
+ 		ret = -EPERM;
+ 	} else if ((verdict & NF_VERDICT_MASK)  == NF_QUEUE) {
++		if (skb_emergency(*pskb))
++			goto drop;
+ 		NFDEBUG("nf_hook: Verdict = QUEUE.\n");
+ 		if (!nf_queue(*pskb, elem, pf, hook, indev, outdev, okfn,
+ 			      verdict >> NF_VERDICT_BITS))
+diff -purN linux-2.6.21.1.old/security/selinux/avc.c linux-2.6.21.1.new/security/selinux/avc.c
+--- linux-2.6.21.1.old/security/selinux/avc.c	2007-07-19 16:19:06.000000000 -0700
++++ linux-2.6.21.1.new/security/selinux/avc.c	2007-07-19 16:26:56.000000000 -0700
+@@ -332,7 +332,7 @@ static struct avc_node *avc_alloc_node(v
+ {
+ 	struct avc_node *node;
+ 
+-	node = kmem_cache_zalloc(avc_node_cachep, GFP_ATOMIC);
++	node = kmem_cache_zalloc(avc_node_cachep, GFP_ATOMIC|__GFP_NOMEMALLOC);
+ 	if (!node)
+ 		goto out;
+ 

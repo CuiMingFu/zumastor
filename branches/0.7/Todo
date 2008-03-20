@@ -1,0 +1,3 @@
+Open issues for release 0.5:
+  * replication checksum error when volume size is not a multiple or chunk size
+  * add more items here...

@@ -1,0 +1,116 @@
+///////////////////
+This document is written in asciidoc format.
+To convert it to HTML (or pdf, or...), install asciidoc-8.2.5 as follows:
+
+ wget http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz
+ tar -xzvf asciidoc-8.2.5.tar.gz
+ cd asciidoc-8.2.5
+ perl -p -i -e 's,BINDIR=/usr/local/bin,BINDIR=/usr/local/asciidoc/bin,;s,MANDIR=/usr/local/man,MANDIR=/usr/local/asciidoc/man,' install.sh
+ sudo mkdir -p /usr/local/asciidoc/bin
+ sudo sh install.sh 
+
+Then use the command
+ /usr/local/asciidoc/bin/asciidoc -a toc -a numbered zumastor-howto.txt 
+to convert this document to HTML.
+///////////////////
+
+Kerberos NFS and Zumastor
+=========================
+
+This is a quick guide to configuring and installing Kerberos with Zumastor
+on a Debian or Ubuntu system.
+
+Setting up Kerberos NFS with Zumastor
+-------------------------------------
+
+1. Configure Kerberos.  (See the instructions below.)
+Skip this step if you already have Kerberos configured and working.
+
+2. Add NFS client and server principals to Kerberos as follows
+(where the client hostname is 'client.domain' and the server hostname is
+'server.domain'):
++
+--------------------------------------
+# kadmin
+kadmin: addprinc -randkey nfs/client.domain
+kadmin: ktadd -e des-cbc-crc:normal -k /tmp/client-keytab nfs/client.domain
+kadmin: addprinc -randkey nfs/server.domain
+kadmin: ktadd -e des-cbc-crc:normal -k /tmp/server-keytab nfs/server.domain
+kadmin: quit
+--------------------------------------
+
+3. On the client system copy `/tmp/client-keytab` to `/etc/krb5.keytab`.
+On the server copy `/tmp/server-keytab` to `/etc/krb5.keytab`.
+
+4. Add the following lines to the `/etc/exports` file (where, again,
+'testvol' is the Zumastor volume to be exported):
++
+--------------------------------------
+/var/run/zumastor/mount/testvol gss/krb5(rw,fsid=0,insecure,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/mount/testvol *(ro,insecure,nohide,no_subtree_check,crossmnt)
+--------------------------------------
+
+5. Add ``NEED_SVCGSSD=yes'' to the `/etc/default/nfs-kernel-server` script on
+the server and restart NFS:
++
+--------------------------------------
+/etc/init.d/nfs-kernel-server restart
+--------------------------------------
+
+6. Verify that `rpc.svcgssd`, `portmap` and `rpc.mountd` are running on the NFS
+server and `rpc.gssd` is running on the NFS client.  Now you may mount the
+Kerberos-protected NFS file system on the client:
++
+--------------------------------------
+mount -tnfs -o "sec=krb5" server.domain:/var/run/zumastor/mount/testvol /home
+--------------------------------------
+
+Installing and Configuring Kerberos
+-----------------------------------
+
+1. Install the Kerberos packages (`krb5-admin-server` and `krb5-kdc`):
++
+--------------------------------------
+# apt-get install krb5-admin-server krb5-kdc
+--------------------------------------
+
+2. Add the following lines to `/etc/krb5.conf`:
++
+--------------------------------------
+[libdefaults]
+default_realm = TEST.DEBIAN.ORG
+forwardable = true
+[domain_realm]
+[realms]
+TEST.DEBIAN.ORG = {
+admin_server = kdc.debian.org
+kdc = kdc.debian.org
+}
+--------------------------------------
+
+3. Create the Kerberos realm:
++
+--------------------------------------
+# kdb5_util create -s -r TEST.DEBIAN.ORG
+--------------------------------------
+
+4. Create an ACL file for kdc:
++
+--------------------------------------
+# echo "*/admin *" > /etc/krb5kdc/kadm5.acl
+--------------------------------------
+
+5. Start kdc and kadmind:
++
+--------------------------------------
+/usr/sbin/krb5kdc
+/usr/sbin/kadmind
+--------------------------------------
+
+6. Create an initial principal using `kadmin.local`:
++
+--------------------------------------
+# kadmin.local
+kadmin.local: addprinc root/admin@TEST.DEBIAN.ORG
+kadmin.local: quit
+--------------------------------------
