@@ -1,7 +1,6 @@
-index 66746dd..622ce63 100644
---- a/drivers/md/dm.c
-+++ b/drivers/md/dm.c
-@@ -873,6 +873,17 @@ static int dm_any_congested(void *congested_data, int bdi_bits)
+--- 2.6.24.3.base/drivers/md/dm.c	2008-03-19 23:48:32.000000000 -0700
++++ 2.6.24.3/drivers/md/dm.c	2008-03-20 00:49:48.000000000 -0700
+@@ -889,6 +889,17 @@ static int dm_any_congested(void *conges
  	return r;
  }
  
@@ -19,10 +18,9 @@ index 66746dd..622ce63 100644
  /*-----------------------------------------------------------------
   * An IDR is used to keep track of allocated minor numbers.
   *---------------------------------------------------------------*/
-index 069adae..57bff38 100644
---- a/include/linux/device-mapper.h
-+++ b/include/linux/device-mapper.h
-@@ -233,6 +233,7 @@ int dm_copy_name_and_uuid(struct mapped_device *md, char *name, char *uuid);
+--- 2.6.24.3.base/include/linux/device-mapper.h	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/include/linux/device-mapper.h	2008-03-20 00:49:48.000000000 -0700
+@@ -196,6 +196,7 @@ int dm_copy_name_and_uuid(struct mapped_
  struct gendisk *dm_disk(struct mapped_device *md);
  int dm_suspended(struct mapped_device *md);
  int dm_noflush_suspending(struct dm_target *ti);
