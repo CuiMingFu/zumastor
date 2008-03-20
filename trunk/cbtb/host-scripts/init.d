@@ -27,6 +27,12 @@ sleep 10
 ./continuous-install.sh >>continuous-install.log 2>&1 </dev/null &
 sleep 10
 ./continuous-test.sh >>continuous-test.log 2>&1 </dev/null &
+cd ../0.7
+LOCKFILE=/var/run/zbuild/build.lock ./continuous-build.sh >>continuous-build.log 2>&1 </dev/null &
+sleep 10
+./continuous-install.sh >>continuous-install.log 2>&1 </dev/null &
+sleep 10
+./continuous-test.sh >>continuous-test.log 2>&1 </dev/null &
 jobs
 EOF
 
