@@ -48,8 +48,7 @@ cp $autopatch debian/binary-custom.d/zumastor/patchset/00${patchnum}-AUTOdm.patc
 rm -rf $mkpatchdir
 rm $autopatch
 
-touch debian/binary-custom.d/zumastor/rules
-touch debian/binary-custom.d/zumastor/vars
+echo "# Placeholder" > debian/binary-custom.d/zumastor/rules
 
 DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
 dpkg-buildpackage -rfakeroot -S
