@@ -81,6 +81,28 @@ This part of the idea is also listed <a href="http://techbase.kde.org/index.php?
 (And it should be listed on Gnome's too, probably.)
 </ul>
 
+<h2>Bring up clustered mode (NFS on ocfs2 on ddraid)</h2>
+aka <a href="http://code.google.com/p/zumastor/issues/detail?id=90">issue 90</a>.
+<p>
+Language: C<br>
+Skills required: Linux kernel coding, sysadmin skills<br>
+Difficulty: 2 Months?
+<p>
+We have a clustered mode waiting to go 
+(see the Cluster RAID, Cluster Snapshots, Cluster Block Device documents at 
+http://zumastor.org/), but it hasn't
+gotten any attention because we've been working
+on getting the single-node configuration solid.
+Ripe for a student to swoop in, update it to work with recent kernel, 
+make sure it place nice with ocfs2 and nfs, and benchmark it.
+This is an opportunity to design and code, but it does involve
+a lot of real world testing.
+<p>
+Our clustered mode is implemented in ddraid.c, which is an
+alternative to <a href="http://dbrd.org">dbrd</a>.
+The best filesystem to use on top of it is probably 
+<a href="http://oss.oracle.com/projects/ocfs2/">OCFS2</a>.
+
 <hr>
 <center>&copy; 2008 Google</center>
 </body>
