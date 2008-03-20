@@ -52,5 +52,5 @@ touch debian/binary-custom.d/zumastor/rules
 touch debian/binary-custom.d/zumastor/vars
 
 DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
-dpkg-buildpackage -rfakeroot
+dpkg-buildpackage -rfakeroot -S
 echo "Results in $WORKDIR"
