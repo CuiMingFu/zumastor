@@ -1,8 +1,6 @@
-diff --git a/block/ll_rw_blk.c b/block/ll_rw_blk.c
-index 30b62ce..62e01c1 100644
---- a/block/ll_rw_blk.c
-+++ b/block/ll_rw_blk.c
-@@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
+--- 2.6.24.3.base/block/ll_rw_blk.c	2008-03-19 23:48:28.000000000 -0700
++++ 2.6.24.3/block/ll_rw_blk.c	2008-03-20 00:19:42.000000000 -0700
+@@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct b
   */
  static inline void __generic_make_request(struct bio *bio)
  {
@@ -14,7 +12,7 @@ index 30b62ce..62e01c1 100644
  	dev_t old_dev;
  	int err = -EIO;
  
-@@ -3221,6 +3221,13 @@ static inline void __generic_make_request(struct bio *bio)
+@@ -3221,6 +3221,13 @@ static inline void __generic_make_reques
  	if (bio_check_eod(bio, nr_sectors))
  		goto end_io;
  
@@ -28,7 +26,7 @@ index 30b62ce..62e01c1 100644
  	/*
  	 * Resolve the mapping until finished. (drivers are
  	 * still free to implement/resolve their own stacking
-@@ -3231,10 +3238,9 @@ static inline void __generic_make_request(struct bio *bio)
+@@ -3231,10 +3238,9 @@ static inline void __generic_make_reques
  	 */
  	old_sector = -1;
  	old_dev = 0;
@@ -53,11 +51,9 @@ index 30b62ce..62e01c1 100644
  }
  
  /*
-diff --git a/drivers/md/dm.c b/drivers/md/dm.c
-index 66746dd..28a42f6 100644
---- a/drivers/md/dm.c
-+++ b/drivers/md/dm.c
-@@ -793,6 +793,11 @@ static int __split_bio(struct mapped_device *md, struct bio *bio)
+--- 2.6.24.3.base/drivers/md/dm.c	2008-03-19 23:48:32.000000000 -0700
++++ 2.6.24.3/drivers/md/dm.c	2008-03-20 00:19:42.000000000 -0700
+@@ -809,6 +809,11 @@ static int __split_bio(struct mapped_dev
   * CRUD END
   *---------------------------------------------------------------*/
  
@@ -69,7 +65,7 @@ index 66746dd..28a42f6 100644
  /*
   * The request function that just remaps the bio built up by
   * dm_merge_bvec.
-@@ -951,6 +956,7 @@ out:
+@@ -967,6 +972,7 @@ out:
  
  static struct block_device_operations dm_blk_dops;
  
@@ -77,7 +73,7 @@ index 66746dd..28a42f6 100644
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -993,6 +999,11 @@ static struct mapped_device *alloc_dev(int minor)
+@@ -1009,6 +1015,11 @@ static struct mapped_device *alloc_dev(i
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
@@ -89,7 +85,7 @@ index 66746dd..28a42f6 100644
  	md->queue->backing_dev_info.congested_fn = dm_any_congested;
  	md->queue->backing_dev_info.congested_data = md;
  	blk_queue_make_request(md->queue, dm_request);
-@@ -1555,6 +1566,7 @@ int dm_suspended(struct mapped_device *md)
+@@ -1571,6 +1582,7 @@ int dm_suspended(struct mapped_device *m
  {
  	return test_bit(DMF_SUSPENDED, &md->flags);
  }
@@ -97,14 +93,12 @@ index 66746dd..28a42f6 100644
  
  int dm_noflush_suspending(struct dm_target *ti)
  {
-diff --git a/fs/bio.c b/fs/bio.c
-index acaf663..26dba1a 100644
---- a/fs/bio.c
-+++ b/fs/bio.c
-@@ -1028,6 +1028,13 @@ void bio_endio(struct bio *bio, int error)
+--- 2.6.24.3.base/fs/bio.c	2008-03-19 23:48:32.000000000 -0700
++++ 2.6.24.3/fs/bio.c	2008-03-20 00:19:42.000000000 -0700
+@@ -1009,6 +1009,13 @@ void bio_endio(struct bio *bio, int erro
  
- 	if (bio_get_endio(bio))
- 		(bio_get_endio(bio))(bio, error);
+ 	if (bio->bi_end_io)
+ 		bio->bi_end_io(bio, error);
 +
 +	if (!bio->bi_size) {
 +		struct request_queue *q = bio->bi_queue;
@@ -115,22 +109,18 @@ index acaf663..26dba1a 100644
  }
  
  void bio_pair_release(struct bio_pair *bp)
-diff --git a/include/linux/bio.h b/include/linux/bio.h
-index 2bede12..42d9d09 100644
---- a/include/linux/bio.h
-+++ b/include/linux/bio.h
-@@ -116,6 +116,7 @@ struct bio {
- 	bio_end_io_t		*bi_endio;
+--- 2.6.24.3.base/include/linux/bio.h	2008-03-19 23:48:32.000000000 -0700
++++ 2.6.24.3/include/linux/bio.h	2008-03-20 00:19:43.000000000 -0700
+@@ -111,6 +111,7 @@ struct bio {
+ 	bio_end_io_t		*bi_end_io;
  	atomic_t		bi_cnt;		/* pin count */
  
 +	struct request_queue	*bi_queue;	/* for throttling */
  	void			*bi_private;
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
-diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
-index d18ee67..045a560 100644
---- a/include/linux/blkdev.h
-+++ b/include/linux/blkdev.h
+--- 2.6.24.3.base/include/linux/blkdev.h	2008-02-25 16:20:20.000000000 -0800
++++ 2.6.24.3/include/linux/blkdev.h	2008-03-20 00:19:43.000000000 -0700
 @@ -384,6 +384,10 @@ struct request_queue
  	struct work_struct	unplug_work;
  
@@ -142,4 +132,3 @@ index d18ee67..045a560 100644
  
  	/*
  	 * The queue owner gets to use this for whatever they like.
-diff --git a/include/linux/device-mapper.h b/include/linux/device-mapper.h
