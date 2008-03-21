@@ -56,6 +56,8 @@ rm $autopatch
 
 echo "# Placeholder" > debian/binary-custom.d/zumastor/rules
 
+cp -r debian/abi/2.6.24-12.21 debian/abi/2.6.24-12.22
+
 DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
 dpkg-buildpackage -rfakeroot -S
 echo "Results in $WORKDIR"
