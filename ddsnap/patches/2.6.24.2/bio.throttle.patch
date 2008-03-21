@@ -1,6 +1,8 @@
---- 2.6.24.3.base/block/ll_rw_blk.c	2008-03-19 23:48:28.000000000 -0700
-+++ 2.6.24.3/block/ll_rw_blk.c	2008-03-20 00:19:42.000000000 -0700
-@@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct b
+diff --git a/block/ll_rw_blk.c b/block/ll_rw_blk.c
+index 8b91994..b2b7e42 100644
+--- a/block/ll_rw_blk.c
++++ b/block/ll_rw_blk.c
+@@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
   */
  static inline void __generic_make_request(struct bio *bio)
  {
@@ -12,7 +14,7 @@
  	dev_t old_dev;
  	int err = -EIO;
  
-@@ -3221,6 +3221,13 @@ static inline void __generic_make_reques
+@@ -3221,6 +3221,13 @@ static inline void __generic_make_request(struct bio *bio)
  	if (bio_check_eod(bio, nr_sectors))
  		goto end_io;
  
@@ -26,7 +28,7 @@
  	/*
  	 * Resolve the mapping until finished. (drivers are
  	 * still free to implement/resolve their own stacking
-@@ -3231,10 +3238,9 @@ static inline void __generic_make_reques
+@@ -3231,10 +3238,9 @@ static inline void __generic_make_request(struct bio *bio)
  	 */
  	old_sector = -1;
  	old_dev = 0;
@@ -51,9 +53,11 @@
  }
  
  /*
---- 2.6.24.3.base/drivers/md/dm.c	2008-03-19 23:48:32.000000000 -0700
-+++ 2.6.24.3/drivers/md/dm.c	2008-03-20 00:19:42.000000000 -0700
-@@ -809,6 +809,11 @@ static int __split_bio(struct mapped_dev
+diff --git a/drivers/md/dm.c b/drivers/md/dm.c
+index 88c0fd6..45dc7b0 100644
+--- a/drivers/md/dm.c
++++ b/drivers/md/dm.c
+@@ -809,6 +809,11 @@ static int __split_bio(struct mapped_device *md, struct bio *bio)
   * CRUD END
   *---------------------------------------------------------------*/
  
@@ -73,7 +77,7 @@
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -1009,6 +1015,11 @@ static struct mapped_device *alloc_dev(i
+@@ -1009,6 +1015,11 @@ static struct mapped_device *alloc_dev(int minor)
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
@@ -85,7 +89,7 @@
  	md->queue->backing_dev_info.congested_fn = dm_any_congested;
  	md->queue->backing_dev_info.congested_data = md;
  	blk_queue_make_request(md->queue, dm_request);
-@@ -1571,6 +1582,7 @@ int dm_suspended(struct mapped_device *m
+@@ -1571,6 +1582,7 @@ int dm_suspended(struct mapped_device *md)
  {
  	return test_bit(DMF_SUSPENDED, &md->flags);
  }
@@ -93,24 +97,28 @@
  
  int dm_noflush_suspending(struct dm_target *ti)
  {
---- 2.6.24.3.base/fs/bio.c	2008-03-19 23:48:32.000000000 -0700
-+++ 2.6.24.3/fs/bio.c	2008-03-20 00:19:42.000000000 -0700
-@@ -1009,6 +1009,13 @@ void bio_endio(struct bio *bio, int erro
+diff --git a/fs/bio.c b/fs/bio.c
+index d59ddbf..fc2a7fe 100644
+--- a/fs/bio.c
++++ b/fs/bio.c
+@@ -1009,6 +1009,13 @@ void bio_endio(struct bio *bio, int error)
  
  	if (bio->bi_end_io)
  		bio->bi_end_io(bio, error);
 +
-+	if (!bio->bi_size) {
++	if (!bio->bi_size && bio->bi_queue) {
 +		struct request_queue *q = bio->bi_queue;
 +		atomic_add(bio->bi_max_vecs, &q->available);
-+		bio->bi_queue = NULL; /* just in case */
++		bio->bi_queue = NULL; /* 0xdeadbeef? */
 +		wake_up(&q->throttle_wait);
 +	}
  }
  
  void bio_pair_release(struct bio_pair *bp)
---- 2.6.24.3.base/include/linux/bio.h	2008-03-19 23:48:32.000000000 -0700
-+++ 2.6.24.3/include/linux/bio.h	2008-03-20 00:19:43.000000000 -0700
+diff --git a/include/linux/bio.h b/include/linux/bio.h
+index 4da4413..638563f 100644
+--- a/include/linux/bio.h
++++ b/include/linux/bio.h
 @@ -111,6 +111,7 @@ struct bio {
  	bio_end_io_t		*bi_end_io;
  	atomic_t		bi_cnt;		/* pin count */
@@ -119,8 +127,10 @@
  	void			*bi_private;
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
---- 2.6.24.3.base/include/linux/blkdev.h	2008-02-25 16:20:20.000000000 -0800
-+++ 2.6.24.3/include/linux/blkdev.h	2008-03-20 00:19:43.000000000 -0700
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index d18ee67..045a560 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
 @@ -384,6 +384,10 @@ struct request_queue
  	struct work_struct	unplug_work;
  
