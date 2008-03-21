@@ -4,7 +4,9 @@
 VERSION="2.6.24-12.22"
 ZUMAREVISION=`svn info ../../ | grep ^Revision:  | cut -d\  -f2`
 PKGVERSION="$VERSION~zumappa$ZUMAREVISION"
-MIRROR="http://mirrors.kernel.org/ubuntu"
+MIRROR="http://archive.ubuntu.com/ubuntu"
+DISTRIBUTION="hardy"
+CHANGELOG="Upstream Package with Zumastor.org r$ZUMAREVISION patches"
 
 WORKDIR=`mktemp -d`
 
@@ -26,19 +28,20 @@ do
 done
 mkdir debian/binary-custom.d/zumastor debian/binary-custom.d/zumastor/patchset
 
-cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.i386
-echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.i386
+VERSIONSIG="CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\""
 
-cp $CWD/../config/2.6.24.2-i386-full debian/binary-custom.d/zumastor/config.lpia
-echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.lpia
-
-cp $CWD/../config/2.6.24.2-amd64-full debian/binary-custom.d/zumastor/config.amd64
-echo "CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\"" >> debian/binary-custom.d/zumastor/config.amd64
+for arch in i386 amd64 lpia
+do
+  cp $CWD/../config/2.6.24.2-${arch}-full \
+     debian/binary-custom.d/zumastor/config.${arch}
+  echo $VERSIONSIG >> debian/binary-custom.d/zumastor/config.${arch}
+done
 
 patchnum=0
 for patch in $CWD/../../ddsnap/patches/2.6.24.2/*
 do
-  cp $patch debian/binary-custom.d/zumastor/patchset/00${patchnum}-`basename $patch`
+  cp $patch \
+     debian/binary-custom.d/zumastor/patchset/00${patchnum}-`basename $patch`
   patchnum=$((${patchnum} + 1))
 done
 
@@ -50,7 +53,8 @@ cp $CWD/../../ddsnap/kernel/dm-ddsnap.* $mkpatchdir/kernel-zumastor/drivers/md
 cd $mkpatchdir
 diff -ruNp kernel-orig kernel-zumastor > $autopatch
 cd $WORKDIR/linux-2.6.24
-cp $autopatch debian/binary-custom.d/zumastor/patchset/00${patchnum}-AUTOdm.patch
+cp $autopatch \
+   debian/binary-custom.d/zumastor/patchset/00${patchnum}-AUTOdm.patch
 rm -rf $mkpatchdir
 rm $autopatch
 
@@ -58,6 +62,12 @@ echo "# Placeholder" > debian/binary-custom.d/zumastor/rules
 
 cp -r debian/abi/2.6.24-12.21 debian/abi/2.6.24-12.22
 
-DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION -b
+## What follows is a horrible hack. Until dch lets you force a distribution
+## it does not know about, these will unfortunately remain.
+DEBEMAIL="Zumastor Builder <zuambuild@gmail.com>" dch -v $PKGVERSION \
+         -D warty-proposed -b $CHANGELOG
+sed -i -e "s/warty-proposed/$DISTRIBUTION/" debian/changelog
+## End Ugly Hack
+
 dpkg-buildpackage -rfakeroot -S
 echo "Results in $WORKDIR"
