@@ -8,35 +8,12 @@
 
 case "$1" in
     start)
-        rm -f /var/lib/misc/dnsmasq.leases /var/lib/misc/dnsmasq.leases.new
-
+        rm -f /var/lib/misc/dnsmasq.leases /var/lib/misc/dnsmasq.leases.new \
+           /var/lib/misc/tunbr.leases /var/lib/misc/tunbr.leases.new
         mkdir /var/run/zbuild
         chown zbuild:zbuild /var/run/zbuild
-        su - zbuild <<EOF
-set -x
-rm -f zumastor/lock 0.6/zumastor/lock
-LOCKFILE=/var/run/zbuild/build.lock ./continuous-build.sh >>continuous-build.log 2>&1 </dev/null &
-sleep 10
-./continuous-install.sh >>continuous-install.log 2>&1 </dev/null &
-sleep 10
-./continuous-test.sh >>continuous-test.log 2>&1 </dev/null &
-sleep 10
-cd 0.6
-LOCKFILE=/var/run/zbuild/build.lock ./continuous-build.sh >>continuous-build.log 2>&1 </dev/null &
-sleep 10
-./continuous-install.sh >>continuous-install.log 2>&1 </dev/null &
-sleep 10
-./continuous-test.sh >>continuous-test.log 2>&1 </dev/null &
-cd ../0.7
-LOCKFILE=/var/run/zbuild/build.lock ./continuous-build.sh >>continuous-build.log 2>&1 </dev/null &
-sleep 10
-./continuous-install.sh >>continuous-install.log 2>&1 </dev/null &
-sleep 10
-./continuous-test.sh >>continuous-test.log 2>&1 </dev/null &
-jobs
-EOF
-
-        jobs
+        cd ~zbuild
+        su - zbuild /home/zbuild/zbuild.start
         ;;
 
     stop)
