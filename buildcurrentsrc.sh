@@ -33,7 +33,7 @@ SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
-DIST="gutsy"
+DIST="hardy"
 
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
