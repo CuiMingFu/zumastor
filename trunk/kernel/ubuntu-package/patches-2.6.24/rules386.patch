@@ -1,0 +1,9 @@
+--- /var/tmp/zumastor-kernel-build/linux-2.6.24/debian/rules.d/i386.mk	2008-03-17 14:11:09.000000000 -0700
++++ /var/tmp/build/new-pkg/linux-2.6.24/debian/rules.d/i386.mk	2008-03-16 19:14:32.000000000 -0700
+@@ -22,5 +22,5 @@
+ #
+ ifeq ($(is_ppa_build),)
+ #custom_flavours	= xen rt
+-custom_flavours	= rt xen
++custom_flavours	= rt xen zumastor
+ endif
