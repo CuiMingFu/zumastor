@@ -4,7 +4,7 @@
 VERSION="2.6.24-12.22"
 ZUMAREVISION=`svn info ../../ | grep ^Revision:  | cut -d\  -f2`
 PKGVERSION="$VERSION~zumappa$ZUMAREVISION"
-MIRROR="http://archive.ubuntu.com/ubuntu"
+MIRROR="http://mirrors.kernel.org/ubuntu"
 DISTRIBUTION="hardy"
 CHANGELOG="Upstream Package with Zumastor.org r$ZUMAREVISION patches"
 
@@ -28,13 +28,12 @@ do
 done
 mkdir debian/binary-custom.d/zumastor debian/binary-custom.d/zumastor/patchset
 
-VERSIONSIG="CONFIG_VERSION_SIGNATURE=\"Ubuntu 2.6.24-4.6-zumastor\""
 
 for arch in i386 amd64 lpia
 do
-  cp $CWD/../config/2.6.24.2-${arch}-full \
-     debian/binary-custom.d/zumastor/config.${arch}
-  echo $VERSIONSIG >> debian/binary-custom.d/zumastor/config.${arch}
+  cat debian/config/${arch}/config debian/config/${arch}/config.generic \
+   >> debian/binary-custom.d/zumastor/config.${arch}
+  echo "CONFIG_DM_DDSNAP=m" >> debian/binary-custom.d/zumastor/config.${arch}
 done
 
 patchnum=0
