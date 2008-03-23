@@ -155,7 +155,15 @@ class KernelBuilder:
     current_abi_list = os.listdir(abidir)
     current_abi_list.sort()
     old_abi = current_abi_list[0]
-    self._quietRun('cp -r %s/%s %s/%s' % (abidir, old_abi, abidir, self._version()))
+    self._quietRun('cp -r %s/%s %s/%s' %
+                   (abidir, old_abi, abidir, self._version()))
+
+  def _addFlavorCustomConfigOpts(self, name, arch, optslist):
+    flavordir = ('%s/%s/debian/binary-custom.d/%s' %
+                 (self._buildDirectory(), self._sourceDir(), name))
+    configfile = '%s/config.%s' % (flavordir, arch)
+    for opt in optslist:
+      self._quietRun('echo "%s" >> %s' % (opt, configfile))
 
   def _addFlavor(self, name, archlist=None, basekernelconfig='generic'):
     logging.info('Adding kernel flavor')
@@ -174,6 +182,7 @@ class KernelBuilder:
                 {'base':self._buildDirectory(),
                  'source':self._sourceDir(), 'bflav':basekernelconfig,
                  'arch':arch, 'flavdir':flavordir})
+      self._addFlavorCustomConfigOpts(name, arch, ['CONFIG_DM_DDSNAP=m'])
     self._addFlavorToBuild(name, archlist)
     self._addFlavorRules(name)
     self._addFlavorVars(name)
@@ -194,12 +203,12 @@ class KernelBuilder:
     self._addFlavor('zumastor')
     self._abiFixup()
     self._updateChangeLog('Zumastor Builder <zuambuild@gmail.com>',
-                          '%s~1' % (self._version()),
+                          '%s~zumappa1' % (self._version()),
                           'Upstream Package with Zumastor.org patches')
 
 if __name__ == '__main__':
   hardy_2624 = KernelBuilder('pool/main/l/linux/linux_2.6.24-12.22.dsc',
-                             'hardya')
+                             'hardy')
   hardy_2624.main()
   
   gutsy_2622 = KernelBuilder('pool/main/l/linux-source-2.6.22/linux-source-2.6.22_2.6.22-14.52.dsc', 'gutsy')
