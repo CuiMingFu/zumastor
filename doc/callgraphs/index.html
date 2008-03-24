@@ -6,8 +6,11 @@
 <h2>How to produce pretty call graphs for Zumastor.</h2>
 <p>(Or, for that matter, for any other set of C sources.)</p>
 <p>
-First, obtain and install the "cflow" program (note: not GNU cflow, the older
-one).  Given all the source files, cflow will produce a complete flow graph
+First, obtain and install the "cflow" program, available
+<a href="http://aur.archlinux.org/packages/cflow/cflow.tar.gz">here</a>,
+among other places (note: <em>not</em> GNU cflow, which produces different
+output and has no "cflow2dot" utility).  Given all
+the source files, cflow will produce a complete flow graph
 in its own format, which is not very useful.  Fortunately, we can convert that
 format to one that's more useful.  With cflow comes "cflow2dot" which converts
 the cflow output to "dot" format, suitable for input to the "dot" program of
@@ -17,15 +20,17 @@ programs, notably "inkscape."</p>
 <p>So the sequence of commands to generate an editable flowgraph of, say,
 ddsnapd, is (assuming we're already in the ddsnap source directory):
 <ul>
-<li>cflow *.[ch] >flowmap.cfl</li>
-<li>cflow2dot <flowmap.cfl >flowmap.dot</li>
-<li>dot -Tsvg flowmap.dot >flowmap.svg</li>
+<li>cflow *.[ch] &gt;flowmap.cfl</li>
+<li>cflow2dot &lt;flowmap.cfl &gt;flowmap.dot</li>
+<li>dot -Tsvg flowmap.dot &gt;flowmap.svg</li>
 </ul>
 Now you have a .svg file suitable for editing with inkscape.  Which you will
-want to do because at this point the flowgraph is <em>ugly</em>:</p>
-<img src="inkscape-screenshot.jpg" />
+want to do because at this point the flowgraph is <em>ugly</em>, not to mention
+hard to read:</p>
+<a href="ugly.jpg"><img src="ugly-thumb.jpg" /></a>
 <p>You can touch it up, remove redundant nodes, add color, rearrange nodes
-and generally make it better and more useful.  That's how I made the flowgraphs
+and generally spend hours and hours making it better, prettier and more useful.
+That's how I made the flowgraphs
 below.  One hint:  For color coding, I chose a node that very obviously
 belonged to the subsystem in which I was interested, colored it in the color
 I had chosen, then colored all the edges linking it to other nodes the same
