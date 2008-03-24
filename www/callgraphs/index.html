@@ -1,0 +1,73 @@
+<html>
+<head>
+<title>Zumastor call graphs</title>
+</head>
+<body>
+<h2>How to produce pretty call graphs for Zumastor.</h2>
+<p>(Or, for that matter, for any other set of C sources.)</p>
+<p>
+First, obtain and install the "cflow" program, available
+<a href="http://aur.archlinux.org/packages/cflow/cflow.tar.gz">here</a>,
+among other places (note: <em>not</em> GNU cflow, which produces different
+output and has no "cflow2dot" utility).  Given all
+the source files, cflow will produce a complete flow graph
+in its own format, which is not very useful.  Fortunately, we can convert that
+format to one that's more useful.  With cflow comes "cflow2dot" which converts
+the cflow output to "dot" format, suitable for input to the "dot" program of
+the "graphviz" package.  Get that package and install it.  Use dot to convert
+the "dot"-formatted flowgraph to svg format, which is editable by a number of
+programs, notably "inkscape."</p>
+<p>So the sequence of commands to generate an editable flowgraph of, say,
+ddsnapd, is (assuming we're already in the ddsnap source directory):
+<ul>
+<li>cflow *.[ch] &gt;flowmap.cfl</li>
+<li>cflow2dot &lt;flowmap.cfl &gt;flowmap.dot</li>
+<li>dot -Tsvg flowmap.dot &gt;flowmap.svg</li>
+</ul>
+Now you have a .svg file suitable for editing with inkscape.  Which you will
+want to do because at this point the flowgraph is <em>ugly</em>, not to mention
+hard to read:</p>
+<a href="ugly.jpg"><img src="ugly-thumb.jpg" /></a>
+<p>You can touch it up, remove redundant nodes, add color, rearrange nodes
+and generally spend hours and hours making it better, prettier and more useful.
+That's how I made the flowgraphs
+below.  One hint:  For color coding, I chose a node that very obviously
+belonged to the subsystem in which I was interested, colored it in the color
+I had chosen, then colored all the edges linking it to other nodes the same
+color (unless they already had a color from an earlier cycle of this operation).
+That pointed me at other nodes that might or might not have been part of the
+subsystem, at which point I would repeat the process.  When I had all subsystems
+colored properly, I could then go through and isolate individual subsystems
+as in the "flowmap-xxx" files below.</p>
+<p>Note that it's also possible, with the proper plugin, to import .svg files
+into Openoffice, but I don't recommend it.</p>
+<table>
+<tr>
+<td>
+<a href="flowmap.svg">flowmap.svg</a>
+</td>
+<td>Flowmap of all of ddsnap.</td>
+</tr>
+<tr>
+<td>
+<a href="flowmap-allocate.svg">flowmap-allocate.svg</a></td>
+<td>Just the allocation subsystem.</td>
+</tr>
+<tr>
+<td>
+<a href="flowmap-btree.svg">flowmap-btree.svg</a></td>
+<td>Just the BTree subsystem.</td>
+</tr>
+<tr>
+<td>
+<a href="flowmap-extonly.svg">flowmap-extonly.svg</a></td>
+<td>Nodes having links connecting outside the subsystem they're a part of.</td>
+</tr>
+<tr>
+<td>
+<a href="flowmap-journal.svg">flowmap-journal.svg</a></td>
+<td>Just the journaling subsystem.</td>
+</tr>
+</table>
+</body>
+</html>
