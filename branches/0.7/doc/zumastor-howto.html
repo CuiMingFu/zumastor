@@ -382,8 +382,8 @@ function generateToc(toclevels) {
 <h1>Zumastor HOWTO</h1>
 <span id="author">Dan Kegel</span><br />
 <span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
-<span id="revision">version 0.6,</span>
-Feb 2008
+<span id="revision">version 0.7,</span>
+Mar 2008
 <div id="toc">
   <div id="toctitle">Table of Contents</div>
   <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
@@ -446,15 +446,20 @@ but <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">his patch</a>
 </div>
 <h2 id="_release_history">5. Release History</h2>
 <div class="sectionbody">
+<div class="para"><p>Version 0.7, released on 27 Mar 2008, adds experimental
+"revert to snapshot" and "multilayer replication" features,
+lets downstream replicas retain snapshots on their own schedule,
+and fixes several bugs.  See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease7%20status%3AFixed">our issue tracker for the full list of fixed issues</a>.</p></div>
 <div class="para"><p>Version 0.6, released on 4 Feb 2008, added support for offline resizing,
 and fixed a bug that could cause data loss.  (For developers, it also
 added a way to run our autobuilder tests before committing changes.)
 See
-<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed">our issue tracker for the full list of fixed issues</a>.</p></div>
 <div class="para"><p>Version 0.5, released on 10 Jan 1008,
 added support for volumes larger than 2TB
 and for exporting snapshots via NFS and CIFS.  See
-<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed">our issue tracker for the full list of fixed issues</a>.</p></div>
 <div class="para"><p>Version 0.4, released on 1 Dec 2007, was the first public release.</p></div>
 <div class="para"><p>We have a number of kernel patches, and will push them upstream as
 soon as possible.  See <a href="http://zumastor.org">http://zumastor.org</a> for a list.</p></div>
@@ -574,7 +579,7 @@ If you need more native Ubuntu packages, see the next section.</p></div>
 <div class="para"><p>Stable releases are at <a href="http://zumastor.org/downloads/releases">http://zumastor.org/downloads/releases</a>,
 and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">http://zumastor.org/downloads/snapshots</a>.
 Directories are named by branch and svn revision.
-e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
+e.g. 0.7-r1491 is the 0.7 branch as of svn revision 1491.
 Once you've picked a version, download and install its four .deb
 packages.  (Install dmsetup first.)</p></div>
 <div class="para"><p>Installing in Feisty or later requires some work to avoid
@@ -586,12 +591,12 @@ to have an absolute path for update-grub.</p></div>
 <div class="para"><p>For instance:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>$ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
-$ mv zumastor.org/downloads/releases/0.6-r1318 .
-$ rm -rf zumastor.org
-$ sudo dpkg -i 0.6-r1318/*.deb
-$ sudo update-grub</tt></pre>
+<pre><tt> sudo apt-get install dmsetup
+ wget -m -np zumastor.org/downloads/releases/0.7-r1491/
+ mv zumastor.org/downloads/releases/0.7-r1491 .
+ rm -rf zumastor.org
+ sudo dpkg -i 0.7-r1491/*.deb
+ sudo update-grub</tt></pre>
 </div></div>
 <div class="para"><p>Don't forget the trailing slash on wget, else it will download
 all directories, not just the one you want!</p></div>
@@ -639,8 +644,7 @@ make sure the system comes up ok.</p></div>
 <div class="olist"><ol>
 <li>
 <p>
-Install VMWare Player
-VMWare offers their player for free download at <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
+Install the free VMWare Player from <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
 </p>
 <div class="ilist"><ul>
 <li>
@@ -651,9 +655,22 @@ If you're on Feisty, it's easier, just do <tt>apt-get install vmware-player</tt>
 <li>
 <p>
 For all other versions of Ubuntu, you have to use the vendor's
-install script. There's a nice tutorial for the timid at
+install script.  You may need to do <tt>sudo apt-get install build-essential</tt> first.
+There's a nice tutorial for the timid at
 <a href="http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710">smokinglinux.com</a>.
 Take the easy way out and choose all defaults when installing.
+</p>
+</li>
+<li>
+<p>
+If you're running a very new kernel, you may get
+compile errors when installing vmware player.
+See <a href="https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391">https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391</a>
+I was able to work around this by using the "any-any" script,
+first described at <a href="http://communities.vmware.com/thread/26693">http://communities.vmware.com/thread/26693</a>, and
+downloadable by clicking on
+<a href="http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz">http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz</a>
+in a browser (no wget).
 </p>
 </li>
 </ul></div>
@@ -718,21 +735,21 @@ as described above.
 <div class="para"><p>If you want to test replication virtually, you'll need to create at
 least one more virtual machine.   The only trick here is getting
 the network addressing straight.  Here's what to do (assuming you're
-using the gutsy jeos image from the previous example):</p></div>
+using the gutsy jeos image from the previous example).</p></div>
+<div class="para"><p>Set up one virtual machine first as follows:</p></div>
 <div class="olist"><ol>
 <li>
 <p>
-For each virtual machine, create a new directory (say, vm1, vm2, etc.),
-and unzip ubuntu-7.10-jeos-vmware.7z into each new directory.
+Create a new directory vm1 and unzip ubuntu-7.10-jeos-vmware.7z into it, e.g.
+ $ mkdir vm1
+ $ cd vm1
+ $ 7zr e ../ubuntu-7.10-jeos-vmware.7z
 </p>
 </li>
 <li>
 <p>
-Set up different uuids and ethernet addresses for each virtual machine
-by editing that machine's copy of gutsy.vmx.
-When creating my 1st, 2nd, 3rd, &#8230; nth etc. virtual machine,
-I like to change the last byte of the uuid and ethernet address to n.
-For instance, when I create my 2nd virtual machine, I change the original
+Set up the uuid and ethernet address in gutsy.vmx to end in 01 (since this is the first vm),
+i.e. change the lines
 </p>
 <div class="literalblock">
 <div class="content">
@@ -743,20 +760,20 @@ uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"</tt></pre>
 <div class="para"><p>to</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
-uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
-uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
 </div></div>
 </li>
 <li>
 <p>
-Boot each new virtual machine.
+Boot the virtual machine by running <tt>vmplayer gutsy.vmx</tt>.
 Networking won't work yet because the system is only
 set up to use the first ethernet device, and the new ethernet
 address is assigned to the second ethernet device.
-Inside the new virtual machine, fix the ethernet
+Once logged in to the new virtual machine, fix the ethernet
 address of eth0 and remove any extra ethernet devices by editing
-`/etc/udev/rules.d/70-persistent-net.rules'.
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt>.
 Then restart each new virtual machine's network by running
 </p>
 <div class="literalblock">
@@ -767,15 +784,14 @@ Then restart each new virtual machine's network by running
 </li>
 <li>
 <p>
-Configure the hostname to be <em>vm1</em>, <em>vm2</em>, etc. by editing <tt>/etc/hostname</tt>.
+Configure the hostname to be <tt>vm1</tt> by editing <tt>/etc/hostname</tt>.
 </p>
 </li>
 <li>
 <p>
-Edit /etc/hosts to use the real hostname rather than <em>ubuntu</em>,
-and add a line for the virtual machine's IP address, with its real hostname.
-Also do this on the other virtual machine so they all know each others' hostname
-and IP address.
+Edit /etc/hosts to use <tt>vm1</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
 </p>
 </li>
 <li>
@@ -790,10 +806,115 @@ Install an ssh server, e.g.
 <li>
 <p>
 Set up ssh authorization as described in the section
-"Try Remote Replication" below.
+<a href="#_try_remote_replication">Try Remote Replication</a> below.
+Add both your own public key from your real workstation,
+as well as the public key of the vm's root account, to
+the virtual machine's root account's authorized_keys file.
+e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>(copy ~/.ssh/id_rsa.pub onto the vm using scp, call it mykey)
+sudo cat mykey /root/.ssh/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Download and install dmsetup and the Zumastor packages as described above.
+</p>
+</li>
+<li>
+<p>
+Shut down the virtual machine with <tt>halt</tt>.
 </p>
 </li>
 </ol></div>
+<div class="para"><p>Cloning the virtual machines is slightly easier than setting them up from scratch:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+For each desired new virtual machine, copy the vm1 directory, e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>cp -a vm1 vm2
+cd vm2</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+As above, edit the new machine's gutsy.vmx file to use
+different uuid and ethernet addresses.  e.g. change
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Boot the new machine, log in to it as root, and edit
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt> as above to use the new address for eth0,
+and remove eth1.  Then restart the network by running
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo /etc/init.d/udev restart</tt></pre>
+</div></div>
+<div class="para"><p>and verify that networking works.</p></div>
+</li>
+<li>
+<p>
+Configure the hostname to be <tt>vm2</tt>, by editing <tt>/etc/hostname</tt>.
+</p>
+</li>
+<li>
+<p>
+Edit /etc/hosts to use <tt>vm2</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
+</p>
+</li>
+<li>
+<p>
+Reboot the virtual machine so the hostname change takes effect.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Then merge the /etc/hosts entries for all virtual machines
+together, and add them to both your host's /etc/hosts file
+and the /etc/hosts files on all the virtual machines.</p></div>
+<div class="para"><p>Finally, from your real host machine, make sure you can do</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ssh root@vm1
+ssh root@vm2
+...</tt></pre>
+</div></div>
+<div class="para"><p>to make sure you can log in to each vm as root without being prompted for a password.</p></div>
+<div class="para"><p>Tip: create a script to start up all your virtual machines, e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>for vm in vm1 vm2 vm3
+do
+   cd $vm
+   vmplayer gutsy.vmx &amp;
+   sleep 2
+   cd ..
+done</tt></pre>
+</div></div>
+<div class="para"><p>Tip: after starting virtual machines, just minimize them,
+and log in via ssh.  That way you won't have to jump through hoops to
+switch windows, and copy-and-paste will work as expected.</p></div>
 <h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.6. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
@@ -1329,7 +1450,6 @@ it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
 <h3 id="_try_remote_replication">10.10. Try Remote Replication</h3><div style="clear:left"></div>
 <div class="para"><p>In this section, we will be working with two machines, <em>original</em>
 (the main machine) and <em>replica</em> (where data is replicated to).</p></div>
-<div class="para"><p>Note: in Zumastor 0.6, replication will fail if you are using Bash 3.2.x. This was fixed in <a href="http://code.google.com/p/zumastor/source/diff?old=1320&amp;r=1337&amp;format=unidiff&amp;path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor">svn revision 1337</a>.</p></div>
 <div class="para"><p>Note: zumastor requires you to refer to each machine
 by the string returned by <tt>uname -n</tt>.  You can't use numerical
 IP addresses!  This is <a href="http://code.google.com/p/zumastor/issues/detail?id=54">bug 54</a>.</p></div>
@@ -1342,7 +1462,7 @@ TLD, you might run into some issues with mDNS. See
 <a href="http://avahi.org/wiki/AvahiAndUnicastDotLocal">Avahi and Unicast Domains .local</a>
 for more information.</p></div>
 <h4 id="_enable_root_login">10.10.1. Enable root login</h4>
-<div class="para"><p>As of Zumastor 0.6, remote replication requires that both
+<div class="para"><p>As of Zumastor 0.7, remote replication still requires that both
 the original and replica machines trust each other, and
 allow root to remotely log in to each other.  This is
 <a href="http://code.google.com/p/zumastor/issues/detail?id=40">bug 40 in the zumastor issue tracker</a>.
@@ -1560,8 +1680,6 @@ zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initializ
 zumastor define source zumatest vm1:11235 --period 5;
 zumastor start source zumatest"</tt></pre>
 </div></div>
-<div class="para"><p>Release 0.6 doesn't support saving old snapshots downstream;
-this is <a href="http://code.google.com/p/zumastor/issues/detail?id=26">bug 26</a>.</p></div>
 <h3 id="_multilayer_replication">10.11. Multilayer replication</h3><div style="clear:left"></div>
 <div class="para"><p>This section illustrates how to set up chained replication on multiple machines, e.g.,
 <em>original</em> replicates to <em>replica1</em> that replicates to <em>replica2</em>.</p></div>
@@ -1842,7 +1960,6 @@ Select a snapshot. Then you can view, copy, or restore any file from that snapsh
 Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system
 running on top of it.</p></div>
 <h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.16.1. Enlarge the origin device of a Zumastor volume</h4>
-<div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1892,9 +2009,9 @@ all the existing snapshots is unchanged.</p></div>
 </li>
 </ol></div>
 <h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.16.2. Shrink the origin device of a Zumastor volume</h4>
-<div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
-<div class="para"><p>The steps to shrink the origin device of a Zumastor volume is similar to those for
-enlarging the origin device, but need to be ran in different orders.</p></div>
+<div class="para"><p>The steps to shrink the origin device of a Zumastor volume are
+similar to those for enlarging the origin device, but need to be
+ran in a different order.</p></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -1945,8 +2062,7 @@ Now it is safe to shrink the origin LVM device.
 </li>
 </ol></div>
 <h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.16.3. Enlarge the snapshot store of a Zumastor volume</h4>
-<div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
-<div class="para"><p>Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
+<div class="para"><p>To enlarge the snapshot store of a Zumastor volume,
 run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the snapshot lvm device.</p></div>
 <div class="literalblock">
 <div class="content">
@@ -1955,15 +2071,14 @@ run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the sna
 </div></div>
 <div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
 <h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.16.4. Shrink the snapshot store of a Zumastor volume</h4>
-<div class="para"><p>Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.</p></div>
-<div class="para"><p>The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
-to be run carefully. First, run the <tt>zumastor resize &#8212;snapshot</tt> command to shrink
-the Zumastor snapshot store. The command may fail if the existing snapshot store does
-not have enough continuous free space. In this case, try a larger value.
-If the  <tt>zumastor resize &#8212;snapshot</tt> command succeeds, you can run the <tt>lvresize</tt>
-command to shrink the snapshot lvm device.
-Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
-may damage the whole Zumastor volume.</p></div>
+<div class="para"><p>Shrinking the snapshot store of a Zumastor volume is not difficult,
+but must be done with care.
+First, run the <tt>zumastor resize &#8212;snapshot</tt> command to shrink
+the Zumastor snapshot store.
+(The command may fail if the existing snapshot store does
+not have enough continuous free space. In this case, try a larger value.)
+If the  <tt>zumastor resize &#8212;snapshot</tt> command succeeds,
+you can then run the <tt>lvresize</tt> command to shrink the snapshot lvm device.</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt># zumastor resize zumatest --snapshot newsize
@@ -1975,8 +2090,9 @@ may damage the whole Zumastor volume.</p></div>
 <td class="icon">
 <div class="title">Note</div>
 </td>
-<td class="content">You can follow the similar procedures when resizing a Zumastor volume with a different file
-system running on top of it. For example, you can replace the
+<td class="content">You can follow the similar procedures when resizing a Zumastor volume
+with a different file system running on top of it. For example, you can
+replace the
 <tt>e2fsck/resize2fs</tt> commands with <tt>resize_reiserfs -f /dev/mapper/zumatest</tt> to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize those partitions.</td>
@@ -1986,9 +2102,10 @@ lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize t
 <div class="olist"><ol>
 <li>
 <p>
-Take a look at <tt>/var/run/zumastor/snapshot/zumatest/</tt> and decide the snapshot you want to revert to.
-Suppose you want to revert to a snapshot that is created two days ago. You can find out its corresponding snapshot
-number as follows:
+Take a look at <tt>/var/run/zumastor/snapshot/zumatest/</tt> and decide
+which snapshot you want to revert to.  Suppose you want to revert to a
+snapshot that is created two days ago. You can find out its corresponding
+snapshot number as follows:
 </p>
 <div class="literalblock">
 <div class="content">
@@ -2089,8 +2206,8 @@ time optimizing Zumastor's write performance.)</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 0.6<br />
-Last updated 2008-03-17 14:15:19 PDT
+Version 0.7<br />
+Last updated 2008-03-27 16:51:27 PDT
 </div>
 </div>
 </body>
