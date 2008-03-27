@@ -87,16 +87,22 @@ but http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz[his patch] has not yet 
 
 Release History
 ---------------
+Version 0.7, released on 27 Mar 2008, adds experimental 
+"revert to snapshot" and "multilayer replication" features,
+lets downstream replicas retain snapshots on their own schedule,
+and fixes several bugs.  See
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease7%20status%3AFixed[our issue tracker for the full list of fixed issues].  
+
 Version 0.6, released on 4 Feb 2008, added support for offline resizing,
 and fixed a bug that could cause data loss.  (For developers, it also 
 added a way to run our autobuilder tests before committing changes.)
 See
-http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed[our issue tracker for the full list of fixed issues].  
 
 Version 0.5, released on 10 Jan 1008,
 added support for volumes larger than 2TB
 and for exporting snapshots via NFS and CIFS.  See 
-http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed[our issue tracker for the full list of fixed issues].  
 
 Version 0.4, released on 1 Dec 2007, was the first public release.
 
@@ -225,7 +231,7 @@ If you need more native Ubuntu packages, see the next section.
 Stable releases are at http://zumastor.org/downloads/releases[],
 and trunk snapshots are at http://zumastor.org/downloads/snapshots[].
 Directories are named by branch and svn revision.
-e.g. 0.6-r1318 is the 0.6 branch as of svn revision 1318.
+e.g. 0.7-r1491 is the 0.7 branch as of svn revision 1491.
 Once you've picked a version, download and install its four .deb
 packages.  (Install dmsetup first.)  
 
@@ -240,10 +246,10 @@ For instance:
 
 ....................
  sudo apt-get install dmsetup
- wget -m -np zumastor.org/downloads/releases/0.6-r1318/
- mv zumastor.org/downloads/releases/0.6-r1318 .
+ wget -m -np zumastor.org/downloads/releases/0.7-r1491/
+ mv zumastor.org/downloads/releases/0.7-r1491 .
  rm -rf zumastor.org
- sudo dpkg -i 0.6-r1318/*.deb
+ sudo dpkg -i 0.7-r1491/*.deb
  sudo update-grub
 ....................
 
@@ -1052,8 +1058,6 @@ Try Remote Replication
 In this section, we will be working with two machines, 'original'
 (the main machine) and 'replica' (where data is replicated to).
 
-Note: in Zumastor 0.6, replication will fail if you are using Bash 3.2.x. This was fixed in http://code.google.com/p/zumastor/source/diff?old=1320&r=1337&format=unidiff&path=%2Ftrunk%2Fzumastor%2Fbin%2Fzumastor[svn revision 1337].
-
 Note: zumastor requires you to refer to each machine 
 by the string returned by `uname -n`.  You can't use numerical
 IP addresses!  This is http://code.google.com/p/zumastor/issues/detail?id=54[bug 54].
@@ -1071,7 +1075,7 @@ for more information.
 Enable root login
 ^^^^^^^^^^^^^^^^^
 
-As of Zumastor 0.6, remote replication requires that both
+As of Zumastor 0.7, remote replication still requires that both
 the original and replica machines trust each other, and
 allow root to remotely log in to each other.  This is
 http://code.google.com/p/zumastor/issues/detail?id=40[bug 40 in the zumastor issue tracker].
@@ -1289,9 +1293,6 @@ replication, but seems to replicate quickly after that.
  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
  zumastor define source zumatest vm1:11235 --period 5;
  zumastor start source zumatest"
-
-Release 0.6 doesn't support saving old snapshots downstream;
-this is http://code.google.com/p/zumastor/issues/detail?id=26[bug 26].
 
 Multilayer replication
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1519,8 +1520,6 @@ running on top of it.
 Enlarge the origin device of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
-
 1. First, make sure you have shut down all of the services running on top of the Zumastor volume,
 such as NFS or Samba. You can use 'lsof' to check if any file in /var/run/zumastor/mount/zumatest is still open:
 +
@@ -1563,10 +1562,9 @@ all the existing snapshots is unchanged.
 Shrink the origin device of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
-
-The steps to shrink the origin device of a Zumastor volume is similar to those for
-enlarging the origin device, but need to be ran in different orders.
+The steps to shrink the origin device of a Zumastor volume are
+similar to those for enlarging the origin device, but need to be 
+ran in a different order.
 
 1. Shut down all of the services running on top of the Zumastor volume.
 
@@ -1607,9 +1605,7 @@ all the existing snapshots is unchanged.
 Enlarge the snapshot store of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
-
-Enlarge the snapshot store of a Zumastor volume is quite simple. You only need to
+To enlarge the snapshot store of a Zumastor volume,
 run the +zumastor resize --snapshot+ command after enlarging the snapshot lvm device.
 .....................................
 # lvresize /dev/sysvg/test_snap -L newsize
@@ -1620,16 +1616,15 @@ After this, check the new size of the Zumastor snapshot store with the +zumastor
 Shrink the snapshot store of a Zumastor volume
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Please note as of Zumastor 0.6, enlarging or shrinking devices is not working and will corrupt replication. Do not try the following procedure in production.
+Shrinking the snapshot store of a Zumastor volume is not difficult,
+but must be done with care.
+First, run the +zumastor resize --snapshot+ command to shrink
+the Zumastor snapshot store. 
+(The command may fail if the existing snapshot store does
+not have enough continuous free space. In this case, try a larger value.)
+If the  +zumastor resize --snapshot+ command succeeds, 
+you can then run the +lvresize+ command to shrink the snapshot lvm device.
 
-The steps to shrink the snapshot store of a Zumastor volume is also simple, but need
-to be run carefully. First, run the +zumastor resize --snapshot+ command to shrink
-the Zumastor snapshot store. The command may fail if the existing snapshot store does
-not have enough continuous free space. In this case, try a larger value.
-If the  +zumastor resize --snapshot+ command succeeds, you can run the +lvresize+
-command to shrink the snapshot lvm device.
-Note that shrinking the lvm device without successfully shrinking the Zumastor snapshot store is dangerous and
-may damage the whole Zumastor volume.
 .....................................
 # zumastor resize zumatest --snapshot newsize
 # lvresize /dev/sysvg/test_snap -L newsize
@@ -1637,17 +1632,19 @@ may damage the whole Zumastor volume.
 After this, check the new size of the Zumastor snapshot store with the +zumastor status --usage+ command.
 
 [NOTE]
-You can follow the similar procedures when resizing a Zumastor volume with a different file 
-system running on top of it. For example, you can replace the
+You can follow the similar procedures when resizing a Zumastor volume
+with a different file system running on top of it. For example, you can
+replace the
 +e2fsck/resize2fs+ commands with +resize_reiserfs -f /dev/mapper/zumatest+ to resize a reiserfs file system.
 If you want to resize a Zumastor volume that uses raw partitions instead of
 lvm devices, you can use +fdisk+ instead of +lvresize+ to resize those partitions.
 
 How to revert a Zumastor volume to a previous snapshot
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-1. Take a look at +/var/run/zumastor/snapshot/zumatest/+ and decide the snapshot you want to revert to.
-Suppose you want to revert to a snapshot that is created two days ago. You can find out its corresponding snapshot
-number as follows:
+1. Take a look at +/var/run/zumastor/snapshot/zumatest/+ and decide
+which snapshot you want to revert to.  Suppose you want to revert to a
+snapshot that is created two days ago. You can find out its corresponding
+snapshot number as follows:
 +
 ................................
 # zumastor status
