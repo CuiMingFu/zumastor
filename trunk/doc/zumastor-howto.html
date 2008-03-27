@@ -382,8 +382,8 @@ function generateToc(toclevels) {
 <h1>Zumastor HOWTO</h1>
 <span id="author">Dan Kegel</span><br />
 <span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
-<span id="revision">version 0.6,</span>
-Feb 2008
+<span id="revision">version 0.7,</span>
+Mar 2008
 <div id="toc">
   <div id="toctitle">Table of Contents</div>
   <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
@@ -586,12 +586,12 @@ to have an absolute path for update-grub.</p></div>
 <div class="para"><p>For instance:</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>$ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
-$ mv zumastor.org/downloads/releases/0.6-r1318 .
-$ rm -rf zumastor.org
-$ sudo dpkg -i 0.6-r1318/*.deb
-$ sudo update-grub</tt></pre>
+<pre><tt> sudo apt-get install dmsetup
+ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
+ mv zumastor.org/downloads/releases/0.6-r1318 .
+ rm -rf zumastor.org
+ sudo dpkg -i 0.6-r1318/*.deb
+ sudo update-grub</tt></pre>
 </div></div>
 <div class="para"><p>Don't forget the trailing slash on wget, else it will download
 all directories, not just the one you want!</p></div>
@@ -639,8 +639,7 @@ make sure the system comes up ok.</p></div>
 <div class="olist"><ol>
 <li>
 <p>
-Install VMWare Player
-VMWare offers their player for free download at <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
+Install the free VMWare Player from <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
 </p>
 <div class="ilist"><ul>
 <li>
@@ -651,9 +650,22 @@ If you're on Feisty, it's easier, just do <tt>apt-get install vmware-player</tt>
 <li>
 <p>
 For all other versions of Ubuntu, you have to use the vendor's
-install script. There's a nice tutorial for the timid at
+install script.  You may need to do <tt>sudo apt-get install build-essential</tt> first.
+There's a nice tutorial for the timid at
 <a href="http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710">smokinglinux.com</a>.
 Take the easy way out and choose all defaults when installing.
+</p>
+</li>
+<li>
+<p>
+If you're running a very new kernel, you may get
+compile errors when installing vmware player.
+See <a href="https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391">https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391</a>
+I was able to work around this by using the "any-any" script,
+first described at <a href="http://communities.vmware.com/thread/26693">http://communities.vmware.com/thread/26693</a>, and
+downloadable by clicking on
+<a href="http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz">http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz</a>
+in a browser (no wget).
 </p>
 </li>
 </ul></div>
@@ -718,21 +730,21 @@ as described above.
 <div class="para"><p>If you want to test replication virtually, you'll need to create at
 least one more virtual machine.   The only trick here is getting
 the network addressing straight.  Here's what to do (assuming you're
-using the gutsy jeos image from the previous example):</p></div>
+using the gutsy jeos image from the previous example).</p></div>
+<div class="para"><p>Set up one virtual machine first as follows:</p></div>
 <div class="olist"><ol>
 <li>
 <p>
-For each virtual machine, create a new directory (say, vm1, vm2, etc.),
-and unzip ubuntu-7.10-jeos-vmware.7z into each new directory.
+Create a new directory vm1 and unzip ubuntu-7.10-jeos-vmware.7z into it, e.g.
+ $ mkdir vm1
+ $ cd vm1
+ $ 7zr e ../ubuntu-7.10-jeos-vmware.7z
 </p>
 </li>
 <li>
 <p>
-Set up different uuids and ethernet addresses for each virtual machine
-by editing that machine's copy of gutsy.vmx.
-When creating my 1st, 2nd, 3rd, &#8230; nth etc. virtual machine,
-I like to change the last byte of the uuid and ethernet address to n.
-For instance, when I create my 2nd virtual machine, I change the original
+Set up the uuid and ethernet address in gutsy.vmx to end in 01 (since this is the first vm),
+i.e. change the lines
 </p>
 <div class="literalblock">
 <div class="content">
@@ -743,20 +755,20 @@ uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"</tt></pre>
 <div class="para"><p>to</p></div>
 <div class="literalblock">
 <div class="content">
-<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
-uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
-uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
 </div></div>
 </li>
 <li>
 <p>
-Boot each new virtual machine.
+Boot the virtual machine by running <tt>vmplayer gutsy.vmx</tt>.
 Networking won't work yet because the system is only
 set up to use the first ethernet device, and the new ethernet
 address is assigned to the second ethernet device.
-Inside the new virtual machine, fix the ethernet
+Once logged in to the new virtual machine, fix the ethernet
 address of eth0 and remove any extra ethernet devices by editing
-`/etc/udev/rules.d/70-persistent-net.rules'.
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt>.
 Then restart each new virtual machine's network by running
 </p>
 <div class="literalblock">
@@ -767,15 +779,14 @@ Then restart each new virtual machine's network by running
 </li>
 <li>
 <p>
-Configure the hostname to be <em>vm1</em>, <em>vm2</em>, etc. by editing <tt>/etc/hostname</tt>.
+Configure the hostname to be <tt>vm1</tt> by editing <tt>/etc/hostname</tt>.
 </p>
 </li>
 <li>
 <p>
-Edit /etc/hosts to use the real hostname rather than <em>ubuntu</em>,
-and add a line for the virtual machine's IP address, with its real hostname.
-Also do this on the other virtual machine so they all know each others' hostname
-and IP address.
+Edit /etc/hosts to use <tt>vm1</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
 </p>
 </li>
 <li>
@@ -790,10 +801,115 @@ Install an ssh server, e.g.
 <li>
 <p>
 Set up ssh authorization as described in the section
-"Try Remote Replication" below.
+<a href="#_try_remote_replication">Try Remote Replication</a> below.
+Add both your own public key from your real workstation,
+as well as the public key of the vm's root account, to
+the virtual machine's root account's authorized_keys file.
+e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>(copy ~/.ssh/id_rsa.pub onto the vm using scp, call it mykey)
+sudo cat mykey /root/.ssh/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Download and install dmsetup and the Zumastor packages as described above.
+</p>
+</li>
+<li>
+<p>
+Shut down the virtual machine with <tt>halt</tt>.
 </p>
 </li>
 </ol></div>
+<div class="para"><p>Cloning the virtual machines is slightly easier than setting them up from scratch:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+For each desired new virtual machine, copy the vm1 directory, e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>cp -a vm1 vm2
+cd vm2</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+As above, edit the new machine's gutsy.vmx file to use
+different uuid and ethernet addresses.  e.g. change
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Boot the new machine, log in to it as root, and edit
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt> as above to use the new address for eth0,
+and remove eth1.  Then restart the network by running
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo /etc/init.d/udev restart</tt></pre>
+</div></div>
+<div class="para"><p>and verify that networking works.</p></div>
+</li>
+<li>
+<p>
+Configure the hostname to be <tt>vm2</tt>, by editing <tt>/etc/hostname</tt>.
+</p>
+</li>
+<li>
+<p>
+Edit /etc/hosts to use <tt>vm2</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
+</p>
+</li>
+<li>
+<p>
+Reboot the virtual machine so the hostname change takes effect.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Then merge the /etc/hosts entries for all virtual machines
+together, and add them to both your host's /etc/hosts file
+and the /etc/hosts files on all the virtual machines.</p></div>
+<div class="para"><p>Finally, from your real host machine, make sure you can do</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ssh root@vm1
+ssh root@vm2
+...</tt></pre>
+</div></div>
+<div class="para"><p>to make sure you can log in to each vm as root without being prompted for a password.</p></div>
+<div class="para"><p>Tip: create a script to start up all your virtual machines, e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>for vm in vm1 vm2 vm3
+do
+   cd $vm
+   vmplayer gutsy.vmx &amp;
+   sleep 2
+   cd ..
+done</tt></pre>
+</div></div>
+<div class="para"><p>Tip: after starting virtual machines, just minimize them,
+and log in via ssh.  That way you won't have to jump through hoops to
+switch windows, and copy-and-paste will work as expected.</p></div>
 <h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.6. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
 <div class="olist"><ol>
 <li>
@@ -2089,8 +2205,8 @@ time optimizing Zumastor's write performance.)</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 0.6<br />
-Last updated 2008-03-17 14:15:19 PDT
+Version 0.7<br />
+Last updated 2008-03-27 16:11:16 PDT
 </div>
 </div>
 </body>

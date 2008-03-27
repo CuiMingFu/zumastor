@@ -17,7 +17,7 @@ to convert this document to HTML.
 Zumastor HOWTO
 ==============
 Dan Kegel <dank@kegel.com>
-v0.6, Feb 2008
+v0.7, Mar 2008
 
 
 Introduction
@@ -239,12 +239,12 @@ to have an absolute path for update-grub.
 For instance:
 
 ....................
-$ sudo apt-get install dmsetup
-$ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
-$ mv zumastor.org/downloads/releases/0.6-r1318 .
-$ rm -rf zumastor.org
-$ sudo dpkg -i 0.6-r1318/*.deb
-$ sudo update-grub
+ sudo apt-get install dmsetup
+ wget -m -np zumastor.org/downloads/releases/0.6-r1318/
+ mv zumastor.org/downloads/releases/0.6-r1318 .
+ rm -rf zumastor.org
+ sudo dpkg -i 0.6-r1318/*.deb
+ sudo update-grub
 ....................
 
 Don't forget the trailing slash on wget, else it will download
@@ -292,13 +292,21 @@ make sure the system comes up ok.
 
 Example: installing Zumastor on Ubuntu inside a VMWare player
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-1.  Install VMWare Player
-VMWare offers their player for free download at http://vmware.com/download/player[].
+1.  Install the free VMWare Player from http://vmware.com/download/player[].
 * If you're on Feisty, it's easier, just do +apt-get install vmware-player+.
 * For all other versions of Ubuntu, you have to use the vendor's 
-install script. There's a nice tutorial for the timid at 
+install script.  You may need to do +sudo apt-get install build-essential+ first.
+There's a nice tutorial for the timid at 
 http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710[smokinglinux.com]. 
 Take the easy way out and choose all defaults when installing. 
+* If you're running a very new kernel, you may get 
+compile errors when installing vmware player.   
+See https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391[]
+I was able to work around this by using the "any-any" script,
+first described at http://communities.vmware.com/thread/26693[], and
+downloadable by clicking on
+http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz[]
+in a browser (no wget).
 
 2. Download a vmware image with Ubuntu preinstalled.  
 Dan Kegel, one of the Zumastor developers, 
@@ -353,16 +361,17 @@ Example: Setting up multiple instances of Zumastor on vmware
 If you want to test replication virtually, you'll need to create at 
 least one more virtual machine.   The only trick here is getting
 the network addressing straight.  Here's what to do (assuming you're
-using the gutsy jeos image from the previous example):
+using the gutsy jeos image from the previous example).
 
-1. For each virtual machine, create a new directory (say, vm1, vm2, etc.),
-and unzip ubuntu-7.10-jeos-vmware.7z into each new directory.
+Set up one virtual machine first as follows:
 
-2. Set up different uuids and ethernet addresses for each virtual machine
-by editing that machine's copy of gutsy.vmx.
-When creating my 1st, 2nd, 3rd, ... nth etc. virtual machine,
-I like to change the last byte of the uuid and ethernet address to n.
-For instance, when I create my 2nd virtual machine, I change the original
+1. Create a new directory vm1 and unzip ubuntu-7.10-jeos-vmware.7z into it, e.g.
+ $ mkdir vm1
+ $ cd vm1
+ $ 7zr e ../ubuntu-7.10-jeos-vmware.7z 
+
+2. Set up the uuid and ethernet address in gutsy.vmx to end in 01 (since this is the first vm),
+i.e. change the lines
 +
 ........................................
 ethernet0.address = "00:50:56:3F:12:00"
@@ -373,18 +382,18 @@ uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"
 to
 +
 ........................................
-ethernet0.address = "00:50:56:3F:12:02"
-uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
-uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
 ........................................
 +
-3. Boot each new virtual machine.  
+3. Boot the virtual machine by running +vmplayer gutsy.vmx+.
 Networking won't work yet because the system is only
 set up to use the first ethernet device, and the new ethernet
 address is assigned to the second ethernet device.  
-Inside the new virtual machine, fix the ethernet
+Once logged in to the new virtual machine, fix the ethernet
 address of eth0 and remove any extra ethernet devices by editing 
-`/etc/udev/rules.d/70-persistent-net.rules'.
++/etc/udev/rules.d/70-persistent-net.rules+.
 Then restart each new virtual machine's network by running
 +
 ........................................
@@ -393,12 +402,11 @@ sudo /etc/init.d/udev restart
 +
 or rebooting it, and verify that networking works.  
 +
-4. Configure the hostname to be 'vm1', 'vm2', etc. by editing +/etc/hostname+.
+4. Configure the hostname to be +vm1+ by editing +/etc/hostname+.
 +
-5. Edit /etc/hosts to use the real hostname rather than 'ubuntu', 
-and add a line for the virtual machine's IP address, with its real hostname.
-Also do this on the other virtual machine so they all know each others' hostname
-and IP address.
+5. Edit /etc/hosts to use +vm1+ rather than +ubuntu+, 
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from +ip addr+).
 +
 6. Install an ssh server, e.g.
 +
@@ -407,8 +415,92 @@ sudo apt-get install openssh-server
 ........................................
 +
 7. Set up ssh authorization as described in the section 
-"Try Remote Replication" below.
+xref:_try_remote_replication[Try Remote Replication] below.
+Add both your own public key from your real workstation,
+as well as the public key of the vm's root account, to
+the virtual machine's root account's authorized_keys file.
+e.g.
++
+........................................................
+(copy ~/.ssh/id_rsa.pub onto the vm using scp, call it mykey)
+sudo cat mykey /root/.ssh/id_rsa.pub >> /root/.ssh/authorized_keys
+........................................................
++
+8. Download and install dmsetup and the Zumastor packages as described above.
++
+9. Shut down the virtual machine with +halt+.
 
+Cloning the virtual machines is slightly easier than setting them up from scratch:
+
+1. For each desired new virtual machine, copy the vm1 directory, e.g.
++
+........................................................
+cp -a vm1 vm2
+cd vm2
+........................................................
++
+2. As above, edit the new machine's gutsy.vmx file to use 
+different uuid and ethernet addresses.  e.g. change
++
+........................................
+ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+........................................
++
+to
++
+........................................
+ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+........................................
++
+3. Boot the new machine, log in to it as root, and edit
++/etc/udev/rules.d/70-persistent-net.rules+ as above to use the new address for eth0,
+and remove eth1.  Then restart the network by running
++
+........................................
+sudo /etc/init.d/udev restart
+........................................
++
+and verify that networking works.  
++
+4. Configure the hostname to be +vm2+, by editing +/etc/hostname+.
++
+5. Edit /etc/hosts to use +vm2+ rather than +ubuntu+, 
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from +ip addr+).
++
+6. Reboot the virtual machine so the hostname change takes effect.
+
+Then merge the /etc/hosts entries for all virtual machines
+together, and add them to both your host's /etc/hosts file 
+and the /etc/hosts files on all the virtual machines.
+
+Finally, from your real host machine, make sure you can do
+........................................
+ssh root@vm1
+ssh root@vm2
+...
+........................................
+
+to make sure you can log in to each vm as root without being prompted for a password.
+
+Tip: create a script to start up all your virtual machines, e.g.
+........................................
+for vm in vm1 vm2 vm3
+do
+   cd $vm
+   vmplayer gutsy.vmx &
+   sleep 2
+   cd ..
+done
+........................................
+
+Tip: after starting virtual machines, just minimize them,
+and log in via ssh.  That way you won't have to jump through hoops to 
+switch windows, and copy-and-paste will work as expected.
 
 Example: installing Zumastor on Ubuntu inside a QEMU virtual machine
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
