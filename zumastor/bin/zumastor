@@ -1250,7 +1250,7 @@ forget)
 		forget_source $vol
 		exit $? ;;
 	*)
-		echo "usage: $0 forget volume|target|source"
+		echo "usage: $0 forget volume|target|source <vol>"
 		exit 2 ;;
 	esac
 	;;
