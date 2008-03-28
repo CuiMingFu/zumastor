@@ -91,18 +91,18 @@ Version 0.7, released on 27 Mar 2008, adds experimental
 "revert to snapshot" and "multilayer replication" features,
 lets downstream replicas retain snapshots on their own schedule,
 and fixes several bugs.  See
-http://code.google.com/p/zumastor/issues/list?q=label%3ARelease7%20status%3AFixed[our issue tracker for the full list of fixed issues].  
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease7%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
 
 Version 0.6, released on 4 Feb 2008, added support for offline resizing,
 and fixed a bug that could cause data loss.  (For developers, it also 
 added a way to run our autobuilder tests before committing changes.)
 See
-http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed[our issue tracker for the full list of fixed issues].  
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
 
 Version 0.5, released on 10 Jan 1008,
 added support for volumes larger than 2TB
 and for exporting snapshots via NFS and CIFS.  See 
-http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed[our issue tracker for the full list of fixed issues].  
+http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
 
 Version 0.4, released on 1 Dec 2007, was the first public release.
 
