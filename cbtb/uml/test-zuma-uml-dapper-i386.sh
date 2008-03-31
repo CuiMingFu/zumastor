@@ -11,11 +11,12 @@
 
 set -e
 
-pushd ../..
+OLDPWD=$PWD
+cd ../..
   repo=${PWD}
   build=${PWD}/build
   SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] ||  svn info zumastor | grep ^Revision:  | cut -d\  -f2`
-popd
+cd $OLDPWD
 
 ARCH=i386
 templateimg=$build/dapper-${ARCH}-zumastor-r${SVNREV}.ext3

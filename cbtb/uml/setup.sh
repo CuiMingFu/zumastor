@@ -12,13 +12,14 @@ tmpdir=`mktemp -d`
 # install tunbr setuid root
 if [ ! -x /usr/local/bin/tunbr ]
 then
-  pushd ../tunbr
+  OLDPWD=$PWD
+  cd ../tunbr
   make tunbr
   mv tunbr $tmpdir
   sudo mv $tmpdir/tunbr /usr/local/bin
   sudo chown root /usr/local/bin/tunbr
   sudo chmod 4755 /usr/local/bin/tunbr
-  popd
+  cd $OLDPWD
 fi
 
 
@@ -38,9 +39,10 @@ then
   if [ -f /etc/debian_version ]
   then
     cp -ar ../host-setup $tmpdir
-    pushd $tmpdir/host-setup
+    OLDPWD=$PWD
+    cd $tmpdir/host-setup
     sudo ./proxy.sh
-    popd
+    cd $OLDPWD
     rm -rf $tmpdir/host-setup
   fi
 fi
@@ -52,9 +54,10 @@ then
   if [ -f /etc/debian_version ]
   then
     cp -ar ../host-setup $tmpdir
-    pushd $tmpdir/host-setup
+    OLDPWD=$PWD
+    cd $tmpdir/host-setup
     sudo ./dnsmasq.sh
-    popd
+    cd $OLDPWD
     rm -rf $tmpdir/host-setup
   fi
 fi
