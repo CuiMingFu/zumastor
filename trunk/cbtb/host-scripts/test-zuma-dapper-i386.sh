@@ -163,7 +163,7 @@ ${rqemu_i386} -m 512 \
 if ! timeout_file_wait 30 ${MONITOR}
 then
   echo First qemu instance never started, test harness problem.  Aborting.
-  kill -0 $qemu_pid && kill $qemu_pid
+  kill -0 $qemu_pid && kill -9 $qemu_pid
   exit 2
 fi
 
@@ -188,8 +188,8 @@ if [ "x$MACADDR2" != "x" ] ; then
   if ! timeout_file_wait 30 ${MONITOR2}
   then
     echo Second qemu instance never started, test harness problem.  Aborting.
-    kill -0 $qemu_pid && kill $qemu_pid
-    kill -0 $qemu2_pid && kill $qemu2_pid
+    kill -0 $qemu_pid && kill -9 $qemu_pid
+    kill -0 $qemu2_pid && kill -9 $qemu2_pid
     exit 2
   fi
 fi
@@ -209,9 +209,9 @@ if [ "x$MACADDR3" != "x" ] ; then
   if ! timeout_file_wait 30 ${MONITOR3}
   then
     echo Third qemu instance never started, test harness problem.  Aborting.
-    kill -0 $qemu_pid && kill $qemu_pid
-    kill -0 $qemu2_pid && kill $qemu2_pid
-    kill -0 $qemu3_pid && kill $qemu3_pid
+    kill -0 $qemu_pid && kill -9 $qemu_pid
+    kill -0 $qemu2_pid && kill -9 $qemu2_pid
+    kill -0 $qemu3_pid && kill -9 $qemu3_pid
     exit 2
   fi
 fi
