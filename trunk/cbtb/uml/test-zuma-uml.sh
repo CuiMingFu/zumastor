@@ -22,12 +22,13 @@ if [ "x$DIST" = "x" ] ; then
 fi
 
 
-pushd ../..
+OLDPWD=$PWD
+cd ../..
   repo=${PWD}
   build=${PWD}/build
   SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
   echo pwd=`pwd` PWD=$PWD SVNREV=$SVNREV
-popd
+cd $OLDPWD
 
 templateimg=$build/r${SVNREV}/${DIST}-${ARCH}-zumastor-r${SVNREV}.ext3
 

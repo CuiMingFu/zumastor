@@ -8,14 +8,15 @@ DIST=etch
 ARCH=i386
 
 # Get the directory paths (grandparent)
-pushd ../..
+OLDPWD=$PWD
+cd ../..
 SRC=${PWD}
 BUILD_DIR=${SRC}/build
 if [ ! -d $BUILD_DIR ]
 then
   mkdir -p $BUILD_DIR
 fi
-popd
+cd $OLDPWD
 
 
 # Cache the prepared  userspace.  Runs once.
@@ -27,7 +28,8 @@ then
 fi
 
 # Get the versions of the kernel and repository.
-pushd ${SRC}
+OLDPWD=$PWD
+cd ${SRC}
 KERNEL_VERSION=`awk '/^2\.6\.[0-9]+(\.[0-9]+)?$/ { print $1; }' KernelVersion`
 if [ "x$KERNEL_VERSION" = "x" ] ; then
   echo "Suspect KernelVersion file"
@@ -65,4 +67,4 @@ rmdir $rootdir
 
 mv $uda $BUILD_DIR/r$SVNREV/$DIST-$ARCH-zumastor-r$SVNREV.ext3
 
-popd
+cd $OLDPWD
