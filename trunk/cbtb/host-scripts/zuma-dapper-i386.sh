@@ -171,8 +171,9 @@ ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm /tmp/*.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 
 # temporary hack before going to LABEL= or UUID=
-${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /boot/grub/menu.lst' || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /etc/fstab' || retval=$?
+# and not necessary on 2.6.24 now for some reason
+# ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /boot/grub/menu.lst' || retval=$?
+# ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'sed -i s/hda/sda/ /etc/fstab' || retval=$?
 
 # qemu still doesn't do apic's well with linux.  Take it off the menu.
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} "sed --in-place 's/^#\ kopt=root=/#\ kopt=noapic\ root=/' /boot/grub/menu.lst " || retval=$?
