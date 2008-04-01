@@ -76,6 +76,8 @@ pushd $BUILD_DIR >> $LOG || exit 1
 echo -n Building zumastor Debian package...
 pushd ${SRC}/zumastor >> $LOG || exit 1
 
+sed -i -e s,_VER_,${VERSION},g debian/control
+
 echo ${SVNREV} >SVNREV
 echo ${VERSION} >SVNVERSION
 

@@ -45,6 +45,8 @@ pushd ${SRC}/zumastor >> $LOG || exit 1
 echo ${SVNREV} >SVNREV
 echo ${VERSION} >SVNVERSION
 
+sed -i -e s,_VER_,${VERSION},g debian/control
+
 export EMAIL="zuambuild@gmail.com"
 export VISUAL=/bin/true
 export EDITOR=/bin/true
