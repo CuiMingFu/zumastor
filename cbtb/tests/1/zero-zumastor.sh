@@ -52,7 +52,7 @@ if cmp --bytes=$size /dev/mapper/testvol /dev/zero
 then
   echo ok 4 - testvol matches /dev/zero
 else
-  echo not ok 4 - testvol matches /dev/zero
+  echo not ok 4 - testvol does not match /dev/zero
   exit 4
 fi
 
