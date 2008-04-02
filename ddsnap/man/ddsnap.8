@@ -42,18 +42,18 @@ ddsnap \- block device snapshot and replication
 .I server_socket changelist_name snapshot1 snapshot2
 .br
 .B ddsnap delta create
-[-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] 
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] 
 .I changelist deltafile_name snapshot_device_stem
 .br
 .B ddsnap delta apply 
 .I deltafile_name snapshot_device_stem
 .br
-.B ddsnap transmit
-[-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP]
-\fIserver_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
-.br
 .B ddsnap delta listen
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
+.br
+.B ddsnap transmit
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP]
+\fIserver_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
 
 .SH DESCRIPTION
 \fBddsnap\fP provides block device replication given a block level snapshot facility capable of holding multiple simultaneous snapshots efficiently. \fBddsnap\fP can generate a list of snapshot chunks that differ between two snapshots, then send that difference over the wire. On a downstream server, write the updated data to a snapshotted block device.
@@ -92,16 +92,15 @@ Specifies the preferred process id file.
 .IP \fB\-v|--verbose
 .br
 Gives lots of information about what's happening.
-.IP \fB\-o|--overwrite
+.IP \fB\-x|--xdelta
 .br
-The delta file contains the literal contents of each destination snapshot chunk from the difference list.  Generating a delta this way only requires reading one snapshot volume and applying it to the destination volume does not require any reading at all, so this method is very fast.  However, the delta file can be quite large.
-.IP \fB\-d|--difference
+Use xdelta as the snapshot delta format.
+.IP \fB\-r|--raw
 .br
-Generates a delta file using xdelta binary differencing. The chunk level delta is compressed by taking a binary difference between source and destination chunks and compressing the result via the xdelta algorithm.
+Use raw data as the snapshot delta format.
 .IP \fB\-b|--best
 .br
-Generates a delta file by trying both binary differencing and straight compression methods, choosing the best method for each extent of the output delta.  Uses more CPU and disk bandwidth in return for slightly smaller delta files.
-This option overrides the \-o and \-d options.
+Automatically select the delta format (xdelta or raw) that has the best compression rate.
 .IP \fB\-z\ \fIcompression_level\fB|--zip=\fIcompression_level
 .br
 Specifies a zlib or xdelta compression level from 0 to 9, where level 0 is no compression and level 9 is maximum compression. If unspecified, compression level defaults to 6.
@@ -167,7 +166,7 @@ Reports snapshot usage statistics.
 .br
 Creates a changelist from snapshot1 and snapshot2 with the given changelist_name.
 .IP \fBdelta\ \fBcreate\fP 
-[-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] 
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP]
 .I changelist_name deltafile_name snapshot_device_stem
 .br
 Creates a deltafile from the given \fIchangelist\fP and snapshot device stem with the given deltafile_name. Defaults to optimal mode if no option was selected.
@@ -175,15 +174,15 @@ Creates a deltafile from the given \fIchangelist\fP and snapshot device stem wit
 .I deltafile_name snapshot_device_stem
 .br
 Applies the deltafile to the given device.
-.IP \fBtransmit\fP 
-[-o|--overwrite] [-d|--difference] [-b|--best] [-z|--zip \fIcompression_level\fP] 
-.I server_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
-.br
-Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data.
 .IP \fBdelta\ \fBlisten\fP 
 [\-f|--foreground] [-l|--logfile \fIstring\fP] [-p|--pidfile \fIstring\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
 .br
 Listens for a deltafile arriving from upstream.
+.IP \fBtransmit\fP 
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP]
+.I server_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
+.br
+Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data.
 
 .SH EXAMPLES
 # Initializing snapshot storage device
@@ -214,7 +213,7 @@ sudo ./\fBddsnap delta changelist\fP \fI/tmp/server\fP \fIchangelist0\-1\fP \fI0
 # Creating a deltafile named \fIdeltafile0\-1\fP based on \fIchangelist0-1\fP, \fI/dev/mapper/snapshot(0)\fP and \fI/dev/mapper/snapshot(1)\fP in \fIraw\fP mode
 .TP
 .B
-sudo ./\fBddsnap delta create\fP \fI\-o\fP \fIchangelist0-1\fP \fIdeltafile0-1\fP \fI/dev/mapper/snapshot\fP
+sudo ./\fBddsnap delta create\fP \fIchangelist0-1\fP \fIdeltafile0-1\fP \fI/dev/mapper/snapshot\fP
 .PP
 # Applying a deltafile name \fIdeltafile0\-1\fP to a device named \fI/dev/mapper/vol\fP
 .TP
