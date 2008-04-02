@@ -149,7 +149,7 @@ date
 ${SSH} root@${IPADDR} 'sed -i s/^root:x:/root::/ /etc/passwd'
 
 # blacklist ide_generic for qemu/dapper's benefit
-${CMDTIMEOUT} ${SSH} root@${IPADDR} 'echo ide-generic >>/etc/modprobe.d/blacklist' 
+${CMDTIMEOUT} ${SSH} root@${IPADDR} 'echo ide_generic >>/etc/modprobe.d/blacklist' 
 
 # create a tmpfs /tmp on the instance to place the debs into
 ${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
