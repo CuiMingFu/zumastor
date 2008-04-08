@@ -22,7 +22,7 @@ slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
 SCP='scp -o StrictHostKeyChecking=no -o BatchMode=yes'
 
-function file_check {
+file_check() {
   hash=`md5sum /var/run/zumastor/mount/testvol/testfile`
 
   rhash=`${SSH} root@${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
