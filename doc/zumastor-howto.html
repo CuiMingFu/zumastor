@@ -382,7 +382,7 @@ function generateToc(toclevels) {
 <h1>Zumastor HOWTO</h1>
 <span id="author">Dan Kegel</span><br />
 <span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
-<span id="revision">version 0.7,</span>
+<span id="revision">version 0.8,</span>
 Mar 2008
 <div id="toc">
   <div id="toctitle">Table of Contents</div>
@@ -1337,6 +1337,7 @@ Successfully created and initialized volume 'zumatest'.
 i.e. you can zumastor-ize an existing volume if you like,
 or you can mkfs a zumastor-ized volume.    (You can even do silly things
 like taking snapshots during the middle of mkfs.)</p></div>
+<div class="para"><p>Note: If you are using XFS, you will need to add <tt>&#8212;mountopts nouuid</tt> to your <tt>zumastor define volume</tt> line.</p></div>
 <h3 id="_set_up_periodic_snapshots">10.7. Set up periodic snapshots</h3><div style="clear:left"></div>
 <div class="para"><p>To set up hourly snapshots on the volume from the previous example, do:</p></div>
 <div class="literalblock">
@@ -1606,7 +1607,7 @@ as those mounted on master.</p></div>
 <div class="literalblock">
 <div class="content">
 <pre><tt>root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600 --mount-snap
-root@replica:~#  zumastor define schedule --hourly 24</tt></pre>
+root@replica:~#  zumastor define schedule zumatest --hourly 24</tt></pre>
 </div></div>
 <h4 id="_start_replication">10.10.7. Start replication</h4>
 <div class="para"><p>This is important; without it, no automatic replication happens:</p></div>
@@ -2206,8 +2207,8 @@ time optimizing Zumastor's write performance.)</p></div>
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 0.7<br />
-Last updated 2008-03-27 17:10:23 PDT
+Version 0.8<br />
+Last updated 2008-04-08 15:01:39 PDT
 </div>
 </div>
 </body>
