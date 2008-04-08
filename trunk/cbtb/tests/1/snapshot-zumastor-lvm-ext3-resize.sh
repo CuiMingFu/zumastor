@@ -32,7 +32,7 @@ timeout_file_wait() {
   return $?
 }
 
-function file_check {
+file_check() {
   if diff -q /var/run/zumastor/mount/testvol/testfile \
       /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
     echo "ok $1 - $2"
@@ -43,7 +43,7 @@ function file_check {
   fi
 }
 
-function size_check {
+size_check() {
   if [ $1 = "origin" ]; then
   	realsize=`ddsnap status /var/run/zumastor/servers/testvol | awk '/Origin size:/ { print $3 }'`
   else
@@ -57,7 +57,7 @@ function size_check {
   fi
 }
 
-function snapshot_size_check {
+snapshot_size_check() {
   local -r id=$1
   if [ $id -eq -1 ]; then
     snapsize=`blockdev --getsize /dev/mapper/testvol`
