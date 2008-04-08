@@ -4,5 +4,5 @@
 #
 # Install any other zumastor testenv (cbtb) dependencies
 
-aptitude install -y timeout uml-utilities
+aptitude install -y timeout uml-utilities pwgen
 
