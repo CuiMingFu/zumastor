@@ -837,12 +837,16 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 				warn("read from snapshot device \"%s\" failed ", dev1name);
 				goto error_source;
 			}
+			if (posix_fadvise(snapdev1, extent_addr, source_extent_size, POSIX_FADV_DONTNEED) != 0)
+				warn("can't free cached pages for the source snapshot, error %s", strerror(errno));
 			deh.ext1_chksum = checksum((const unsigned char *) dev1_extent, source_extent_size);
 		}
 		if ((err = diskread(snapdev2, dev2_extent, extent_size, extent_addr)) < 0) {
 			warn("read from snapshot device \"%s\" failed ", dev2name);
 			goto error_source;
 		}
+		if (posix_fadvise(snapdev2, extent_addr, extent_size, POSIX_FADV_DONTNEED) != 0)
+			warn("can't free cached pages for the target snapshot, error %s", strerror(errno));
 		deh.ext2_chksum = checksum((const unsigned char *) dev2_extent, extent_size);
 
 		if (fullvolume || (extent_addr > source_volume_size - extent_size)) {
@@ -1219,6 +1223,8 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 			u64 source_extent_size = (extent_addr > source_volume_size - extent_size) ? (source_volume_size - extent_addr) : extent_size;
 			if ((err = diskread(snapdev1, extent_data, source_extent_size, extent_addr)) < 0)
 				goto apply_devread_error;
+			if (posix_fadvise(snapdev1, extent_addr, source_extent_size, POSIX_FADV_DONTNEED) != 0)
+				warn("can't free cached pages for the source snapshot, error %s", strerror(errno));
 			/* check to see if the checksum of snap0 is the same on upstream and downstream */
 			if (deh.ext1_chksum != checksum((const unsigned char *)extent_data, source_extent_size)) {
 				warn("delta header checksum '%lld', actual checksum '%lld'", deh.ext1_chksum, checksum((const unsigned char *)extent_data, source_extent_size));
