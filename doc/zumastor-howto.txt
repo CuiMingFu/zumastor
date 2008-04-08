@@ -1216,7 +1216,7 @@ of the command +zumastor define source+ to have snapshots mounted and symlinked,
 as those mounted on master.
 
   root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600 --mount-snap
-  root@replica:~#  zumastor define schedule --hourly 24
+  root@replica:~#  zumastor define schedule zumatest --hourly 24
 
 Start replication
 ^^^^^^^^^^^^^^^^^
