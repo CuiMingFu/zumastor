@@ -17,7 +17,7 @@ to convert this document to HTML.
 Zumastor HOWTO
 ==============
 Dan Kegel <dank@kegel.com>
-v0.7, Mar 2008
+v0.8, Mar 2008
 
 
 Introduction
@@ -939,6 +939,7 @@ i.e. you can zumastor-ize an existing volume if you like,
 or you can mkfs a zumastor-ized volume.    (You can even do silly things
 like taking snapshots during the middle of mkfs.)
 
+Note: If you are using XFS, you will need to add +--mountopts nouuid+ to your +zumastor define volume+ line.
 
 Set up periodic snapshots
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1216,7 +1217,7 @@ of the command +zumastor define source+ to have snapshots mounted and symlinked,
 as those mounted on master.
 
   root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600 --mount-snap
-  root@replica:~#  zumastor define schedule --hourly 24
+  root@replica:~#  zumastor define schedule zumatest --hourly 24
 
 Start replication
 ^^^^^^^^^^^^^^^^^
