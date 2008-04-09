@@ -34,6 +34,9 @@ ddsnap \- block device snapshot and replication
 .B ddsnap resize
 .I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
 .br
+.B ddsnap revert
+.I server_socket snapshot
+.br
 .B ddsnap status
 [\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
 .br
@@ -157,6 +160,10 @@ Changes the use count of the snapshot with the given sockname and snap_tag by ad
 .I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
 .br
 Resize the origin/snapshot/metadata device of an existing ddsnap volume.
+.IP \fBrevert
+.I server_socket snapshot
+.br
+Revert the origin volume to a previous snapshot.
 .IP \fBstatus
 [\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
 .br

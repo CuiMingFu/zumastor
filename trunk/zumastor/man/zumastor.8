@@ -32,6 +32,9 @@ zumastor \- block device snapshot and replication management
 .B zumastor resize
 .I volume \fB[options]\fP
 .br
+.B zumastor revert
+.I volume snapshot
+.br
 .B zumastor status
 [\fIvolume\fP [\fIsnap\fP]] \fB[options]\fP
 
@@ -120,6 +123,10 @@ Explicitly initiate a volume replication cycle to the specified host. If \fIsnap
 .I volume \fP[\fB-o\fP|\fB--origin\fP \fInewsize\fP] [\fB-s\fP|\fB--snapshot\fP \fInewsize\fP] [\fB-m\fP|\fB--metadata\fP \fInewsize\fP]
 
 Resize the origin/snapshot/metadata device of a zumastor volume to \fInewsize\fP.
+.IP \fBrevert\fP
+.I volume snapshot
+
+Revert \fIvolume\fP to a previous \fIsnapshot\fP.
 .IP \fBstatus\fP
 [\fIvolume\fP [\fIsnap\fP]] [\fB-u\fP|\fB--usage\fP]
 
