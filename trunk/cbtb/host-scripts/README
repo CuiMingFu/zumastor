@@ -46,11 +46,9 @@ nodes, and has a tftpboot directory.  eg.
   d) Create a dapper-i386 template image
     cd zumastor/cbtb/host-setup/
     tunbr ./dapper-i386.sh
-    mv dapper-i386.img zumastor/build/dapper-i386-r`svnversion`.img
-    (TODO: not current, need to update.  Both build and install use existing
-     dapper images, and not the same one due to development changes.
-     directories and binaries are moved, copied, or hardlinked from
-     trunk's build/ directory on a new release branch)
+    mkdir ~/zumastor/build/
+    mv dapper-i386-r`svnversion`.img ~/zumastor/build/
+    ln -s dapper-i386-r`svnversion`.img ~/zumastor/build/dapper-i386.img
 
   e) Launch the continuous build
     cd ~   or  cd ~/0.4

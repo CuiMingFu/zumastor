@@ -30,12 +30,7 @@ lockfile $locks
 
 branch=`cat $repo/Version`
 
-diskimgdir=${HOME}/testenv
 [ -x /etc/default/testenv ] && . /etc/default/testenv
-
-IMAGE=zuma-dapper-i386
-IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
 
 
 if [ ! -f zumastor/Changelog ] ; then
