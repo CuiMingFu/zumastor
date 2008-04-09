@@ -63,7 +63,6 @@ WGETTIMEOUT='time timeout -14 3600'
 # defaults, overridden by /etc/default/testenv if it exists
 # diskimgdir should be local for reasonable performance
 size=10G
-diskimgdir=${HOME}/testenv
 tftpdir=/tftpboot
 qemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
 qemu_threads=1
@@ -73,15 +72,13 @@ qemu_threads=1
 threads=$(($qemu_threads + 1))
 mem=$(($threads * 128 + 768))
 
-IMAGE=dapper-i386
-IMAGEDIR=${diskimgdir}/${IMAGE}
-diskimg=${IMAGEDIR}/hda.img
 
 tmpdir=`mktemp -d /tmp/${IMAGE}.XXXXXX`
 SERIAL=${tmpdir}/serial
 MONITOR=${tmpdir}/monitor
 VNC=${tmpdir}/vnc
 
+diskimg=build/`readlink build/dapper-i386.img`
 
 if [ ! -f ${diskimg} ] ; then
   echo "No $diskimg available.  Run dapper-i386.sh first."
