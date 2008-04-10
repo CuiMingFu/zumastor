@@ -100,9 +100,9 @@ Used after \fBdefine\fP \fBvolume\fP to specify the upstream host that is expect
 
 Used after \fBdefine\fP \fBmaster\fP or \fBdefine\fP \fBsource\fP to specify the snapshot rotation for the volume. Each of \fIsnapshots\fP is the maximum number of snapshots that will be held for the respective snapshot rotation interval. If the schedule of the \fIvolume\fP is already defined, just updates the rotation limits.
 .IP \fBdefine\ \fBtarget\fP
-.I volume \fP\fIhost\fP [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-t|--test \fIfeature\fP]
+.I volume \fP\fIhost\fP [-p|--period \fIinterval\fP] [-n|--name \fIremote_volume\fP] [-r|--rate-limit \fIbandwidth\fP] [-t|--test \fIfeature\fP]
 
-Used after \fBdefine\fP \fBvolume\fP to specify a downstream host to which the volume will be replicated to.  If the optional \fIinterval\fP (in seconds) is specified, the target (downstream) server will be replicated to at the given interval.  The name option allows you to specify a different \fIremote_volume\fP name on the downstream host. The test option is used for testing purpose.
+Used after \fBdefine\fP \fBvolume\fP to specify a downstream host to which the volume will be replicated to.  If the optional \fIinterval\fP (in seconds) is specified, the target (downstream) server will be replicated to at the given interval.  The name option allows you to specify a different \fIremote_volume\fP name on the downstream host. The ratelimit option is used to specify the maximum \fIbandwidth\fP (in bytes/sec) at which replication data can be sent. The test option is used for testing purpose.
 .IP \fBforget\ \fBvolume\fP
 .I volume
 
