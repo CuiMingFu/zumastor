@@ -55,7 +55,7 @@ ddsnap \- block device snapshot and replication
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
 .br
 .B ddsnap transmit
-[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP]
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP] [-l|--ratelimit \fItransrate\fP]
 \fIserver_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
 
 .SH DESCRIPTION
@@ -186,10 +186,10 @@ Applies the deltafile to the given device.
 .br
 Listens for a deltafile arriving from upstream.
 .IP \fBtransmit\fP 
-[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP]
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP] [-l|--ratelimit \fItransrate\fP]
 .I server_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
 .br
-Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data.
+Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data. If resume \fIaddr\fP is specified, replication will resume from the given address of the replicated snapshot. If \fItransrate\fP is specified, replication data will be sent at in that bytes/sec.
 
 .SH EXAMPLES
 # Initializing snapshot storage device

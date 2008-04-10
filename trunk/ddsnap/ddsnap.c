@@ -757,7 +757,25 @@ static int write_progress(const char *progress_file, const char *progress_tmpfil
 	return 0;
 }
 
-static int generate_delta_extents(u32 mode, int level, struct change_list *cl, int deltafile, char const *devstem, u32 src_snap, u32 tgt_snap, char const *progress_file, u64 start_chunk)
+/* returns the current time in useconds since the epoch */
+u64 usec_now(void) {
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec * 1000000) + tv.tv_usec;
+}
+
+static void usec_sleep(unsigned long sleep_usecs)
+{
+	struct timespec sleep_time, left_time;
+	sleep_time.tv_sec = sleep_usecs / 1000000;
+	sleep_time.tv_nsec = (sleep_usecs % 1000000) * 1000;
+	while (nanosleep(&sleep_time, &left_time) && (errno == EINTR)) {
+		sleep_time.tv_sec = left_time.tv_sec;
+		sleep_time.tv_nsec = left_time.tv_nsec;
+	}
+}
+static int generate_delta_extents(u32 mode, int level, struct change_list *cl, int deltafile, char const *devstem, u32 src_snap, u32 tgt_snap, char const *progress_file, u64 start_chunk, u32 rate_limit)
 {
 	int fullvolume = (src_snap == -1);
 	char *dev1name = NULL, *dev2name = NULL, *progress_tmpfile = NULL;
@@ -805,7 +823,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	if (progress_file && (err = generate_progress_file(progress_file, &progress_tmpfile)))
 		goto out;
 
-	int current_time, last_update = 0, start_time = now();
+	u64 current_time, last_update = 0, start_time = usec_now();
 
 	for (chunk_num = start_chunk; chunk_num < cl->count;) {
 		if (fullvolume) {
@@ -891,7 +909,11 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 		}
 		bytes_sent += deh.extents_delta_length + sizeof(deh);
 
-		if (progress_file && (((current_time = now()) - last_update) > 0)) {
+		current_time = usec_now();
+		if (rate_limit && ((bytes_sent * 1000000 / rate_limit) > (current_time - start_time)))
+			usec_sleep(bytes_sent * 1000000 / rate_limit - (current_time - start_time));
+
+		if (progress_file && ((current_time - last_update) > 1000000)) {
 			if (write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) < 0)
 				goto out;
 			last_update = current_time;
@@ -905,8 +927,9 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 		warn("changelist was not fully transmitted");
 		err = -ERANGE;
 	} else {
-		current_time = now();
-		warn("Total chunks %Lu (%Lu bytes), wrote %Lu bytes in %i seconds", chunk_num, bytes_total, bytes_sent, current_time - start_time);
+		current_time = usec_now();
+		u32 transrate = (current_time > start_time) ? (unsigned)(bytes_sent * 1000000 / (current_time - start_time)) : 0;
+		warn("Total chunks %Lu (%Lu bytes), wrote %Lu bytes in %i seconds, rate limit %u, transfer rate %u bytes/s", chunk_num, bytes_total, bytes_sent, (unsigned)((current_time - start_time) / 1000000), rate_limit, transrate);
 		err = progress_file ? write_progress(progress_file, progress_tmpfile, chunk_num, cl->count, extent_addr, tgt_snap) : 0;
 	}
 	goto out;
@@ -953,7 +976,7 @@ static int generate_delta(u32 mode, int level, struct change_list *cl, int delta
 	if ((err = fdwrite(deltafile, &dh, sizeof(dh))) < 0)
 		return err;
 
-	return generate_delta_extents(mode, level, cl, deltafile, devstem, dh.src_snap, dh.tgt_snap, NULL, 0);
+	return generate_delta_extents(mode, level, cl, deltafile, devstem, dh.src_snap, dh.tgt_snap, NULL, 0, 0);
 }
 
 static int ddsnap_generate_delta(u32 mode, int level, char const *changelistname, char const *deltaname, char const *devstem)
@@ -1069,7 +1092,7 @@ static u64 get_snapshot_sectors(int serv_fd, u32 snaptag)
 	return reply.count;
 }
 
-static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char const *devstem, u32 mode, int level, int ds_fd, char const *progress_file, u64 start_addr)
+static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char const *devstem, u32 mode, int level, int ds_fd, char const *progress_file, u64 start_addr, u32 ratelimit)
 {
 	int fullvolume = (src_snap == -1), err = -ENOMEM;
 	u64 skip_chunks = 0;
@@ -1134,7 +1157,7 @@ static int ddsnap_replication_send(int serv_fd, u32 src_snap, u32 tgt_snap, char
 	warn("sending delta from %i to %i", src_snap, tgt_snap);
 
 	/* stream delta */
-	if ((err = generate_delta_extents(mode, level, cl, ds_fd, devstem, src_snap, tgt_snap, progress_file, skip_chunks)) < 0) {
+	if ((err = generate_delta_extents(mode, level, cl, ds_fd, devstem, src_snap, tgt_snap, progress_file, skip_chunks, ratelimit)) < 0) {
 		warn("could not send delta downstream for snapshots %i and %i", src_snap, tgt_snap);
 		goto out;
 	}
@@ -2040,6 +2063,7 @@ int main(int argc, char *argv[])
 	char const *progress_file = NULL;
 	char const *resume = NULL;
 	char const *cachesize_str = NULL;
+	char const *ratelimit_str = NULL;
 	struct poptOption serverOptions[] = {
 		{ "foreground", 'f', POPT_ARG_NONE, &nobg, 0, "run in foreground. daemonized by default.", NULL }, // !!! unusual semantics, we should be foreground by default, and optionally daemonize
 		{ "logfile", 'l', POPT_ARG_STRING, &logfile, 0, "use specified log file", NULL },
@@ -2060,6 +2084,7 @@ int main(int argc, char *argv[])
 		{ "gzip", 'g', POPT_ARG_INT, &gzip_level, 0, "Compression via gzip", "compression_level"},
 		{ "progress", 'p', POPT_ARG_STRING, &progress_file, 0, "Output progress to specified file", NULL },
 		{ "resume", 's', POPT_ARG_STRING, &resume, 0, "Resume from specified address", NULL },
+		{ "ratelimit", 'l', POPT_ARG_STRING, &ratelimit_str, 0, "Rate limit to send delta to downstream (unit = bytes/s; default = 0, no limit)", "rate" },
 		POPT_TABLEEND
 	};
 
@@ -2085,8 +2110,6 @@ int main(int argc, char *argv[])
 		  "Create delta\n\t Function: Create a delta file given a changelist and 2 snapshots\n\t Usage: delta create [OPTION...] <changelist> <deltafile> <devstem>\n", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
 		  "Apply delta\n\t Function: Apply a delta file to a volume\n\t Usage: delta apply <deltafile> <devstem>", NULL },
-		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &cdOptions, 0,
-		  "Send delta\n\t Function: Send a delta file to a downstream server\n\t Usage: delta send [OPTION...] <sockname> <snapshot1> <snapshot2> <devstem> <remsnapshot> <host>[:<port>]\n", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &serverOptions, 0,
 		  "Listen\n\t Function: Listen for a delta arriving from upstream\n\t Usage: delta listen [OPTION...] <devstem> [<host>[:<port>]]", NULL },
 		POPT_TABLEEND
@@ -2122,6 +2145,8 @@ int main(int argc, char *argv[])
 		  "Get statistics\n\t Function: Report snapshot usage statistics\n\t Usage: status [OPTION...] <sockname> [<snapshot>]", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &deltaOptions, 0,
 		  "Delta\n\t Usage: delta [OPTION...] <subcommand> ", NULL},
+		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &cdOptions, 0,
+		  "Transmit\n\t Function: Stream delta of the given two snapshots to downstream\n\t Usage: transmit [OPTION...] <sockname> <host>[:<port>] [snapshot1] <snapshot2>", NULL},
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &resizeOptions, 0,
 		  "Resize\n\t Function: Change origin/snapshot/metadata device size\n\t Usage: resize [OPTION...] <sockname>", NULL },
 		{ NULL, '\0', POPT_ARG_INCLUDE_TABLE, &noOptions, 0,
@@ -2772,6 +2797,13 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
+		u32 ratelimit = 0;
+		if (ratelimit_str && ((ratelimit = strtobytes(ratelimit_str)) == INPUT_ERROR)) {
+			fprintf(stderr, "Invalid rate limit input. Omit option, or use 0 for the default\n");
+			poptPrintUsage(cdCon, stderr, 0);
+			poptFreeContext(cdCon);
+			return 1;
+		}
 		trace_off(fprintf(stderr, "xd=%d raw=%d best_comp=%d mode=%u gzip_level=%d\n", xd, raw, best_comp, mode, gzip_level););
 
 		char const *sockname, *snaptag1str, *snaptag2str, *hoststr;
@@ -2842,7 +2874,7 @@ int main(int argc, char *argv[])
 				ret = 1;
 			} else {
 				sprintf(devstem, "%s%s", DEVMAP_PATH, volume);
-				ret = ddsnap_replication_send(sock, snaptag1, snaptag2, devstem, mode, gzip_level, ds_fd, progress_file, start_addr);
+				ret = ddsnap_replication_send(sock, snaptag1, snaptag2, devstem, mode, gzip_level, ds_fd, progress_file, start_addr, ratelimit);
 				free(devstem);
 			}
 		}
