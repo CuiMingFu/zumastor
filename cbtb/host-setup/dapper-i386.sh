@@ -37,7 +37,6 @@ fi
 # defaults, overridden by /etc/default/testenv if it exists
 # diskimgdir should be local for reasonable performance
 size=10G
-diskimgdir=${HOME}/testenv
 tftpdir=/tftpboot
 qemu_img=qemu-img  # could be kvm, kqemu version, etc.
 qemu_i386=qemu  # could be kvm, kqemu version, etc.
@@ -115,7 +114,7 @@ EOF
     -serial unix:${SERIAL},server,nowait \
     -monitor unix:${MONITOR},server,nowait \
     -vnc unix:${VNC} \
-    -net nic,macaddr=${MACADDR},model=ne2k_pci -net tap,ifname=${IFACE},script=no \
+    -net nic,macaddr=${MACADDR} -net tap,ifname=${IFACE},script=no \
     -boot n -hda ${diskimg} -no-reboot & qemu_pid=$!
  
   # kill the emulator if any abort-like signal is received
@@ -130,7 +129,7 @@ EOF
     -serial unix:${SERIAL},server,nowait \
     -monitor unix:${MONITOR},server,nowait \
     -vnc unix:${VNC} \
-    -net nic,macaddr=${MACADDR},model=ne2k_pci -net tap,ifname=${IFACE},script=no \
+    -net nic,macaddr=${MACADDR} -net tap,ifname=${IFACE},script=no \
     -boot c -hda ${diskimg} -no-reboot & qemu_pid=$!
 
   # kill the emulator if any abort-like signal is received

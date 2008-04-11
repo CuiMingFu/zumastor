@@ -1,5 +1,6 @@
 Host setup scripts.  You may wish to perform these actions by hand rather
 than the script, so you know what they're doing to your host setup.
+See ../host-scripts/README for typical runtime use.
 
 dependencies.sh - install packages on the host required by the cbtb test
 environment.
