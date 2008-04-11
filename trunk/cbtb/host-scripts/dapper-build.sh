@@ -55,7 +55,7 @@ fi
 SSH='ssh -o StrictHostKeyChecking=no'
 SCP='timeout -14 3600 scp -o StrictHostKeyChecking=no'
 CMDTIMEOUT='time timeout -14 300'
-BUILDTIMEOUT='time timeout -14 36000'
+BUILDTIMEOUT='time timeout -14 172800'
 SETUPTIMEOUT='time timeout -14 3600'
 WGETTIMEOUT='time timeout -14 3600'
 
@@ -64,7 +64,7 @@ WGETTIMEOUT='time timeout -14 3600'
 # diskimgdir should be local for reasonable performance
 size=10G
 tftpdir=/tftpboot
-qemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
+rqemu_i386=qemu  # could be kvm, kqemu version, etc.  Must be 0.9.0 to net boot.
 qemu_threads=1
 
 [ -x /etc/default/testenv ] && . /etc/default/testenv
@@ -88,7 +88,7 @@ fi
 echo IPADDR=${IPADDR}
 echo control/tmp dir=${tmpdir}
 
-${qemu_i386} -snapshot -m ${mem} -smp ${qemu_threads} \
+${rqemu_i386} -snapshot -m ${mem} -smp ${qemu_threads} \
   -serial unix:${SERIAL},server,nowait \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
