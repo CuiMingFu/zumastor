@@ -216,12 +216,12 @@ function replicate_snapshot {
 	local -r target_dir=$VOLUMES/$vol/targets/$host
 	local -r send_file=$target_dir/send
 	local -r rate_file=$target_dir/ratelimit
+	local -r compress_file=$target_dir/compress
 	local -r remote_file=$send_file.remote
 	local -r hold_file=$target_dir/hold
 	local -r server=$SERVERS/$vol
 	local -r volume_file=$target_dir/name
-	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol ratelimit=0
-
+	local old_snap port status output remote_hold remote_send remote_addr resume ret=0 remote_vol ratelimit=0 compress=1 compression=""
 	read -d" " old_snap 2>/dev/null <$hold_file
 	read remote_vol <$volume_file || return 1
 
@@ -287,9 +287,14 @@ function replicate_snapshot {
 	fi
 
 	[[ -e $rate_file ]] && read ratelimit < $rate_file
+	[[ -e $compress_file ]] && read compress < $compress_file
+	if [[ "x$compress" == "x1" ]]
+	then
+		compression="-g 6"
+        fi 
 	log "remote listen started on port $port, transmitting snapshot $snap$resume"
 	# send the changes since the last snapshot via ddsnap transmit
-	ddsnap transmit $server $host:$port -r -g 6 $old_snap $snap$resume -p $send_file -l $ratelimit
+	ddsnap transmit $server $host:$port -r $compression $old_snap $snap$resume -p $send_file -l $ratelimit
 	if [[ $? -ne 0 ]]; then
 		log "transmit $server $host:$port $old_snap $snap$resume failed"
 		return 1
@@ -610,12 +615,13 @@ function forget_volume {
 }
 
 function define_target {
-	[[ $# -eq 4 ]] || [[ $# -eq 5 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
+	[[ $# -eq 5 ]] || [[ $# -eq 6 ]] || { echo "$0: wrong argument count ($#: $@) in call: ${FUNCNAME[@]}"; exit 1; }
 	local -r vol=$1
 	local -r host=$2
 	local -r name=$3
 	local -r rlimit=$4
-	local -r period=$5
+	local -r compress=$5
+	local -r period=$6
 	local -r path=$VOLUMES/$vol/targets/$host
 	local new=0
 
@@ -631,6 +637,7 @@ function define_target {
 
 	echo $name >$path/name || return 1
 	[[ "$rlimit" == 0 ]] || echo $rlimit >$path/ratelimit || return 1
+	echo $compress > $path/compress || return 1
 	if [[ -z $period ]]; then
 		rm $path/period 2> /dev/null
 		[[ $new == 0 ]] && pkill -f "zumastor replicate $vol $host --delay"
@@ -1011,12 +1018,12 @@ define)
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"
-		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-n|--name volname] [-r|--ratelimit rate] [-t|--test test_feature>] [-h|--help]"
-		declare test_fullvolume=0 rlimit=0
+		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-n|--name volname] [-r|--ratelimit rate] [-u|--uncompressed] [-t|--test test_feature>] [-h|--help]"
+		declare test_fullvolume=0 rlimit=0 compress=1
 		declare period name
 
-		shift 2
-		args=`getopt -ot:p:n:r:h -l test:,help,period:,name:,ratelimit: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
+		shift 2 
+		args=`getopt -ot:p:n:r:hu -l uncompressed,test:,help,period:,name:,ratelimit: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
 		eval set -- "$args"  # remove getopt quotes and set new arguments
 		until [[ $1 = -- ]]; do
 			case "$1" in
@@ -1029,6 +1036,8 @@ define)
 			-r|--ratelimit)
 				rlimit=$2
 				shift 1;;
+			-u|--uncompressed)
+				compress=0;;
 			-t|--test)
 				case "$2" in
 					fullvolume) test_fullvolume=1;;
@@ -1048,7 +1057,7 @@ define)
 		verify_managed_vol $vol || { echo "$cmd: volume '$vol' is not a managed volume"; exit 1; }
 		verify_valid_host $host || { echo "$cmd: invalid host '$host'"; exit 1; }
 
-		define_target $vol $host $name $rlimit $period
+		define_target $vol $host $name $rlimit $compress $period
 		exit $? ;;
 	master)
 		declare args
