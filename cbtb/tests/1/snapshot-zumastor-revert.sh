@@ -26,14 +26,14 @@ timeout_file_wait() {
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
   do
-    let "count = count + 1"
+    count=$(($count + 1))
     sleep 1
   done
   [ -e $file ]
   return $?
 }
 
-echo "1..7"
+echo "1..8"
 
 apt-get update
 aptitude install -y e2fsprogs
@@ -108,5 +108,10 @@ else
   echo "not ok 7 - testfile changed backup to version of the first snapshot"
   exit 7
 fi
+
+## Cleanup
+apt-get remove --purge --force-yes -y e2fsprogs
+zumastor forget testvol
+echo 'ok 8 - cleanup'
 
 exit 0

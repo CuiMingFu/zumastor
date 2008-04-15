@@ -13,7 +13,7 @@ set -e
 
 TIMEOUT=1200
 
-echo "1..2"
+echo "1..3"
 rc=0
 
 apt-get update
@@ -27,4 +27,9 @@ then
 else
   echo "ok 2 - zumastor not reported by check-initd-order"
 fi
+
+## Cleanup
+apt-get remove --purge --force-yes -y e2fsprogs
+echo 'ok 3 - cleanup'
+
 exit $rc

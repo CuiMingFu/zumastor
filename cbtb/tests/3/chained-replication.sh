@@ -30,8 +30,8 @@ timeout_remote_file_wait() {
   local file=$3
   local count=0
   while $SSH $remote [ ! -e $file ] && [ $count -lt $max ]
-  do 
-    let "count = count + 1"
+  do
+    count=$(($count + 1))
     sleep 1
   done
   $SSH $remote [ -e $file ]
@@ -63,7 +63,7 @@ ${SSH} root@${slave1} hostname slave1
 ${SSH} root@${slave1} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
 ${SSH} root@${slave1} zumastor status --usage
 echo ok 2 - slave1 testvol set up
- 
+
 echo ${IPADDR} master | ${SSH} root@${slave2} "cat >>/etc/hosts"
 echo ${IPADDR2} slave1 | ${SSH} root@${slave2} "cat >>/etc/hosts"
 echo ${IPADDR3} slave2 | ${SSH} root@${slave2} "cat >>/etc/hosts"

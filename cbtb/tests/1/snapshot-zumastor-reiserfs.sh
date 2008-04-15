@@ -27,7 +27,7 @@ timeout_file_wait() {
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
   do 
-    let "count = count + 1"
+    count=$(($count + 1))
     sleep 1
   done
   [ -e $file ]
@@ -36,7 +36,7 @@ timeout_file_wait() {
 
 
 
-echo "1..6"
+echo "1..7"
 
 apt-get update
 aptitude install -y reiserfsprogs
@@ -102,5 +102,10 @@ else
   echo "not ok 6 - testfile changed between origin and second snapshot"
   exit 6
 fi
+
+## Cleanup
+apt-get remove --purge --force-yes -y reiserfsprogs
+zumastor forget testvol
+echo 'ok 7 - cleanup'
 
 exit 0

@@ -22,7 +22,7 @@ TIMEOUT=600
 # necessary at the moment, looks like a zumastor bug
 SLEEP=5
 
-echo "1..3"
+echo "1..4"
 
 apt-get update
 aptitude install -y e2fsprogs
@@ -53,5 +53,10 @@ else
   echo "not ok 3 - testfile not present in first snapshot"
   exit 3
 fi
+
+## Cleanup
+apt-get remove --purge --force-yes -y e2fsprogs
+zumastor forget testvol
+echo 'ok 4 - cleanup'
 
 exit 0

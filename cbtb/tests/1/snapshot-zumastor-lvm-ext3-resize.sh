@@ -25,7 +25,7 @@ timeout_file_wait() {
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
   do
-    let "count = count + 1"
+    count=$(($count + 1))
     sleep 1
   done
   [ -e $file ]
@@ -161,5 +161,15 @@ zumastor resize testvol --snapshot 32m
 echo y | lvresize /dev/testvg/test_snap -L 32m
 size_check "snap" "2,048" 16 "size check after snapshot store shrink"
 file_check 17 "testfile changed after snapshot store shrink"
+
+## Cleanup
+zumastor forget testvol
+apt-get remove --purge --force-yes -y e2fsprogs
+yes | lvremove /dev/testvg/test_snap
+yes | lvremove /dev/testvg/test
+yes | vgremove testvg
+#TODO: Fix this
+#yes | pvremove ${DEV1NAME}
+echo 'ok 18 - cleanup'
 
 exit 0
