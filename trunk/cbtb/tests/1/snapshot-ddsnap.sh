@@ -82,5 +82,12 @@ if [ "$hash" != "$hash2" ] ; then
 fi
 echo ok 12 - testvol==testvol\(2\) new snapshot correct
 
+## Cleanup
+dmsetup remove testvol\(2\)
+dmsetup remove testvol\(0\)
+dmsetup remove testvol
+killall ddsnap || true
+echo 'ok 13 - cleanup'
+
 exit $rc
 

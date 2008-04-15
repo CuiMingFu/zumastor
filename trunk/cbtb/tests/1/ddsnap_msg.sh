@@ -66,4 +66,11 @@ echo "ok 13 - snapshot state"
 ddsnap status /tmp/src.server || { echo "not ok 14 - snapshot status"; exit -1; }
 echo "ok 14 - snapshot status"
 
+
+### Cleanup
+dmsetup remove test
+dmsetup remove test\(0\)
+killall ddsnap || true
+echo 'ok 15 - cleanup'
+
 exit 0
