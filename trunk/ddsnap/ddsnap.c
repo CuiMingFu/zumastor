@@ -226,13 +226,6 @@ struct cl_header
 	u32 tgt_snap;
 };
 
-struct vol_header
-{
-	char magic[MAGIC_SIZE];
-	u64 vol_size_bytes;
-	u32 chunksize_bits;
-};
-
 struct delta_header
 {
 	char magic[MAGIC_SIZE];
@@ -240,7 +233,7 @@ struct delta_header
 	u32 chunk_size;
 	u32 src_snap;
 	u32 tgt_snap;
-};
+} PACKED;
 
 struct delta_extent_header
 {
@@ -252,7 +245,7 @@ struct delta_extent_header
 	u64 extents_delta_length;
 	u64 ext1_chksum;
 	u64 ext2_chksum;
-};
+} PACKED;
 
 static u64 checksum(const unsigned char *data, u32 data_length)
 {
