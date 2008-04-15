@@ -930,7 +930,7 @@ function usage {
 }
 
 [[ $1 == "--version" ]] || [[ $1 == "-V" ]] && { cat $CONFIG/version ; exit; }
-[[ $1 == "--help" ]] || [[ $1 == "-h" ]] && { usage; exit 0; }
+[[ $1 == "--help" ]] && { usage; exit 0; }
 [[ -d $VOLUMES ]] || { echo "$0: cannot find zumastor database in '$VOLUMES'"; exit 1; }
 [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ -e $RUNFILE ]] || { echo "$0: zumastor not running, start with '/etc/init.d/zumastor start' first"; exit 1; }
 [[ $1 == "start" ]] || [[ $1 == "stop" ]] || [[ $1 == "status" ]] || [[ $1 == "replicate" ]] || [[ ! -e $LOCKFILE ]] || { echo "$0: $LOCKFILE exists, please wait if zumastor is in the middle of start/stop or call zumastor force-reload to recover"; exit 1; }
@@ -946,18 +946,18 @@ define)
 		declare chunksize=16k
 		declare cachesize
 		declare mountpoint snappath
-		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-z|--zero] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [-h|--help]"
+		declare usage="Usage: $name <vol> <origin> <snapstore> [-i|--initialize] [-z|--zero] [-m|--metadev <device>] [-b|--blocksize <bytes>] [-c|--chunksize <bytes>] [-k|--cachesize <size>] [-p|--mountpoint <dir>] [-o|--mountopts <list>] [-s|--snappath] [--help]"
 
 		shift 2
-		args=`getopt -ob:c:m:hizk:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,zero,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
+		args=`getopt -ob:c:m:izk:o:p:s: -l blocksize:,chunksize:,help,metadev:,initialize,zero,cachesize:,mountpoint:,mountopts:,snappath: -n"$name" -- "$@"` || { echo "$usage"; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
 		until [[ $1 = -- ]] ; do
 			case "$1" in
-			-h|--help)
+			--help)
 				echo "$usage"
-				echo "  -h, --help              show this help"
+				echo "  --help                  show this help"
 				echo "  -i, --initialize        initialize the snapstore (will overwrite data on snapstore)"
 				echo "  -z, --zero              initialize the origin (will overwrite data on origin with zeros!!!)"
 				echo "  -m, --metadev <device>  sets the metadata device (default is snapstore)"
@@ -1018,12 +1018,12 @@ define)
 		exit ;;
 	target)
 		declare cmd="$0 $1 $2"
-		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-n|--name volname] [-r|--ratelimit rate] [-u|--uncompressed] [-t|--test test_feature>] [-h|--help]"
+		declare usage="usage: $cmd <vol> <host> [-p|--period period] [-n|--name volname] [-r|--ratelimit rate] [-u|--uncompressed] [-t|--test test_feature>] [--help]"
 		declare test_fullvolume=0 rlimit=0 compress=1
 		declare period name
 
 		shift 2 
-		args=`getopt -ot:p:n:r:hu -l uncompressed,test:,help,period:,name:,ratelimit: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -ot:p:n:r:u -l uncompressed,test:,help,period:,name:,ratelimit: -n"$cmd" -- "$@"` || { echo $usage; exit 2; }
 		eval set -- "$args"  # remove getopt quotes and set new arguments
 		until [[ $1 = -- ]]; do
 			case "$1" in
@@ -1064,16 +1064,16 @@ define)
 		declare mountsnap="yes" export samba dotsnapshot
 		declare -a token value
 		declare name="$0 $1 $2"
-		declare usage="Usage: $name <vol> [-e|--export] [-s|--dotsnapshot] [-n|--no-snapmount] [-p|--samba] [-h|--help]"
+		declare usage="Usage: $name <vol> [-e|--export] [-s|--dotsnapshot] [-n|--no-snapmount] [-p|--samba] [--help]"
 
 		shift 2
-		args=`getopt -ohynesp -l help,no-snapmount,export,dotsnapshot,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
+		args=`getopt -oynesp -l help,no-snapmount,export,dotsnapshot,samba,yes -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 		eval set -- "$args" # remove getopt quotes and set new arguments
 
 		until [[ $1 = -- ]]; do
 			case "$1" in
-			-h|--help)
+			--help)
 				echo "usage: $name <vol> [Options]"
 				echo "Options"
 				echo "  -n, --no-snapmount       don't mount snapshots"
@@ -1410,20 +1410,20 @@ snapshot)
 	;;
 replicate)
 	declare name="$0 $1"
-	declare usage="Usage: $name <vol> [<host>] [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [-h|--help]"
+	declare usage="Usage: $name <vol> [<host>] [-s|--snapnum <snapnum>] [-d|--delay <seconds>] [-w|--wait] [-n|--nowait] [--help]"
 	declare snap delay
 	declare wait=0
 
 	shift 1
-	args=`getopt -os:d:hinw -l size:,delay:,help,nowait,wait -n"$name" -- "$@"` || { echo $usage; exit 2; }
+	args=`getopt -os:d:inw -l size:,delay:,help,nowait,wait -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 	eval set -- "$args" # remove getopt quotes and set new arguments
 
 	until [[ $1 = -- ]] ; do
 		case "$1" in
-		-h|--help)
+		--help)
 			echo $usage
-			echo "  -h, --help            show this help"
+			echo "  --help                show this help"
 			echo "  -s, --snapnum <snap>  send specified snapshot (otherwise take a new snapshot)"
 			echo "  -d, --delay <seconds> wait specified number of seconds before replicating (default is 0)"
 			echo "  -n, --nowait          don't wait for replication to complete"
@@ -1495,14 +1495,14 @@ status)
 	declare usage="Usage: $0 status [<vol> [<snap>]] [--full] [--usage]"
 
 	shift 1
-	args=`getopt -ofhu -l full,help,usage -n"$name" -- "$@"` || { echo $usage; exit 2; }
+	args=`getopt -ofu -l full,help,usage -n"$name" -- "$@"` || { echo $usage; exit 2; }
 
 	eval set -- "$args" # remove getopt quotes and set new arguments
 	until [[ $1 = -- ]] ; do
 		case "$1" in
-		-h|--help)
+		--help)
 			echo $usage
-			echo "  -h, --help            show this help"
+			echo "  --help                show this help"
 			echo "  -f, --full            show full rather than abbreviated paths"
 			echo "  -u, --usage           show detailed snapshot usage"
 			exit;;
@@ -1663,12 +1663,12 @@ resize)
 	declare usage="usage: $cmd <vol> [-o|--origin <size>] [-s|--snapshot <size>] [-m|--metadata <size>]"
 
 	shift 1
-	args=`getopt -oho:s:m: -l help,origin:,snapshot:,metadata: -n"$cmd" -- "$@"` || \
+	args=`getopt -oo:s:m: -l help,origin:,snapshot:,metadata: -n"$cmd" -- "$@"` || \
 		{ echo $usage; exit 2; }
 	eval set -- "$args"  # remove getopt quotes and set new arguments
 	until [[ $1 = -- ]]; do
 		case "$1" in
-		-h|--help)
+		--help)
 			echo $usage
 			exit;;
 		-o|--origin) orgsize=$2; shift 1;;
