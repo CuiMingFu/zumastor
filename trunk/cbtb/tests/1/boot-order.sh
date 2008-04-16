@@ -29,7 +29,6 @@ else
 fi
 
 ## Cleanup
-apt-get remove --purge --force-yes -y e2fsprogs
 echo 'ok 3 - cleanup'
 
 exit $rc
