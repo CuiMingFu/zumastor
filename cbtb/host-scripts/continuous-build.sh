@@ -82,7 +82,8 @@ then
 fi
 
 
-time ${TUNBR} timeout -14 39600 ${top}/dapper-build.sh $nobuild >${buildlog} 2>&1
+# give dapper-build one more hour than its internal timeout
+time ${TUNBR} timeout -14 176400 ${top}/dapper-build.sh $nobuild >${buildlog} 2>&1
 buildret=$?
 echo continuous dapper-build returned $buildret
 

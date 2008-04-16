@@ -160,7 +160,7 @@ done
 time ${CMDTIMEOUT} \
   ${SSH} build@${IPADDR} "echo $SVNREV >zumastor/SVNREV" || rc=$?
 
-# give the build 10 hours, then kill it.
+# give the build several hours, then kill it.
 time ${BUILDTIMEOUT} \
   ${SSH} build@${IPADDR} "cd zumastor && ./buildcurrent.sh $buildflags $KERNEL_CONFIG" || \
   rc=$?
