@@ -35,6 +35,7 @@ LOG=/dev/null
 TIME=`date +%s`
 DIST=$1
 if [ -z "$DIST" ]
+then
   DIST="hardy"
 fi
 
