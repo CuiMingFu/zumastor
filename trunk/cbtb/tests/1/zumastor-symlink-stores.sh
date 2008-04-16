@@ -55,7 +55,7 @@ else
 fi
 
 ## Cleanup
-zumastor forget testvol
+zumastor forget volume testvol
 echo 'ok 4 - cleanup'
 
 exit 0

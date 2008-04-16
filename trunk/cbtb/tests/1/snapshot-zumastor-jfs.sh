@@ -105,7 +105,7 @@ fi
 
 ## Cleanup
 apt-get remove --purge --force-yes -y jfsutils
-zumastor forget testvol
+zumastor forget volume testvol
 echo 'ok 7 - cleanup'
 
 exit 0

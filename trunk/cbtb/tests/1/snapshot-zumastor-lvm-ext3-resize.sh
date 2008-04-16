@@ -163,7 +163,7 @@ size_check "snap" "2,048" 16 "size check after snapshot store shrink"
 file_check 17 "testfile changed after snapshot store shrink"
 
 ## Cleanup
-zumastor forget testvol
+zumastor forget volume testvol
 yes | lvremove /dev/testvg/test_snap
 yes | lvremove /dev/testvg/test
 yes | vgremove testvg
