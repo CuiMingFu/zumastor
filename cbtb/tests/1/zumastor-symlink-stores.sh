@@ -55,7 +55,6 @@ else
 fi
 
 ## Cleanup
-apt-get remove --purge --force-yes -y e2fsprogs
 zumastor forget testvol
 echo 'ok 4 - cleanup'
 

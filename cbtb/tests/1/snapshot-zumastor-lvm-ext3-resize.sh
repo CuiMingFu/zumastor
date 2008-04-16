@@ -164,7 +164,6 @@ file_check 17 "testfile changed after snapshot store shrink"
 
 ## Cleanup
 zumastor forget testvol
-apt-get remove --purge --force-yes -y e2fsprogs
 yes | lvremove /dev/testvg/test_snap
 yes | lvremove /dev/testvg/test
 yes | vgremove testvg
