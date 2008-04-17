@@ -119,11 +119,11 @@ else
   popd
 fi
 
-${qemu_i386} -m 512 \
+${rqemu_i386} -m 512 \
   -serial unix:${SERIAL},server,nowait \
   -monitor unix:${MONITOR},server,nowait \
   -vnc unix:${VNC} \
-  -net nic,macaddr=${MACADDR},model=ne2k_pci \
+  -net nic,macaddr=${MACADDR} \
   -net tap,ifname=${IFACE},script=no \
   -boot c -hda "${DISKIMG}" -no-reboot & qemu_pid=$!
   
