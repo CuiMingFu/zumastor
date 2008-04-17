@@ -146,7 +146,7 @@ class VzHostSetup:
 
   def setupApache(self):
     logging.info('Setting up apache')
-    cmds = ['/usr/bin/apt-get install apache2',
+    cmds = ['/usr/bin/apt-get -y -q --force-yes install apache2',
             '/usr/sbin/a2enmod proxy_http',
             '/usr/sbin/a2enmod mem_cache',
             '/usr/sbin/a2enmod cache']
