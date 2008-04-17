@@ -1,3 +1,2 @@
-Open issues for release 0.5:
-  * replication checksum error when volume size is not a multiple or chunk size
-  * add more items here...
+Please see open issues at:
+http://code.google.com/p/zumastor/issues/list?can=2&q=&colspec=ID+Type+Status+Priority+Milestone+Owner+Summary&cells=tiles
