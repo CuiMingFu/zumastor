@@ -158,7 +158,7 @@ class VzHostSetup:
     fh.write(self.apacheCfg())
     fh.close()
     cmds = ['/usr/sbin/a2ensite proxy',
-            '/usr/sbin/a2dissite 000-default'
+            '/usr/sbin/a2dissite 000-default',
             '/etc/init.d/apache2 stop',
             '/etc/init.d/apache2 start']
     for cmd in cmds:
@@ -231,6 +231,10 @@ class VzHostSetup:
                                                     ' '.join(dirs)))
     logging.info('In-instance setup complete')
 
+  def miscSetup(self):
+    self._quietRun('ln -sf %s/%s/build /build' %
+                   (self._ovzprivatedir, self._veid))
+
   def checkPreReqs(self):
     self._checkUID()
     self._checkHostPkgs()
@@ -261,6 +265,7 @@ class VzHostSetup:
     self.startAndConfigureInterfaces()
     self.setupApache()
     self.setupInstance()
+    self.miscSetup()
     logging.info('Setup Done')
 
 if __name__ == '__main__':
