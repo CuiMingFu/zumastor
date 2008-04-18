@@ -50,12 +50,12 @@ cp --sparse=always $dapperext3 $uda
 sudo mount -oloop,rw $uda $rootdir
 
 # install the new zumastor userspace programs
-cp $BUILD_DIR/zumastor_$VERSION-r${SVNREV}_$ARCH.deb \
+cp $BUILD_DIR/zumastor_$VERSION-r${SVNREV}_all.deb \
   $BUILD_DIR/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
   $rootdir/tmp
 
 sudo chroot $rootdir dpkg -i /tmp/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
-  /tmp/zumastor_$VERSION-r${SVNREV}_$ARCH.deb
+  /tmp/zumastor_$VERSION-r${SVNREV}_all.deb
 sudo rm $rootdir/tmp/*.deb
 sudo umount $rootdir
 rmdir $rootdir
