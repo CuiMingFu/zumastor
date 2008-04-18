@@ -174,7 +174,7 @@ files="${BUILDSRC}/ddsnap_${DEBVERS}_${ARCH}.changes \
     ${BUILDSRC}/ddsnap_${DEBVERS}.dsc \
     ${BUILDSRC}/ddsnap_${DEBVERS}.tar.gz \
     ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.changes \
-    ${BUILDSRC}/zumastor_${DEBVERS}_${ARCH}.deb \
+    ${BUILDSRC}/zumastor_${DEBVERS}_all.deb \
     ${BUILDSRC}/zumastor_${DEBVERS}.dsc \
     ${BUILDSRC}/zumastor_${DEBVERS}.tar.gz"
 
