@@ -20,4 +20,4 @@ rm ${DESTDIR}/t.tar
 
 chmod 755 ${DESTDIR}/etc/cron.{hourly,daily,weekly}/zumastor ${DESTDIR}/etc/init.d/zumastor
 mkdir -p ${DESTDIR}/usr/share/man/man8 2>/dev/null
-gzip -c ./man/zumastor.8 > ${DESTDIR}/usr/share/man/man8/zumastor.8.gz
+gzip -c --best ./man/zumastor.8 > ${DESTDIR}/usr/share/man/man8/zumastor.8.gz
