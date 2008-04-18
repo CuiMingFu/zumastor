@@ -194,7 +194,7 @@ done
 if [ $rc -eq 0 ] ; then
   pushd build
   ln -sf r${SVNREV}/ddsnap_${DEBVERS}_${ARCH}.deb ddsnap_build_${ARCH}.deb
-  ln -sf r${SVNREV}/zumastor_${DEBVERS}_${ARCH}.deb zumastor_build_${ARCH}.deb 
+  ln -sf r${SVNREV}/zumastor_${DEBVERS}_all.deb zumastor_build_all.deb 
   if [ "$buildkernel" = "true" ]
   then
     ln -sf r${SVNREV}/kernel-headers-${KVERS}_${ARCH}.deb kernel-headers-build_${ARCH}.deb
