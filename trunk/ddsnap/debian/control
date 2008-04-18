@@ -8,4 +8,5 @@ Standards-Version: 0.1.0
 Package: ddsnap
 Architecture: any
 Depends: dmsetup, libpopt0, zlib1g
+Provides: nblock-write
 Description: ddsnap userspace daemons for block level snapshot and replication

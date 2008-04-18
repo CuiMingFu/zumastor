@@ -568,7 +568,7 @@ function send_to_fifo {
 	local -r data=$2
 
 	if [[ $nonblock == "yes" ]]; then
-		echo $data | /lib/zumastor/nblock_write $fifo || { echo "error writing to $fifo"; return 1; }
+		echo $data | /sbin/nblock_write $fifo || { echo "error writing to $fifo"; return 1; }
 	else
 		[[ -e $fifo ]] || { echo "$fifo does not exist"; return 1; }
 		[[ -p $fifo ]] || { echo "$fifo not a fifo"; return 1; }

@@ -55,7 +55,7 @@ install: build
 	dh_installdirs
 
 	mkdir -p $(CURDIR)/debian/ddsnap/sbin
-	install ddsnap devspam $(CURDIR)/debian/ddsnap/sbin
+	install ddsnap devspam nblock_write $(CURDIR)/debian/ddsnap/sbin
 	mkdir -p $(CURDIR)/debian/ddsnap/usr/share/man/man8
 	install ddsnap.8.gz $(CURDIR)/debian/ddsnap/usr/share/man/man8
 
