@@ -19,14 +19,14 @@ ddraid_binaries = mkddraid ddraidd ddraid-agent
 ddsnap_binaries = ddsnap
 # ddraid temporarily removed
 #binaries =  $(ddraid_binaries) $(ddsnap_binaries) devspam
-binaries =  $(ddsnap_binaries) devspam
+binaries =  $(ddsnap_binaries) devspam nblock_write
 
 all: $(binaries) ddsnap.8.gz
 .PHONY: all
 
 clean:
 	$(MAKE) -C $(testdir) clean
-	rm -f build.h $(binaries) *.o xdelta/*.o a.out ddsnap.8.gz patches/*/AUTO.*
+	rm -f build.h $(binaries) *.o xdelta/*.o a.out nblock_write ddsnap.8.gz patches/*/AUTO.*
 .PHONY: clean
 
 install:
@@ -64,6 +64,9 @@ event.o: event.c $(kernel)/dm-ddsnap.h event.h trace.h Makefile
 
 daemonize.o: daemonize.c $(deps)
 
+nblock_write: nblock_write.c
+	$(CC) nblock_write.c -o nblock_write
+
 mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
 	$(CC) -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
 
@@ -88,7 +91,7 @@ build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps)
 	@echo ' * This file is generated automatically by the Makefile.' >> $@
 	@echo ' */' >> $@
 	@echo '' >> $@
-	@echo '#define SVN_VERSION "'`cat SVNREV || svnversion .`'"' >> $@
+	@echo '#define SVN_VERSION "'`cat SVNREV || svnversion . || echo unknown`'"' >> $@
 	@echo '#define BUILD_DATE "'`date`'"' >> $@
 	@echo '#define BUILD_USER "'`whoami`'"' >> $@
 	@echo '#define BUILD_HOST "'`hostname`'"' >> $@

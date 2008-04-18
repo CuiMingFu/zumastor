@@ -82,7 +82,7 @@ echo ${SVNREV} >SVNREV
 echo ${VERSION} >SVNVERSION
 
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+EDITOR=/bin/true VISUAL=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
 mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
@@ -92,7 +92,7 @@ echo -n Building ddsnap Debian package...
 pushd ${SRC}/ddsnap >> $LOG || exit 1
 echo ${SVNREV} >SVNREV
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+EDITOR=/bin/true VISUAL=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
 dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 make genpatches
 popd >> $LOG

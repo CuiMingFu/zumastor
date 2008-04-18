@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 4.0.0)
 Standards-Version: 3.6.2
 
 Package: zumastor
-Architecture: any
-Depends: ddsnap (>= _VER_), bash, cron, dmsetup, util-linux, ${shlibs:Depends}, ${misc:Depends}
+Architecture: all
+Depends: ddsnap (>= _VER_), nblock-write,  bash, cron, dmsetup, util-linux, ${shlibs:Depends}, ${misc:Depends}
 Description: Zumastor interface for ddsnap
 	Provides snapshot and replication management for the ddsnap package
