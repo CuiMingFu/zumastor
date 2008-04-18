@@ -169,7 +169,7 @@ done
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} aptitude install -y tree || retval=$?
 ${KINSTTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/kernel-image-build_${ARCH}.deb || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/ddsnap_build_${ARCH}.deb || retval=$?
-${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_build_${ARCH}.deb || retval=$?
+${CMDTIMEOUT} ${SSH} root@${IPADDR} dpkg -i /tmp/zumastor_build_all.deb || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} 'rm /tmp/*.deb' || retval=$?
 ${CMDTIMEOUT} ${SSH} root@${IPADDR} apt-get clean || retval=$?
 
