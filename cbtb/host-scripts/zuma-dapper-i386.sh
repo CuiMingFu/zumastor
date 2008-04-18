@@ -158,7 +158,7 @@ ${SSH} root@${IPADDR} 'mount -t tmpfs tmpfs /tmp'
 # onto the new zuma template instance
 for f in \
     ddsnap_build_${ARCH}.deb \
-    zumastor_build_${ARCH}.deb \
+    zumastor_build_all.deb \
     kernel-headers-build_${ARCH}.deb \
     kernel-image-build_${ARCH}.deb
 do
