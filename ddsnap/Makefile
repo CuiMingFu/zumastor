@@ -21,7 +21,7 @@ ddsnap_binaries = ddsnap
 #binaries =  $(ddraid_binaries) $(ddsnap_binaries) devspam
 binaries =  $(ddsnap_binaries) devspam nblock_write
 
-all: $(binaries) ddsnap.8.gz
+all: $(binaries) ddsnap.8.gz devspam.8.gz nblock_write.8.gz
 .PHONY: all
 
 clean:
@@ -31,8 +31,8 @@ clean:
 
 install:
 	mkdir -p $(INSTDIR) || true
-	cp $(binaries) $(INSTDIR)
-	gzip -c ./man/ddsnap.8 > $(PREFIX)/$(MANDIR)/man8/ddsnap.8.gz
+	install -s -v $(binaries) $(INSTDIR)
+	install -v --mode=644 ddsnap.8.gz devspam.8.gz nblock_write.8.gz $(PREFIX)/$(MANDIR)/man8/
 .PHONY: install
 
 genpatches:
@@ -83,7 +83,11 @@ devspam: tests/devspam.c trace.h
 	$(CC) $< $(CFLAGS) $(CPPFLAGS) -o $@
 
 ddsnap.8.gz: ./man/ddsnap.8
-	gzip -c ./man/ddsnap.8 > ddsnap.8.gz
+	gzip -c --best ./man/ddsnap.8 > ddsnap.8.gz
+devspam.8.gz: ./man/devspam.8
+	gzip -c --best ./man/devspam.8 > devspam.8.gz
+nblock_write.8.gz: ./man/nblock_write.8
+	gzip -c --best ./man/nblock_write.8 > nblock_write.8.gz
 
 build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps) 
 	rm -f $@
@@ -252,4 +256,3 @@ ddsnap-test4:
 
 ddsnap-test9:
 	sudo /sbin/dmsetup remove torigin
-

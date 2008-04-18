@@ -55,9 +55,9 @@ install: build
 	dh_installdirs
 
 	mkdir -p $(CURDIR)/debian/ddsnap/sbin
-	install ddsnap devspam nblock_write $(CURDIR)/debian/ddsnap/sbin
+	install -s ddsnap devspam nblock_write $(CURDIR)/debian/ddsnap/sbin
 	mkdir -p $(CURDIR)/debian/ddsnap/usr/share/man/man8
-	install ddsnap.8.gz $(CURDIR)/debian/ddsnap/usr/share/man/man8
+	install -m 644 ddsnap.8.gz devspam.8.gz nblock_write.8.gz $(CURDIR)/debian/ddsnap/usr/share/man/man8
 
 # Build architecture-independent files here.
 binary-indep: build install
