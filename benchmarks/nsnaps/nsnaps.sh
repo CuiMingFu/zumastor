@@ -20,11 +20,11 @@ setup_tar() {
 
 check_environment() {
 	[ -d $ORIGIN_MOUNT ] || mkdir -p $ORIGIN_MOUNT || { echo "$ORIGIN_MOUNT doesn't exists"; exit 1; }
-	[ -d $TAR_MNT ] || mkdir -p $TAR_MNT || { echo "$TAR_MNT doesn't exists"; exit 1; } 
+	[ -d $TAR_MNT ] || mkdir -p $TAR_MNT || { echo "$TAR_MNT doesn't exists"; exit 1; }
         [ -e ${SOURCE_TAR}/$KERNEL_TAR ] || { cd $SOURCE_TAR; wget http://www.kernel.org/pub/linux/kernel/v2.6/${KERNEL_TAR}.bz2; bunzip2 ${KERNEL_TAR}.bz2; cd $SCRIPT_HOME; }
-	[ -e $ORIG_DEV ] || { echo "$ORIG_DEV doesn't exist"; exit 1; }  
-	[ -e $SNAP_DEV ] || { echo "$SNAP_DEV doesn't exist"; exit 1; }  
-	[ -e $TAR_DEV ] || { echo "$TAR_DEV doesn't exist"; exit 1; }  
+	[ -e $ORIG_DEV ] || { echo "$ORIG_DEV doesn't exist"; exit 1; }
+	[ -e $SNAP_DEV ] || { echo "$SNAP_DEV doesn't exist"; exit 1; }
+	[ -e $TAR_DEV ] || { echo "$TAR_DEV doesn't exist"; exit 1; }
 	[ -d $TEST_ROOT_DIR ] || mkdir -p ${TEST_ROOT_DIR} || { echo "unable to mkdir $TEST_ROOT_DIR"; exit 1; }
 }
     
@@ -35,14 +35,14 @@ setup_ddsnap() {
         [[ $# -ge 1 ]] && [[ $# -le 3 ]] || { echo "$0 setup_ddsnap: wrong number of arguments."; exit 1; }
 
         #makes local variables out of the inputs from the command line, first thing entered is origin
-        local -r orig=$ORIG_DEV
-        local -r snap=$SNAP_DEV
-        local -r csize=$1
+        local    orig=$ORIG_DEV
+        local    snap=$SNAP_DEV
+        local    csize=$1
         local    meta=""
         local    bsize=""
 
         if [[ $# -eq 2 ]]; then
-                meta=$2        
+                meta=$2
         elif [[ $# -eq 3 ]]; then
                 meta=$2
                 bsize=$3
@@ -94,19 +94,19 @@ umount_dir() {
 }
 
 new_snapshot() {
-        local -r snapid=$1
+        local    snapid=$1
         ddsnap create $SERVER_PIPE $snapid || { echo "unable to create snapshot id $snapid"; exit 1; }
 }
 
 run_tests() {
-        local -r num_tests=$1
-        local -r testname=$2
-	local -r testdir=${TEST_ROOT_DIR}/Config$global_test_num
-        local -r kern_tarball=${TAR_MNT}/${KERNEL_TAR} 
-        local -r temp=raw
+        local    num_tests=$1
+        local    testname=$2
+	local    testdir=${TEST_ROOT_DIR}/Config$global_test_num
+        local    kern_tarball=${TAR_MNT}/${KERNEL_TAR} 
+        local    temp=raw
         mkdir -p ${testdir} || { echo "unable to create $testdir"; exit 1; }
 	touch ${testdir}/$testname || { echo "unable to create file $testname"; exit 1; }
-	local -r kernel_dir=$(echo $KERNEL_TAR | sed -e 's/\.tar//g')
+	local    kernel_dir=$(echo $KERNEL_TAR | sed -e 's/\.tar//g')
 
 	local count=1
 	local device=""
@@ -139,9 +139,9 @@ run_tests() {
 		if [ $2 != raw ]; then
 		        new_snapshot $count
 		fi
-                count=$((count + 1))
-        done	
-	global_test_num=$((global_test_num + 1))    
+                count=$(($count + 1))
+        done
+	global_test_num=$(($global_test_num + 1))
 }
 
 
@@ -151,9 +151,9 @@ mkfs_test() {
 }
 
 create_device() {
-        local -r snapid=$1
-        local -r server=$SERVER_PIPE
-        local -r size=$(ddsnap status $server --size) || { echo "$0: FUNCNAME[@]} size"; exit 1; }
+        local    snapid=$1
+        local    server=$SERVER_PIPE
+        local    size=$(ddsnap status $server --size) || { echo "$0: FUNCNAME[@]} size"; exit 1; }
         echo 0 $size ddsnap $SNAP_DEV $ORIG_DEV $AGENT_PIPE $snapid | dmsetup create $VOLUME_NAME || { echo "unable to create vol device"; exit 1; }
 }
 
@@ -175,12 +175,12 @@ run_raw_configuration() {
 # $4 = block size, 
 # $5 = number of tests to run
 run_configuration() {
-        local -r num_tests=$5
-	local -r testdir=${TEST_ROOT_DIR}/Config$global_test_num
+        local    num_tests=$5
+	local    testdir=${TEST_ROOT_DIR}/Config$global_test_num
 
 	#first, the tests are run on a raw device
 	if [ $global_test_num -eq 0 ] ; then
-	    run_raw_configuration $num_tests "raw" 
+	    run_raw_configuration $num_tests "raw"
 	fi
 
 	echo "Setting up ddsnap"
@@ -188,7 +188,7 @@ run_configuration() {
 #       new_snapshot 0
         mkfs_test $testdir # output mkfs info into testdir```
         echo "Starting to run tests"
-        run_tests $num_tests $1    
+        run_tests $num_tests $1
         echo "Removing device ${VOLUME_NAME}"
         remove_devices ${VOLUME_NAME}
         kill_ddsnap
@@ -206,21 +206,21 @@ plot_data() {
 # sets the x coordinate of the key for gnuplot based on the number
 # of tests that were run
 find_X_coord() {
-        local -r num_tests=$1
+        local    num_tests=$1
         local percent=94
-        X_COORD_PLOT_KEY=$((num_tests * percent))
-        X_COORD_PLOT_KEY=$((X_COORD_PLOT_KEY / 100))
+        X_COORD_PLOT_KEY=$(($num_tests * $percent))
+        X_COORD_PLOT_KEY=$(($X_COORD_PLOT_KEY / 100))
 }
 
-# runs each configuration 
+# runs each configuration
 run_all_configurations() {
 
-        local -r num_tests=3
+        local    num_tests=3
 #	run_configuration "native:normal:4k" 4k "" "" $num_tests
 #	run_configuration "native:normal:16k" 16k "" "" $num_tests
 #	run_configuration "native:normal:64k" 64k "" ""	$num_tests
 	run_configuration "native:normal:128k" 128k "" "" $num_tests
-	run_configuration "native:normal:256k" 256k "" "" $num_tests	
+	run_configuration "native:normal:256k" 256k "" "" $num_tests
 #       run_configuration "native:nvram:4k" 4k $META_DEV 4k $num_tests
 #       run_configuration "native:nvram:16k" 16k $META_DEV 4k $num_tests
 #       run_configuration "native:nvram:64k" 64k $META_DEV 4k $num_tests

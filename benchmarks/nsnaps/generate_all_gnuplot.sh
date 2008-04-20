@@ -15,7 +15,7 @@ do
         else
                 echo -n ", \"$testfile\" using 1:2 w lp t\"$testfile\" "
         fi
-        count=$((count + 1))
+        count=$(($count + 1))
 done;
 
 for testfile in `ls raw`
