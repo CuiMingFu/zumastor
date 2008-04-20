@@ -7,30 +7,30 @@ SERVER_LOG=/tmp/server.log
 AGENT_PIPE=/tmp/control
 SERVER_PIPE=/tmp/server
 
-. config.sh
+. ./config.sh
 
 global_test_num=0
 
-function setup_tar() {
+setup_tar() {
 	mkfs.ext3 $TAR_DEV || { echo "unable to mkfs tar device"; exit 1; }
 	mount_dir $TAR_DEV $TAR_MNT
 	cp ${SOURCE_TAR}/$KERNEL_TAR ${TAR_MNT}/
 	umount_dir $TAR_MNT
 }
 
-function check_environment() {
+check_environment() {
 	[ -d $ORIGIN_MOUNT ] || mkdir -p $ORIGIN_MOUNT || { echo "$ORIGIN_MOUNT doesn't exists"; exit 1; }
 	[ -d $TAR_MNT ] || mkdir -p $TAR_MNT || { echo "$TAR_MNT doesn't exists"; exit 1; } 
         [ -e ${SOURCE_TAR}/$KERNEL_TAR ] || { cd $SOURCE_TAR; wget http://www.kernel.org/pub/linux/kernel/v2.6/${KERNEL_TAR}.bz2; bunzip2 ${KERNEL_TAR}.bz2; cd $SCRIPT_HOME; }
-	[ -e $ORIG_DEV ] || { echo "$ORIG_DEV doesn't exists"; exit 1; }  
-	[ -e $SNAP_DEV ] || { echo "$SNAP_DEV doesn't exists"; exit 1; }  
-	[ -e $TAR_DEV ] || { echo "$TAR_DEV doesn't exists"; exit 1; }  
+	[ -e $ORIG_DEV ] || { echo "$ORIG_DEV doesn't exist"; exit 1; }  
+	[ -e $SNAP_DEV ] || { echo "$SNAP_DEV doesn't exist"; exit 1; }  
+	[ -e $TAR_DEV ] || { echo "$TAR_DEV doesn't exist"; exit 1; }  
 	[ -d $TEST_ROOT_DIR ] || mkdir -p ${TEST_ROOT_DIR} || { echo "unable to mkdir $TEST_ROOT_DIR"; exit 1; }
 }
     
 # take in origin device, snapshot device, and optionally metadevice
 # setup_ddsnap(origin, snapshot_store, chunksize, [meta device], [block size])
-function setup_ddsnap() {
+setup_ddsnap() {
         # the number of operands $# needs to be greater than or equal to 3
         [[ $# -ge 1 ]] && [[ $# -le 3 ]] || { echo "$0 setup_ddsnap: wrong number of arguments."; exit 1; }
 
@@ -69,20 +69,19 @@ function setup_ddsnap() {
 }
 
 
-function remove_devices() {
+remove_devices() {
 	# not sure if we should exit here
         dmsetup ls | grep $VOLUME_NAME | awk '{print $1}' | xargs -i dmsetup remove {} || { echo "unable to remove devices from dmsetup"; }
 }
 
-function kill_ddsnap() {
+kill_ddsnap() {
 	remove_devices
 	killall ddsnap
 }
 
 
 # mount will take the device, directory and optionally mount options
-function mount_dir() {
-        
+mount_dir() {
         local cmd_options=""
         if [[ $# -eq 3 ]]; then
                 cmd_options="-o $3"
@@ -90,16 +89,16 @@ function mount_dir() {
         mount $cmd_options $1 $2 || { echo "unable to mount directory $2 (dev: $1)"; exit 1; }
 }
 
-function umount_dir() {
+umount_dir() {
          umount $1 || { echo "unable to umount directory $2 )"; exit 1; }
 }
 
-function new_snapshot() {
+new_snapshot() {
         local -r snapid=$1
         ddsnap create $SERVER_PIPE $snapid || { echo "unable to create snapshot id $snapid"; exit 1; }
 }
 
-function run_tests() {
+run_tests() {
         local -r num_tests=$1
         local -r testname=$2
 	local -r testdir=${TEST_ROOT_DIR}/Config$global_test_num
@@ -146,12 +145,12 @@ function run_tests() {
 }
 
 
-function mkfs_test() {
+mkfs_test() {
 	mkdir -p $1
         /usr/bin/time -po ${1}/mkfs.test mkfs.ext3 /dev/mapper/${VOLUME_NAME} || { echo "make failed"; exit 1; }
 }
 
-function create_device {
+create_device() {
         local -r snapid=$1
         local -r server=$SERVER_PIPE
         local -r size=$(ddsnap status $server --size) || { echo "$0: FUNCNAME[@]} size"; exit 1; }
@@ -161,7 +160,7 @@ function create_device {
 # runs the specified number of tests on a raw device
 # $1 = number of tests to run,
 # $2 = testname)
-function run_raw_configuration() {
+run_raw_configuration() {
         mkfs.ext3 $RAW_DEV
         echo "Starting to run $1 raw device tests"
         run_tests $1 $2
@@ -175,7 +174,7 @@ function run_raw_configuration() {
 # $3 = nvram or empty string if running without nvram,
 # $4 = block size, 
 # $5 = number of tests to run
-function run_configuration() {
+run_configuration() {
         local -r num_tests=$5
 	local -r testdir=${TEST_ROOT_DIR}/Config$global_test_num
 
@@ -195,7 +194,7 @@ function run_configuration() {
         kill_ddsnap
 }
 
-function plot_data() {
+plot_data() {
         cd $TEST_ROOT_DIR
         echo "Extracting data."
         $SCRIPT_HOME/extract_data.pl
@@ -206,7 +205,7 @@ function plot_data() {
 
 # sets the x coordinate of the key for gnuplot based on the number
 # of tests that were run
-function find_X_coord() {
+find_X_coord() {
         local -r num_tests=$1
         local percent=94
         X_COORD_PLOT_KEY=$((num_tests * percent))
@@ -214,7 +213,7 @@ function find_X_coord() {
 }
 
 # runs each configuration 
-function run_all_configurations() {
+run_all_configurations() {
 
         local -r num_tests=3
 #	run_configuration "native:normal:4k" 4k "" "" $num_tests
