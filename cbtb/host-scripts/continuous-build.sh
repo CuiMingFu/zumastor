@@ -118,7 +118,18 @@ if [ -x ${mailto} ] ; then
 
 elif [ -x ${biabam} ] ; then
   bfiles=`echo $files | tr ' ' ','`
-  cat $files | ${biabam} $bfiles -s "${subject}" ${email}
+  totallength=`wc -l *|tail -n 1|awk '{print $1}'`
+  maxlength=100
+  tmpfile=`mktemp`
+  if [ $totallength -gt $maxlength ]
+  then
+    cat $files | head -n $maxlength >> $tmpfile
+    echo "-- Message truncated at ${maxlength} lines --" >> $tmpfile
+  else
+    cat $files >> $tmpfile
+  fi
+  cat $tmpfile | ${biabam} $bfiles -s "${subject}" ${email}
+  rm $tmpfile
 
 elif [ -x ${sendmail} ] ; then
   (
