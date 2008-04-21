@@ -13,7 +13,10 @@ function read_and_inc {
 	local -r inc=$2
 	local num new
 	# we only use even numbers for master snapshots (odd for mounting downstream)
-	read num <$filename || num=0
+	read_and_inc_sub() {
+		read num <$filename || num=0
+	}
+	read_and_inc_sub 2>/dev/null
 	new=$((num + 1))
 	[[ $((new % 2)) -eq 0 ]] || let new++
 	echo $new > $filename || return 1
