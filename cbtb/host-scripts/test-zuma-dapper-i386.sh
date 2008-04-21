@@ -17,8 +17,8 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
-    let "count = count + 1"
+  do
+    count=$(($count + 1))
     sleep 1
   done
   [ -e $file ]
