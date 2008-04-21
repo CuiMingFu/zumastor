@@ -32,7 +32,7 @@ check_environment() {
 # setup_ddsnap(origin, snapshot_store, chunksize, [meta device], [block size])
 setup_ddsnap() {
         # the number of operands $# needs to be greater than or equal to 3
-        [[ $# -ge 1 ]] && [[ $# -le 3 ]] || { echo "$0 setup_ddsnap: wrong number of arguments."; exit 1; }
+        [ $# -ge 1 ] && [ $# -le 3 ] || { echo "$0 setup_ddsnap: wrong number of arguments."; exit 1; }
 
         #makes local variables out of the inputs from the command line, first thing entered is origin
         local    orig=$ORIG_DEV
@@ -41,9 +41,9 @@ setup_ddsnap() {
         local    meta=""
         local    bsize=""
 
-        if [[ $# -eq 2 ]]; then
+        if [ $# -eq 2 ]; then
                 meta=$2
-        elif [[ $# -eq 3 ]]; then
+        elif [ $# -eq 3 ]; then
                 meta=$2
                 bsize=$3
         fi
@@ -83,7 +83,7 @@ kill_ddsnap() {
 # mount will take the device, directory and optionally mount options
 mount_dir() {
         local cmd_options=""
-        if [[ $# -eq 3 ]]; then
+        if [ $# -eq 3 ]; then
                 cmd_options="-o $3"
         fi       
         mount $cmd_options $1 $2 || { echo "unable to mount directory $2 (dev: $1)"; exit 1; }

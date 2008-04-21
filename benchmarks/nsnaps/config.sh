@@ -14,6 +14,7 @@ set -u # let make sure we use initialized variable
 #ORIG_DEV= origin device volume
 #SNAP_DEV= snap device volume
 #META_DEV= meta device
+#RAW_DEV= device to do raw testing
 #SCRIPT_HOME= the directory path that hold the scripts
 
 
