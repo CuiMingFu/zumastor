@@ -19,6 +19,7 @@ do
   case $1 in
     --no-kernel)
         buildkernel=false
+	kconfig=/dev/null
         ;;
     *)
       kconfig=$1
