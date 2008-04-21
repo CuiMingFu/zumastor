@@ -19,7 +19,7 @@ wait_for_ssh() {
   local count=0
   while [ $count -lt $max ] && ! ${SSH} $account hostname 2>/dev/null
   do
-    let "count = count + 1"
+    count=$(($count + 1))
     sleep 10
   done
   ${SSH} $account hostname 2>/dev/null
