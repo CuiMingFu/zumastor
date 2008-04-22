@@ -10,10 +10,16 @@
 
 set -e
 
+# While working on this new Harness->Test interface, this will fail.
+EXPECT_FAIL=1
+
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
@@ -24,7 +30,7 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -32,17 +38,15 @@ timeout_file_wait() {
   return $?
 }
 
-
-
-echo "1..4"
+echo "1..5"
 
 apt-get update
 
-dd if=/dev/urandom bs=512 of=/dev/sdb || true
-dd if=/dev/urandom bs=512 of=/dev/sdc || true
+dd if=/dev/urandom bs=512 of=${DEV1NAME} || true
+dd if=/dev/urandom bs=512 of=${DEV2NAME} || true
 echo ok 1 - raw volumes randomized
 
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize  --zero
+zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize  --zero
 echo ok 2 - zumastor volume defined
 
 size=`blockdev --getsize64 /dev/mapper/testvol`
@@ -54,6 +58,14 @@ then
 else
   echo not ok 4 - testvol does not match /dev/zero
   exit 4
+fi
+
+if zumastor forget volume testvol
+then
+  echo ok 5 - Cleanup complete
+else
+  echo not ok 5 - Cleanup not complete
+  exit 5
 fi
 
 exit 0
