@@ -2,7 +2,7 @@ Source: zumastor
 Section: utils
 Priority: optional
 Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
-Build-Depends: debhelper (>= 4.0.0)
+Build-Depends: debhelper (>= 4.0.0), rsync
 Standards-Version: 3.6.2
 
 Package: zumastor
