@@ -140,32 +140,20 @@ General
   \ Prevent multiple server starts on same snapshot store
   + More configurable tracing
   + Add more internal consistency checks
-  - Magic number + version for superblock
+  \ Magic number + version for superblock
   + Flesh out and audit error paths
   - Make it endian-neutral
-  - Verify wordsize neutral
-  - Add an on-the-fly verify path
+  \ Verify wordsize neutral
+  \ Add an on-the-fly verify path
   + strip out the unit testing gunk
   + More documentation
   + Audits and more audits
-  + Memory inversion prevention
+  \ Memory inversion prevention
   \ failed chunk alloc fails operation, no abort
 
 Cluster integration
   + Restart/Error recovery/reporting
 */
-
-static void hexdump(void const *data, unsigned length)
-{
-	while (length) {
-		int row = length < 16? length: 16;
-		printf("%p: ", data);
-		length -= row;
-		while (row--)
-			printf("%02hhx ", *(unsigned char const *)data++);
-		printf("\n");
-	}
-}
 
 /*
  * Snapshot btree
@@ -553,7 +541,7 @@ static int replay_journal(struct superblock *sb)
 
 		if (checksum_block(sb, (void *)block)) {
 			warn("block %i failed checksum", i);
-			hexdump(block, 40);
+			//hexdump(block, 40);
 			if (scribbled != -1) {
 				why = "Too many scribbled blocks in journal";
 				goto failed;
@@ -3155,7 +3143,7 @@ static void save_state(struct superblock *sb)
  */
 int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits)
 {
-	int i, error;
+	int error;
 	
 	sb->image = (struct disksuper){ .magic = SB_MAGIC };
 	sb->image.metadata.allocsize_bits = bs_bits;
@@ -3184,20 +3172,6 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	}
 	set_sb_dirty(sb);
 
-#ifdef INITDEBUG1
-	printf("chunk = %Lx\n", alloc_chunk_from_range(sb, sb->image.chunks - 1, 1));
-//	struct buffer *buffer = snapread(sb, sb->image.bitmap_base + 3 * 8);
-//	dump_buffer(buffer, 4090, 6);
-	return 0;
-#endif
-
-#ifdef INITDEBUG2
-	grab_chunk(sb, 32769);
-	struct buffer *buffer = snapread(sb, sb->image.bitmap_base + 8);
-	printf("sector %Lx\n", buffer->sector);
-	free_chunk(sb, 32769);
-	return 0;
-#endif
 	/* Get an enode and an eleaf for the root of the b-tree. */
 	struct buffer *leafbuf = new_leaf(sb);
 	struct buffer *rootbuf = new_node(sb);
@@ -3205,89 +3179,22 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	buffer2node(rootbuf)->count = 1;
 	buffer2node(rootbuf)->entries[0].sector = leafbuf->sector;
 	sb->image.etree_root = rootbuf->sector;
-
-#ifdef INITDEBUG3
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-//	free_chunk(sb, 23);
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	printf("chunk = %Lx\n", alloc_chunk(sb));
-	return 0;
-#endif
-
 	brelse_dirty(rootbuf);
 	brelse_dirty(leafbuf);
 
-#ifdef INITDEBUG4
-	struct buffer *leafbuf1 = new_leaf(sb);
-	struct buffer *leafbuf2 = new_leaf(sb);
-	struct eleaf *leaf1 = buffer2leaf(leafbuf1);
-	struct eleaf *leaf2 = buffer2leaf(leafbuf2);
-	init_leaf(leaf1, 256);
-	init_leaf(leaf2, 256);
-	add_exception_to_leaf(leaf1, 0x111, 0x11, 0, 3);
-	add_exception_to_leaf(leaf2, 0x222, 0x11, 1, 3);
-	add_exception_to_leaf(leaf2, 0x333, 0x33, 1, 3);
-	show_leaf(leaf1);
-	show_leaf(leaf2);
-	merge_leaves(leaf1, leaf2);
-	show_leaf(leaf1);
-	return 0;
-#endif
-
 	chunk_t metafree = sb->image.metadata.freechunks;
 	chunk_t snapfree = sb->image.snapdata.freechunks;
-	for (i = 0; i < sb->image.journal_size; i++) {
+	for (int i = 0; i < sb->image.journal_size; i++) {
 		struct buffer *buffer = jgetblk(sb, i);
 		memset(buffer->data, 0, sb->metadata.allocsize);
 		struct commit_block *commit = (struct commit_block *)buffer->data;
 		*commit = (struct commit_block){ .magic = JMAGIC, .sequence = i, .metafree = metafree, .snapfree = snapfree };
-#ifdef TEST_JOURNAL
-		commit->sequence = (i + 3) % (sb->image.journal_size);
-#endif
 		commit->checksum = -checksum_block(sb, (void *)commit);
 		write_buffer(buffer);
 		brelse(buffer);
 	}
 
-#ifdef TEST_JOURNAL
-	show_journal(sb);
-	show_tree(sb);
-	(void)flush_buffers();
-	replay_journal(sb);
-	show_buffers();
-#endif
-
-#ifdef TEST_JOURNAL
-	show_buffers();
-	show_dirty_buffers();
-	commit_transaction(sb);
-	(void)flush_buffers();
-	evict_buffers();
-
-	show_journal(sb);
-	show_tree(sb);
-	replay_journal(sb);
-	(void)flush_buffers();
-	evict_buffers();
-	show_tree(sb);
-#endif
 	save_state(sb);
-	free(sb->copybuf);
-	free(sb->snaplocks);
-	
-#ifdef INITDEBUG5
-	printf("Let's try to load the superblock again\n");
-	load_sb(sb);
-	printf("snapshot dev %u\n", sb->snapdev);
-#endif
 	return 0;
 }
 
@@ -3418,9 +3325,7 @@ static int incoming(struct superblock *sb, struct client *client)
 
 	switch (message.head.code) {
 	case QUERY_WRITE:
-		/*
-		 * if snaptag is -1, we're writing to the origin.
-		 */
+		/* Write to origin if snaptag is -1 */
 		if (client->snaptag == -1) {
 			struct pending *pending = NULL;
 			struct rw_request *body = (struct rw_request *)message.body;
@@ -3464,9 +3369,7 @@ static int incoming(struct superblock *sb, struct client *client)
 			reply(sock, &message);
 			break;
 		}
-		/*
-		 * We're writing to a snapshot.
-		 */
+		/* Write to snapshot */
 		struct rw_request *body = (struct rw_request *)message.body;
 		if (message.head.length < sizeof(*body))
 			goto message_too_short;
@@ -3686,14 +3589,8 @@ static int incoming(struct superblock *sb, struct client *client)
 		}
 		break;
 	}
-	case INITIALIZE_SNAPSTORE:
+	case INITIALIZE_SNAPSTORE: // this is a stupid feature
 	{
-		/* FIXME: init_snapstore takes more arguments now */
-#if 0 // this is a stupid feature
-		warn("Improper initialization.");
-		init_snapstore(sb, DEFAULT_JOURNAL_SIZE, 
-			       SECTOR_BITS + SECTORS_PER_BLOCK, SECTOR_BITS + SECTORS_PER_BLOCK);
-#endif
 		break;
 	}
 	case DUMP_TREE_RANGE:
@@ -4377,6 +4274,8 @@ int really_init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits
 	
 	if (init_snapstore(sb, js_bytes, bs_bits, cs_bits) < 0) 
 		warn("Snapshot storage initiailization failed");
+	free(sb->copybuf);
+	free(sb->snaplocks);
 	free(sb);
 	return 0;
 }
