@@ -26,7 +26,7 @@ all: $(binaries) ddsnap.8.gz devspam.8.gz nblock_write.8.gz
 
 clean:
 	$(MAKE) -C $(testdir) clean
-	rm -f build.h $(binaries) *.o xdelta/*.o a.out nblock_write *.gz patches/*/AUTO.*
+	rm -f build.h $(binaries) *.o xdelta/*.o a.out *.gz patches/*/AUTO.*
 .PHONY: clean
 
 install:
