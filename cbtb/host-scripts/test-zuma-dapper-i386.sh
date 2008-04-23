@@ -309,6 +309,19 @@ if [ "x$IPADDR3" != "x" ] ; then
   params="${params} IPADDR3=${IPADDR3}"
 fi
 
+# Supply device names as environment variables
+if [ "x${DEV1NAME}" != "x" ]
+then
+  params="${params} DEV1NAME=${DEV1NAME}"
+fi
+if [ "x${DEV2NAME}" != "x" ]
+then
+  params="${params} DEV2NAME=${DEV2NAME}"
+fi
+if [ "x${DEV3NAME}" != "x" ]
+then
+  params="${params} DEV3NAME=${DEV3NAME}"
+fi
 
 # execute any parameters here, but only if all instances booted
 if [ "x${execfiles}" != "x" ] && [ $retval -eq 0 ]
