@@ -2341,7 +2341,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		trace_off(printf("js_bytes is %u, bs_bits is %u, and cs_bits is %u\n", js_bytes, bs_bits, cs_bits););
-		return really_init_snapstore(orgdev_, snapdev_, metadev_, bs_bits, cs_bits, js_bytes);
+		return init_snapstore(orgdev_, snapdev_, metadev_, bs_bits, cs_bits, js_bytes);
 	}
 	if (strcmp(command, "agent") == 0) {
 		char const *sockname;

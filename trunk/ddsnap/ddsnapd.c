@@ -3136,15 +3136,28 @@ static void save_state(struct superblock *sb)
 	save_sb(sb);
 }
 
-/*
- * I'll leave all the testing hooks lying around in the main routine for now,
- * since the low level components still tend to break every now and then and
- * require further unit testing.
- */
-int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits)
+static int init_journal(struct superblock *sb)
+ {
+	chunk_t metafree = sb->image.metadata.freechunks;
+	chunk_t snapfree = sb->image.snapdata.freechunks;
+	for (int i = 0; i < sb->image.journal_size; i++) {
+		struct buffer *buffer = jgetblk(sb, i);
+		memset(buffer->data, 0, sb->metadata.allocsize);
+		struct commit_block *commit = (struct commit_block *)buffer->data;
+		*commit = (struct commit_block){ .magic = JMAGIC, .sequence = next_journal_block(sb), .metafree = metafree, .snapfree = snapfree };
+		commit->checksum = -checksum_block(sb, (void *)commit);
+		assert(buffer->count == 1);
+		write_buffer(buffer);
+		brelse(buffer);
+		evict_buffer(buffer);
+	}
+	return 0;
+}
+
+static int init_super(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits)
 {
 	int error;
-	
+
 	sb->image = (struct disksuper){ .magic = SB_MAGIC };
 	sb->image.metadata.allocsize_bits = bs_bits;
 	sb->image.snapdata.allocsize_bits = cs_bits;
@@ -3181,20 +3194,6 @@ int init_snapstore(struct superblock *sb, u32 js_bytes, u32 bs_bits, u32 cs_bits
 	sb->image.etree_root = rootbuf->sector;
 	brelse_dirty(rootbuf);
 	brelse_dirty(leafbuf);
-
-	chunk_t metafree = sb->image.metadata.freechunks;
-	chunk_t snapfree = sb->image.snapdata.freechunks;
-	for (int i = 0; i < sb->image.journal_size; i++) {
-		struct buffer *buffer = jgetblk(sb, i);
-		memset(buffer->data, 0, sb->metadata.allocsize);
-		struct commit_block *commit = (struct commit_block *)buffer->data;
-		*commit = (struct commit_block){ .magic = JMAGIC, .sequence = i, .metafree = metafree, .snapfree = snapfree };
-		commit->checksum = -checksum_block(sb, (void *)commit);
-		write_buffer(buffer);
-		brelse(buffer);
-	}
-
-	save_state(sb);
 	return 0;
 }
 
@@ -4247,37 +4246,24 @@ int sniff_snapstore(int metadev)
 	return sniff;
 }
 
-int really_init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits, unsigned cs_bits, unsigned js_bytes)
+int init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits, unsigned cs_bits, unsigned js_bytes)
 {
 	struct superblock *sb = new_sb(metadev, orgdev, snapdev);
 
-#ifdef MKDDSNAP_TEST
-	if (init_snapstore(sb, js_bytes, bs_bits, cs_bits) < 0)
-		return 1;
-	create_snapshot(sb, 0);
-	
-	int i;
-	for (i = 0; i < 100; i++)
-		make_unique(sb, i, NULL);
-	
-	flush_buffers();
-	evict_buffers();
-	warn("delete...");
-	delete_tree_range(sb, 1, 0, 5);
-	show_buffers();
-	warn("dirty buffers = %i", dirty_buffer_count);
-	show_tree(sb);
-	return 0;
-#endif
 	unsigned bufsize = 1 << bs_bits;
 	init_buffers(bufsize, 0); /* do not preallocate buffers */
-	
-	if (init_snapstore(sb, js_bytes, bs_bits, cs_bits) < 0) 
-		warn("Snapshot storage initiailization failed");
+	if (init_super(sb, js_bytes, bs_bits, cs_bits) < 0)
+		goto fail;
+	if (init_journal(sb) < 0)
+		goto fail;
+	save_state(sb);
 	free(sb->copybuf);
 	free(sb->snaplocks);
 	free(sb);
 	return 0;
+fail:
+	warn("Snapshot storage initiailization failed");
+	return -1;
 }
 
 int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned long long cachesize_bytes)
