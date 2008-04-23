@@ -117,10 +117,15 @@ if [ -x ${mailto} ] ; then
   ) | ${mailto} -s "${subject}" ${email}
 
 elif [ -x ${biabam} ] ; then
-  bfiles=`echo $files | tr ' ' ','`
-  totallength=`wc -l *|tail -n 1|awk '{print $1}'`
+  bfiles=""
+  totallength=`wc -l $files|tail -n 1|awk '{print $1}'`
   maxlength=100
   tmpfile=`mktemp`
+  for f in $files
+  do
+    gzip -c $f > $f.gz
+    bfiles="$bfiles,$f.gz"
+  done
   if [ $totallength -gt $maxlength ]
   then
     cat $files | head -n $maxlength >> $tmpfile
