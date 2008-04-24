@@ -36,56 +36,6 @@
 
 /* Utilities */
 
-int fd_size(int fd, u64 *bytes)
-{
-	struct stat stat;
-	if (fstat(fd, &stat) == -1)
-		return -errno;
-	if (S_ISREG(stat.st_mode)) {
-		*bytes = stat.st_size;
-		return 0;
-	}
-	if (ioctl(fd, BLKGETSIZE64, bytes))
-		return -errno;
-	return 0;
-}
-
-int is_same_device(char const *dev1,char const *dev2) {
-	struct stat stat1, stat2;
-
-	if (stat(dev1, &stat1) < 0) {
-		warn("could not stat %s", dev1);
-		return -1;
-	}
-
-	if (stat(dev2, &stat2) < 0) {
-		warn("could not stat %s", dev2);
-		return -1;
-	}
-
-	if (!S_ISBLK(stat1.st_mode) && !S_ISREG(stat1.st_mode)) {
-		fprintf(stderr, "device %s is not a block device\n", dev1);
-		return -1;
-	}
-
-	if (!S_ISBLK(stat2.st_mode) && !S_ISREG(stat2.st_mode)) {
-		fprintf(stderr, "device %s is not a block device\n", dev2);
-		return -1;
-	}
-
-	if (S_ISBLK(stat1.st_mode) != S_ISBLK(stat2.st_mode))
-		return 0;
-
-	if (S_ISREG(stat1.st_mode) && stat1.st_ino != stat2.st_ino)
-		return 0;
-
-	if (stat1.st_rdev != stat2.st_rdev)
-		return 0;
-
-	warn("device %s is the same as %s\n", dev1, dev2);
-	return 1;
-}
-
 // FIXME: Overloading *_MAX is bad
 #define INPUT_ERROR UINT32_MAX
 #define INPUT_ERROR_64 UINT64_MAX
@@ -805,11 +755,11 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 	trace_off(printf("level: %d, chunksize bits: %Lu, chunk_count: %Lu\n", level, (llu_t) cl->chunksize_bits, (llu_t) cl->count););
 	trace_off(printf("starting delta generation, mode %u, chunksize %u\n", mode, chunk_size););
 
-	if (!fullvolume && fd_size(snapdev1, &source_volume_size) < 0) {
+	if (!fullvolume && (source_volume_size = fdsize64(snapdev1)) == -1) {
 		warn("unable to determine volume size for %s", dev1name);
 		goto out;
 	}
-	if (fd_size(snapdev2, &target_volume_size) < 0) {
+	if ((target_volume_size = fdsize64(snapdev2)) == -1) {
 		warn("unable to determine volume size for %s", dev2name);
 		goto out;
 	}
@@ -1213,11 +1163,11 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	u64 extent_addr = 0, chunk_num;
 	int current_time, last_update = 0;
 
-	if (!fullvolume && fd_size(snapdev1, &source_volume_size) < 0) {
+	if (!fullvolume && (source_volume_size = fdsize64(snapdev1)) != -1) {
 		warn("unable to determine volume size for %s", dev1name);
 		goto out;
 	}
-	if (fd_size(snapdev2, &target_volume_size) < 0) {
+	if ((target_volume_size = fdsize64(snapdev2)) != -1) {
 		warn("unable to determine volume size for %s", dev2name);
 		goto out;
 	}

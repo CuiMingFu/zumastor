@@ -3082,36 +3082,33 @@ static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize,
 	return 0;
 }
 
-int fd_size(int fd, u64 *bytes); // bogus, do the size checks in ddsnap.c
-
 static int sb_get_device_sizes(struct superblock *sb)
 {
 	u64 metasize, snapsize, orgsize;
-	int error;
 
-	if ((error = fd_size(sb->metadev, &metasize)) < 0) {
-		warn("Error %i: %s determining metadata store size", error, strerror(-error));
-		return error;
+	if ((metasize = fdsize64(sb->metadev)) == -1) {
+		warn("Error %i: %s determining metadata store size", errno, strerror(errno));
+		return -errno;
 	}
 
 	if (sb->metadev != sb->snapdev) {
-		if ((error = fd_size(sb->snapdev, &snapsize)) < 0) {
-			warn("Error %i: %s determining snapshot store size", error, strerror(-error));
-			return error;
+		if ((snapsize = fdsize64(sb->snapdev)) == -1) {
+			warn("Error %i: %s determining snapshot store size", errno, strerror(errno));
+			return -errno;
 		}
 	} else
 		snapsize = metasize;
 
-	if ((error = fd_size(sb->orgdev, &orgsize)) < 0) {
-		warn("Error %i: %s determining origin volume size", errno, strerror(-errno));
-		return error;
+	if ((orgsize = fdsize64(sb->orgdev)) == -1) {
+		warn("Error %i: %s determining origin volume size", errno, strerror(errno));
+		return -errno;
 	}
 
 	change_device_sizes(sb, orgsize, snapsize, metasize);
 	return 0;
 }
 
-static void load_sb(struct superblock *sb)
+static int load_sb(struct superblock *sb)
 {
 	if (diskread(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
 		error("Unable to read superblock: %s", strerror(errno));
@@ -3120,7 +3117,7 @@ static void load_sb(struct superblock *sb)
 	sb->snapmask = calc_snapmask(sb);
 	trace(printf("Active snapshot mask: %016llx\n", sb->snapmask););
 	if (sb_get_device_sizes(sb))
-		error("Unable to get device sizes");
+		error("FIXME!!! don't exit from load_sb, return -1 instead");
 #if 0
 	// make this a startup option !!!
 	sb->metadata.chunks_used = sb->metadata.asi->chunks - count_free(sb, &sb->metadata);
@@ -3128,6 +3125,7 @@ static void load_sb(struct superblock *sb)
 		return;
 	sb->snapdata.chunks_used = sb->snapdata.asi->chunks - count_free(sb, &sb->snapdata);
 #endif
+	return 0;
 }
 
 static void save_state(struct superblock *sb)
