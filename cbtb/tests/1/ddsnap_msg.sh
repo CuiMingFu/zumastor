@@ -9,22 +9,22 @@
 
 set -e
 
-# The required sizes of the sdb and sdc devices in M.  2045G
-# Read only by the test harness.
-# 8M for the snapsho storeand 4M for the origin.
-HDBSIZE=8
-HDCSIZE=4
+NUMDEVS=2
+DEV1SIZE=8
+DEV2SIZE=4
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # test combined snapshot and metadata
-ddsnap initialize -y -c 16k /dev/sdb /dev/sdc
+ddsnap initialize -y -c 16k $DEV1NAME $DEV2NAME
 
 ddsnap agent --logfile /tmp/srcagt.log /tmp/src.control
-ddsnap server --logfile /tmp/srcsvr.log /dev/sdb /dev/sdc /tmp/src.control /tmp/src.server
+ddsnap server --logfile /tmp/srcsvr.log $DEV1NAME $DEV2NAME /tmp/src.control /tmp/src.server
 
 size=`ddsnap status /tmp/src.server --size`
-echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/src.control -1 | dmsetup create test
+echo 0 $size ddsnap $DEV1NAME $DEV2NAME /tmp/src.control -1 | dmsetup create test
 ddsnap create /tmp/src.server 0
-echo 0 $size ddsnap /dev/sdb /dev/sdc /tmp/src.control 0 | dmsetup create test\(0\)
+echo 0 $size ddsnap $DEV1NAME $DEV2NAME /tmp/src.control 0 | dmsetup create test\(0\)
 
 # error message checking
 (ddsnap create /tmp/src.server 0 > /tmp/error 2>&1)

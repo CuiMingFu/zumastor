@@ -17,8 +17,11 @@ set -e
 
 # The required sizes of the sdb and sdc devices in M.  2045G
 # Read only by the test harness.
-HDBSIZE=2094080
-HDCSIZE=2094080
+NUMDEVS=2
+DEV1SIZE=2094080
+DEV2SIZE=2094080
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Terminate test in 40 minutes.  Read by test harness.
 TIMEOUT=2400
@@ -29,7 +32,7 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -45,15 +48,15 @@ apt-get update
 aptitude install -y xfsprogs
 
 mount
-ls -l /dev/sdb /dev/sdc
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize --mountopts nouuid
+ls -l $DEV1NAME $DEV2NAME
+zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize --mountopts nouuid
 mkfs.xfs -f /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
   echo "ok 3 - first snapshot mounted"

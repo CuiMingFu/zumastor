@@ -10,9 +10,6 @@
 
 set -e
 
-# While working on this new Harness->Test interface, this will fail.
-EXPECT_FAIL=1
-
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
 NUMDEVS=2

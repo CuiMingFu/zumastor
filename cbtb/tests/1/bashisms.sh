@@ -19,10 +19,11 @@ EXPECT_FAIL=1
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
 
-# The required sizes of the sdb and sdc devices in M.
-# Read only by the test harness.
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # wait for file.  The first argument is the timeout, the second the file.
 timeout_file_wait() {
@@ -37,7 +38,6 @@ timeout_file_wait() {
   [ -e $file ]
   return $?
 }
-                        
 
 # install dash and replace /bin/sh
 apt-get update
@@ -59,7 +59,7 @@ aptitude install -y e2fsprogs
 
   echo "1..6"
 
-  zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+  zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 
   $mkfs /dev/mapper/testvol
   zumastor define master testvol -s; zumastor define schedule testvol -h 24 -d 7
@@ -67,8 +67,8 @@ aptitude install -y e2fsprogs
   echo ok 1 - testvol set up
 
   sync
-  zumastor snapshot testvol hourly 
- 
+  zumastor snapshot testvol hourly
+
 
   if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
     echo "ok 2 - first snapshot mounted"
