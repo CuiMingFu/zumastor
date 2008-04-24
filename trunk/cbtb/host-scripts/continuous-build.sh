@@ -124,7 +124,12 @@ elif [ -x ${biabam} ] ; then
   for f in $files
   do
     gzip -c $f > $f.gz
-    bfiles="$bfiles,$f.gz"
+    if [ "x$bfiles" = "x" ]
+    then
+      bfiles="$f.gz"
+    else
+      bfiles="$bfiles,$f.gz"
+    fi
   done
   if [ $totallength -gt $maxlength ]
   then
