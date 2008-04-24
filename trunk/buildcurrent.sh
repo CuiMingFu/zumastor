@@ -56,13 +56,24 @@ fi
 # Get the svn revision number from the file SVNREV, svnversion, or by scraping
 # the output of svn log, in order until one is successful
 SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
-
+if [ "x$SVNREV" = "x" ]
+then
+  SVNREV=unknown0
+elif [ "x$SVNREV" = "xexported" ]
+then
+  SVNREV=exported0
+fi
 SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
-ARCH=i386
-
+if [ `uname -m || echo i386` = "x86_64" ]
+then
+  ARCH=amd64
+else
+  ARCH=i386
+fi
+HOSTARCH=$ARCH
 
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
@@ -133,15 +144,21 @@ then
   if [ "$builduml" = "true" ]
   then
    echo -n Building UML kernel binary
-   make -j4 ARCH=um SUBARCH=i386 linux
+   if [ "$HOSTARCH" = "amd64" ]
+   then
+     SUBARCH=x86_64
+   else
+     SUBARCH=i386
+   fi
+   make -j4 ARCH=um SUBARCH=$SUBARCH linux
    [ -d ../r${SVNREV} ] || mkdir ../r${SVNREV}
-   mv linux ../r${SVNREV}/linux-i386-r${SVNREV}
+   mv linux ../r${SVNREV}/linux-${HOSTARCH}-r${SVNREV}
   else
     echo -n Building kernel package...
     fakeroot make-kpkg --append_to_version=-zumastor-r$SVNREV --revision=1.0 --initrd  --mkimage="mkinitramfs -o /boot/initrd.img-%s %s" --bzimage kernel_image kernel_headers >> $LOG </dev/null || exit 1
     for kfile in \
-      kernel-image-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb \
-      kernel-headers-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${ARCH}.deb
+      kernel-image-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${HOSTARCH}.deb \
+      kernel-headers-${KERNEL_VERSION}-zumastor-r${SVNREV}_1.0_${HOSTARCH}.deb
     do
       [ -f ../$kfile ] && mv ../$kfile ${BUILD_DIR}/r${SVNREV}/
     done
