@@ -14,8 +14,11 @@ set -e
 
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
-HDBSIZE=64
-HDCSIZE=64
+NUMDEVS=2
+DEV1SIZE=64
+DEV2SIZE=64
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Terminate test in 40 minutes.  Read by test harness.
 TIMEOUT=600
@@ -26,7 +29,7 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -42,15 +45,15 @@ apt-get update
 aptitude install -y reiserfsprogs
 
 mount
-ls -l /dev/sdb /dev/sdc
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+ls -l $DEV1NAME $DEV2NAME
+zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 mkfs.reiserfs -f /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
 echo ok 1 - testvol set up
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
   echo "ok 3 - first snapshot mounted"
@@ -71,7 +74,7 @@ else
 fi
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 
 if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.1 ; then
@@ -82,7 +85,7 @@ else
   exit 5
 fi
 
-  
+
 if diff -q /var/run/zumastor/mount/testvol/testfile \
     /var/run/zumastor/snapshot/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
   echo "ok 6 - identical testfile immediately after second snapshot"

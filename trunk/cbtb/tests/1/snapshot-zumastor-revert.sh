@@ -13,8 +13,11 @@ set -e
 
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
@@ -38,7 +41,7 @@ echo "1..8"
 apt-get update
 aptitude install -y e2fsprogs
 
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 
@@ -46,7 +49,7 @@ echo ok 1 - testvol set up
 
 date >> /var/run/zumastor/mount/testvol/testfile
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 120 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
   echo "ok 2 - first snapshot mounted"
@@ -69,7 +72,7 @@ else
   exit 3
 fi
 
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 120 /var/run/zumastor/snapshot/testvol/hourly.1 ; then
   echo "ok 4 - second snapshot mounted"

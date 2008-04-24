@@ -16,9 +16,13 @@ set -e
 
 # The required sizes of the sd[bcd] devices in M.
 # Read only by the test harness.
-HDBSIZE=2094080
-HDCSIZE=2094080
-HDDSIZE=2094080
+NUMDEVS=3
+DEV1SIZE=2094080
+DEV2SIZE=2094080
+DEV3SIZE=2094080
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
+#DEV3NAME=/dev/null
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
@@ -29,7 +33,7 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -44,10 +48,10 @@ apt-get update
 aptitude install -y xfsprogs
 
 # create LVM VG testvg
-time pvcreate -ff /dev/sdb
-time pvcreate -ff /dev/sdc
-time pvcreate -ff /dev/sdd
-time vgcreate testvg /dev/sdb /dev/sdc /dev/sdd
+time pvcreate -ff $DEV1NAME
+time pvcreate -ff $DEV2NAME
+time pvcreate -ff $DEV3NAME
+time vgcreate testvg $DEV1NAME $DEV2NAME $DEV3NAME
 
 # create volumes 5T origin and .5T snapshot
 time lvcreate --size 5124G -n test testvg
@@ -63,7 +67,7 @@ echo ok 1 - testvol set up
 
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 120 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
   echo "ok 2 - first snapshot mounted"
@@ -84,7 +88,7 @@ else
 fi
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 120 /var/run/zumastor/snapshot/testvol/hourly.1 ; then
   echo "ok 4 - second snapshot mounted"

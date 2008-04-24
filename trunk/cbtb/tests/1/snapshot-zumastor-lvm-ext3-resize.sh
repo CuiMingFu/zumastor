@@ -13,7 +13,9 @@ set -e
 
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
-HDBSIZE=1024
+NUMDEVS=1
+DEV1SIZE=1024
+#DEV1NAME=/dev/null
 
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
@@ -76,8 +78,8 @@ apt-get update
 aptitude install -y e2fsprogs
 
 # create LVM VG testvg
-time pvcreate -ff /dev/sdb
-time vgcreate testvg /dev/sdb
+time pvcreate -ff $DEV1NAME
+time vgcreate testvg $DEV1NAME
 
 # create volumes 8M origin and 8M snapshot
 time lvcreate --size 8M -n test testvg
