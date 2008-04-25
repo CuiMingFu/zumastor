@@ -21,7 +21,7 @@ ddsnap_binaries = ddsnap
 #binaries =  $(ddraid_binaries) $(ddsnap_binaries) devspam
 binaries =  $(ddsnap_binaries) devspam nblock_write
 
-all: $(binaries) ddsnap.8.gz devspam.8.gz nblock_write.8.gz
+all: $(binaries) ddsnap.8.gz nblock_write.8.gz
 .PHONY: all
 
 clean:
@@ -84,8 +84,6 @@ devspam: tests/devspam.c trace.h
 
 ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c --best ./man/ddsnap.8 > ddsnap.8.gz
-devspam.8.gz: ./man/devspam.8
-	gzip -c --best ./man/devspam.8 > devspam.8.gz
 nblock_write.8.gz: ./man/nblock_write.8
 	gzip -c --best ./man/nblock_write.8 > nblock_write.8.gz
 
