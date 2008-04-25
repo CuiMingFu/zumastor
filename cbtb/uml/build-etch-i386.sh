@@ -60,7 +60,7 @@ cp $BUILD_DIR/r${SVNREV}/zumastor_$VERSION-r${SVNREV}_all.deb \
   $rootdir/tmp
 
 sudo chroot $rootdir dpkg -i /tmp/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
-  /tmp/zumastor_$VERSION-r${SVNREV}_$ARCH.deb
+  /tmp/zumastor_$VERSION-r${SVNREV}_all.deb
 sudo rm $rootdir/tmp/*.deb
 sudo umount $rootdir
 rmdir $rootdir
