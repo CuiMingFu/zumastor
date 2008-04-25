@@ -12,14 +12,10 @@ deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
 ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
 ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h daemonize.h ddsnap.h
 ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
-ddraid_deps = $(deps) ddraid.h $(kernel)/dm-ddraid.h
-testdir =tests
+testdir = tests
 
-ddraid_binaries = mkddraid ddraidd ddraid-agent
 ddsnap_binaries = ddsnap
-# ddraid temporarily removed
-#binaries =  $(ddraid_binaries) $(ddsnap_binaries) devspam
-binaries =  $(ddsnap_binaries) devspam nblock_write
+binaries = $(ddsnap_binaries) devspam nblock_write
 
 all: $(binaries) ddsnap.8.gz nblock_write.8.gz
 .PHONY: all
@@ -67,16 +63,7 @@ daemonize.o: daemonize.c $(deps)
 nblock_write: nblock_write.c
 	$(CC) nblock_write.c -o nblock_write
 
-mkddraid: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	$(CC) -DCREATE ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o mkddraid
-
-ddraidd: ddraid.c diskio.o buffer.o $(ddraid_deps)
-	$(CC) -DSERVER ddraid.c $(CFLAGS) $(CPPFLAGS) diskio.o buffer.o -o ddraidd
-
-ddraid-agent: ddraid.agent.c $(ddraid_deps)
-	$(CC) ddraid.agent.c $(CFLAGS) $(CPPFLAGS) -lpthread -o ddraid-agent -lpopt
-
-ddsnap: ddsnap.c buffer.o ddsnapd.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
+ddsnap: ddsnap.c ddsnapd.o buffer.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
 	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
 
 devspam: tests/devspam.c trace.h
@@ -93,7 +80,7 @@ build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps)
 	@echo ' * This file is generated automatically by the Makefile.' >> $@
 	@echo ' */' >> $@
 	@echo '' >> $@
-	@echo '#define SVN_VERSION "'`cat SVNREV || svnversion . || echo unknown`'"' >> $@
+	@echo '#define VERSION "'`cat SVNREV || svnversion . || echo unknown`'"' >> $@
 	@echo '#define BUILD_DATE "'`date`'"' >> $@
 	@echo '#define BUILD_USER "'`whoami`'"' >> $@
 	@echo '#define BUILD_HOST "'`hostname`'"' >> $@
@@ -103,7 +90,7 @@ build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps)
 device=test
 port=8080
 
-# Use an anonymous socket (@ is ddraid's anon socket name extension)
+# Use an anonymous socket (@ is ddsnap's anon socket name extension)
 sock=@test
 
 # Intended to run as non-root user (recommended)
@@ -128,44 +115,6 @@ data=/dev/$(data0) /dev/$(data1) /dev/$(data2) /dev/$(data3) /dev/$(data4)
 # README test values
 origindev=/dev/hdb1
 snapstoredev=/dev/hdb2
-
-ddraid-test: ddraid-test1 ddraid-test2
-
-ddraid-test1:
-	killall ddraidd || true
-	sudo killall ddraid-agent || true
-	./mkddraid /dev/$(meta)
-	sudo /sbin/dmsetup remove $(device) || true
-	sudo ./ddraid-agent @test
-	./ddraidd /dev/$(meta) $(data) $(sock) $(port)
-
-ddraid-test2: ddraid-order2
-
-ddraid-order0:
-	echo 0 204800 ddraid 2 $(data) $(sock) | sudo /sbin/dmsetup create $(device)
-	sudo chmod a+rw /dev/mapper/$(device)
-
-ddraid-order1:
-	echo 0 204800 ddraid 3 $(data) $(sock) | sudo /sbin/dmsetup create $(device)
-	sudo chmod a+rw /dev/mapper/$(device)
-
-ddraid-order2:
-	echo 0 204800 ddraid 5 $(data) $(sock) | sudo /sbin/dmsetup create $(device)
-	sudo chmod a+rw /dev/mapper/$(device)
-
-ddraid-test3:
-	./devspam /dev/mapper/$(device) write 100 20 77
-
-ddraid-test4:
-	./devspam /dev/mapper/$(device) read 100 20 77
-
-ddraid-test8:
-	killall ddraidd
-
-ddraid-test9:
-	sudo /sbin/dmsetup remove $(device)
-
-#ddsnap-test: ddsnap-test1 ddsnap-test2 ddsnap-test3
 
 dd-init: 
 	ln -s $(snapstoredev) /dev/test-snapstore || true
