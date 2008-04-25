@@ -9,6 +9,9 @@ set -e
 stagefile=`mktemp`
 tmpdir=`mktemp -d`
 
+sudo apt-get -q --force-yes -y install devscripts build-essential fakeroot \
+                                       debhelper zlib1g-dev libpopt-dev rsync
+
 # install tunbr setuid root
 if [ ! -x /usr/local/bin/tunbr ]
 then
