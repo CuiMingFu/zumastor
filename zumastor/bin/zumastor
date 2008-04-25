@@ -375,6 +375,10 @@ function run_master {
 		fi
 	fi
 
+	# we trap HUP signal so that 'zumastor master' daemon does NOT
+	# exit during 'apt-get upgrade'. see issue 119.
+	trap '' HUP
+
 	# we reopen the log for each write so rotation works
 	pid=""
 	while true; do
