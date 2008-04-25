@@ -10,7 +10,8 @@ stagefile=`mktemp`
 tmpdir=`mktemp -d`
 
 sudo apt-get -q --force-yes -y install devscripts build-essential fakeroot \
-                                       debhelper zlib1g-dev libpopt-dev rsync
+                                       debhelper zlib1g-dev libpopt-dev rsync \
+				       uml-utilities
 
 # install tunbr setuid root
 if [ ! -x /usr/local/bin/tunbr ]
@@ -25,6 +26,8 @@ then
   cd $OLDPWD
 fi
 
+# fix this randomness
+[ -d /tftpboot/pxelinux.cfg/ ] || sudo mkdir -p /tftpboot/pxelinux.cfg/
 
 # Add br1 to /etc/network/interfaces
 if ! egrep "^iface br1" /etc/network/interfaces
