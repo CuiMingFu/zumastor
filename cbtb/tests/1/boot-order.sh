@@ -13,6 +13,8 @@ set -e
 
 TIMEOUT=1200
 
+env
+
 echo "1..3"
 rc=0
 
