@@ -3278,6 +3278,51 @@ void outerror(int sock, int err, char *text)
 		warn("unable to send error %u", GENERIC_ERROR);
 }
 
+void get_status(struct superblock *sb, unsigned sock)
+{
+	struct snapshot const *snaplist = sb->image.snaplist;
+
+	unsigned snapshots = sb->image.snapshots;
+	size_t reply_len = snapshot_details_calc_size(snapshots, snapshots);
+	struct status_reply *reply = calloc(reply_len, 1); // !!! error check?
+
+	uint64_t share_array[MAX_SNAPSHOTS * MAX_SNAPSHOTS];
+	memset(share_array, 0, sizeof(share_array));
+
+	traverse_tree_range(sb, 0, -1, calc_sharing, share_array);
+	reply->ctime = sb->image.create_time;
+	reply->meta.chunksize_bits = sb->image.metadata.allocsize_bits;
+	reply->meta.total = sb->image.metadata.chunks;
+	reply->meta.free = sb->image.metadata.freechunks;
+	reply->store.chunksize_bits = sb->image.snapdata.allocsize_bits;
+	reply->store.total = sb->image.snapdata.chunks;
+	reply->store.free = sb->image.snapdata.freechunks;
+	reply->write_density = 0; // !!! think about how to compute this
+	reply->snapshots = snapshots;
+
+	for (int row = 0; row < sb->image.snapshots; ++row) {
+		struct snapshot_details *details = snapshot_details(reply, row, snapshots);
+
+		details->snapinfo.ctime = snaplist[row].ctime;
+		details->snapinfo.snap = snaplist[row].tag;
+		details->snapinfo.prio = snaplist[row].prio;
+		details->snapinfo.usecnt = usecount(sb, (struct snapshot*)&snaplist[row]);
+
+		if (is_squashed(&snaplist[row])) {
+			details->sharing[0] = -1;
+			continue;
+		}
+		for (int col = 0; col < snapshots; ++col)
+			details->sharing[col] = share_array[MAX_SNAPSHOTS * snaplist[row].bit + col];
+	}
+
+	if (outhead(sock, STATUS_OK, reply_len) < 0 || writepipe(sock, reply, reply_len) < 0)
+		warn("unable to send status message");
+
+	free(reply);
+	selfcheck_freespace(sb);
+}
+
 /*
  * Responses to IO requests take two quite different paths through the
  * machinery:
@@ -3761,51 +3806,13 @@ static int incoming(struct superblock *sb, struct client *client)
 	}
 	case STATUS:
 	{
-		struct snapshot const *snaplist = sb->image.snaplist;
-
-		if (message.head.length != sizeof(struct status_request)) { // maybe we should allow messages to be long and assume zero filled for upward compatibility?
-			outerror(sock, EINVAL, "status_request has wrong length");
-			break;
+		if (message.head.length > sizeof(struct status_request)) { //maybe we should allow messages to be long and assume zero filled for upward compatibility?
+			goto message_too_long;
+		} else if (message.head.length < sizeof(struct status_request)) {
+			goto message_too_short;
 		}
 
-		unsigned snapshots = sb->image.snapshots;
-		size_t reply_len = snapshot_details_calc_size(snapshots, snapshots);
-		struct status_reply *reply = calloc(reply_len, 1); // !!! error check?
-
-		uint64_t share_array[MAX_SNAPSHOTS * MAX_SNAPSHOTS];
-		memset(share_array, 0, sizeof(share_array));
-
-		traverse_tree_range(sb, 0, -1, calc_sharing, share_array);
-		reply->ctime = sb->image.create_time;
-		reply->meta.chunksize_bits = sb->image.metadata.allocsize_bits;
-		reply->meta.total = sb->image.metadata.chunks;
-		reply->meta.free = sb->image.metadata.freechunks;
-		reply->store.chunksize_bits = sb->image.snapdata.allocsize_bits;
-		reply->store.total = sb->image.snapdata.chunks;
-		reply->store.free = sb->image.snapdata.freechunks;
-		reply->write_density = 0; // !!! think about how to compute this
-		reply->snapshots = snapshots;
-
-		for (int row  = 0; row < sb->image.snapshots; row++) {
-			struct snapshot_details *details = snapshot_details(reply, row, snapshots);
-
-			details->snapinfo.ctime = snaplist[row].ctime;
-			details->snapinfo.snap = snaplist[row].tag;
-			details->snapinfo.prio = snaplist[row].prio;
-			details->snapinfo.usecnt = usecount(sb, (struct snapshot*)&snaplist[row]);
-			if (is_squashed(&snaplist[row])) {
-				details->sharing[0] = -1;
-				continue;
-			}
-			for (int col = 0; col < snapshots; col++)
-				details->sharing[col] = share_array[MAX_SNAPSHOTS * snaplist[row].bit + col];
-		}
-
-		if (outhead(sock, STATUS_OK, reply_len) < 0 || writepipe(sock, reply, reply_len) < 0)
-			warn("unable to send status message");
-
-		free(reply);
-		selfcheck_freespace(sb);
+		get_status(sb, sock);
 		break;
 	}
 	case REQUEST_SNAPSHOT_STATE:
