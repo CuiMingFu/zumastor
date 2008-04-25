@@ -1163,11 +1163,11 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	u64 extent_addr = 0, chunk_num;
 	int current_time, last_update = 0;
 
-	if (!fullvolume && (source_volume_size = fdsize64(snapdev1)) != -1) {
+	if (!fullvolume && (source_volume_size = fdsize64(snapdev1)) == -1) {
 		warn("unable to determine volume size for %s", dev1name);
 		goto out;
 	}
-	if ((target_volume_size = fdsize64(snapdev2)) != -1) {
+	if ((target_volume_size = fdsize64(snapdev2)) == -1) {
 		warn("unable to determine volume size for %s", dev2name);
 		goto out;
 	}
