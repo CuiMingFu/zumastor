@@ -76,7 +76,7 @@ remove_devices() {
 
 kill_ddsnap() {
 	remove_devices
-	killall ddsnap
+	pkill -f ddsnap
 }
 
 
