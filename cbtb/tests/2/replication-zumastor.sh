@@ -19,8 +19,10 @@ set -e
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
-HDBSIZE=4
-HDCSIZE=8
+
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
 
 slave=${IPADDR2}
 
@@ -63,7 +65,7 @@ echo "1..10"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
@@ -75,7 +77,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
-${SSH} root@${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+${SSH} root@${slave} zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  
