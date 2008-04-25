@@ -63,7 +63,7 @@ setup_ddsnap() {
 	echo "Initializing"
 	ddsnap initialize -y $copt $bopt $snap $orig $meta 2>&1 || { echo "init failed"; exit 1; }
 	ddsnap agent $AGENT_PIPE
-	ddsnap server $snap $orig $meta $AGENT_PIPE $SERVER_PIPE
+	ddsnap server $snap $orig $meta $AGENT_PIPE $SERVER_PIPE --logfile $SERVER_LOG
 	echo "Creating Device, $VOLUME_NAME"
 	create_device -1 || { echo create failed; return 1; }
 }
