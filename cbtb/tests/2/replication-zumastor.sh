@@ -17,6 +17,8 @@
 
 set -e
 
+EXPECT_FAIL=1
+
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
@@ -59,6 +61,8 @@ timeout_remote_file_wait() {
   return $?
 }
 
+
+env
 
 echo "1..10"
 
