@@ -29,6 +29,7 @@ then
   if [ -f /etc/network/interfaces ]
   then
     cp ../host-setup/interfaces-bridge.sh $stagefile
+    chmod +x $stagefile
     sudo $stagefile
   fi
 fi
@@ -48,7 +49,7 @@ then
 fi
 
 
-# Install and configure dnsmasq 
+# Install and configure dnsmasq
 if [ ! -f /etc/dnsmasq.conf.distrib ]
 then
   if [ -f /etc/debian_version ]
