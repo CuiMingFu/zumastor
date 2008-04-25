@@ -91,7 +91,7 @@ $SUDO tar cf - -C $rootdir . | \
 # make sure the ubd* devices are in the base image
 mkdir -p $ext3dir/proc
 $SUDO mount -t proc proc $ext3dir/proc
-$SUDO chroot $ext3dir <<EOF
+$SUDO chroot $ext3dir /bin/bash <<EOF
 cd /dev
 /dev/MAKEDEV ubd
 EOF

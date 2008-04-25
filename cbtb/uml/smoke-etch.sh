@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 # $Id: smoke.sh 1198 2007-12-22 11:43:15Z drake.diedrich $
 #
