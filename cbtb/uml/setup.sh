@@ -26,6 +26,9 @@ then
   cd $OLDPWD
 fi
 
+tunctl 2>&1 | grep -q Failed && sh -c \
+      'echo "Please fix permissions on /dev/net/tun"; exit 1'
+
 # fix this randomness
 [ -d /tftpboot/pxelinux.cfg/ ] || sudo mkdir -p /tftpboot/pxelinux.cfg/
 
