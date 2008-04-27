@@ -265,32 +265,27 @@ Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda
 If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
 through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)
 
-Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles
+Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We've created https://launchpad.net/~zumastor-team, but are not
-yet building standard Ubuntu kernel packages there.  Until we have that going,
-you can use the ones built by pgquiles for Gutsy.
+We've created https://launchpad.net/~zumastor-team hosting standard Ubuntu
+kernel packages and zumastor/ddsnap packages for i386 and amd64.
 
-Caution, his respository contains many other packages, so don't do 
-"apt-get upgrade" when using it! 
-
-Here are his instructions for installing using his his repository:
+Here are his instructions for installing using the ppa repository:
 
 1. Add these lines to /etc/apt/sources.list
 +
 .......................
-deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
-deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
+deb http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse
+deb-src http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse
 .......................
 +
 Then run +sudo apt-get update+.
 
 2. Install zumastor, ddsnap, dmsetup, and a zumastor-enabled kernel.
-There are two to choose from: linux-image-zumastor (only zumastor) and 
-linux-image-xenzumastor (Xen and Zumastor).  For instance:
+For instance:
 +
 .......................
-sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup
+sudo aptitude install linux-image-2.6.22-14-zumastor zumastor ddsnap
 .......................
 
 Finally, reboot and choose the Zumastor-enabled kernel, and
