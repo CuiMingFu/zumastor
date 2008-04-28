@@ -17,8 +17,6 @@
 
 set -e
 
-EXPECT_FAIL=1
-
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
 
