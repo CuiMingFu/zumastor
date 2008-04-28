@@ -148,9 +148,17 @@ function new_snapshot {
 	echo ${snapshots[@]} >$listfile
 	echo "'$kind' snapshot list is now: ${snapshots[*]}"
 	[[ -f $mountsnap ]] && update_symlinks $vol $kind
+
 	# unmount/delete a snapshot may take a while. We do it after updating
 	# symlinks to reduce the window that a symlink points to nowhere
-	[[ -z $oldest ]] || umount_drop_snapshot $vol $oldest
+	if [[ ! -z $oldest ]]; then
+		# don't umount a snapshot that is still kept for other schedule
+		if grep -w "$oldest" $VOLUMES/$vol/$type/snapshots/* >&/dev/null; then
+			drop_snapshot $vol $oldest
+		else
+			umount_drop_snapshot $vol $oldest
+		fi
+	fi
 	[[ -f $dotsnapshot ]] && umount -l ${mpoint}/.snapshot && mount --rbind $snapmp ${mpoint}/.snapshot
 }
 
