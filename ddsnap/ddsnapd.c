@@ -2268,6 +2268,7 @@ static int auto_delete_snapshot(struct superblock *sb)
 	warn("releasing snapshot %u", victim->tag);
 	if (usecount(sb, victim)) {
 		err = delete_tree_range(sb, 1ULL << victim->bit, 0);
+		sb->usecount[victim->bit] = 0;
 		victim->bit = SNAPSHOT_SQUASHED;
 	} else
 		err = delete_snap(sb, victim);
