@@ -4,7 +4,7 @@ clean:
 	rm -rf ./usr
 
 etc/zumastor/version:
-	@echo zumastor v`cat SVNVERSION || echo Unknown` revision `cat SVNREV || svnversion .` built on `date` by `whoami`@`hostname` > $@
+	@echo zumastor `cat VERSION_STRING || echo unknown` built on `date` by `whoami`@`hostname` > $@
 
 zumastor.8.gz: ./man/zumastor.8
 	gzip -c --best ./man/zumastor.8 > zumastor.8.gz

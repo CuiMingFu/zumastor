@@ -44,7 +44,7 @@ clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp configure-stamp
-	rm -f SVNREV SVNVERSION
+	rm -f etc/zumastor/version
 	rm -f debian/zumastor.cron.hourly debian/zumastor.cron.daily \
 	      debian/zumastor.cron.weekly
 	rm -f debian/zumastor.8
