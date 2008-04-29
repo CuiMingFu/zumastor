@@ -25,9 +25,9 @@ if [ "x$VERSION" = "x" ] ; then
   exit 1
 fi
 
-# Get the svn revision number from the file SVNREV, svnversion, or by scraping
+# Get the svn revision number from the file REVISION, svnversion, or by scraping
 # the output of svn log, in order until one is successful
-SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+REVISION=`awk '/^[0-9]+$/ { print $1; }' REVISION || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 
 SRC=${PWD}
 BUILD_DIR=${SRC}/build
@@ -39,39 +39,38 @@ then
   DIST="hardy"
 fi
 
+VERSION_STRING="${VERSION}-r${REVISION}"
 
 [ -d $BUILD_DIR ] || mkdir $BUILD_DIR
-[ -d $BUILD_DIR/r${SVNREV} ] || mkdir $BUILD_DIR/r${SVNREV}
+[ -d $BUILD_DIR/r${REVISION} ] || mkdir $BUILD_DIR/r${REVISION}
 
 echo -n Building zumastor Debian package...
 pushd ${SRC}/zumastor >> $LOG || exit 1
 
-echo ${SVNREV} >SVNREV
-echo ${VERSION} >SVNVERSION
+echo ${VERSION_STRING} > VERSION_STRING
 
 export EMAIL="zuambuild@gmail.com"
 export VISUAL=/bin/true
 export EDITOR=/bin/true
 export NAME="Zumastor Builder"
 [ -f debian/changelog.template ] && cp -f debian/changelog.template debian/changelog
-dch -u low -D $DIST --no-query -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dch -u low -D $DIST --no-query -v $VERSION_STRING "revision $REVISION" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
 popd >> $LOG
-mv ${SRC}/*.changes ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
+mv ${SRC}/*.changes ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${REVISION}
 echo -e "done.\n"
 
 echo -n Building ddsnap Debian package...
 pushd ${SRC}/ddsnap >> $LOG || exit 1
-echo ${SVNREV} >SVNREV
+echo ${VERSION_STRING} > VERSION_STRING
 [ -f debian/changelog.template ] && cp -f debian/changelog.template debian/changelog
-dch -u low --no-query -D $DIST -v $VERSION-r$SVNREV "revision $SVNREV" || exit 1
+dch -u low --no-query -D $DIST -v $VERSION_STRING "revision $REVISION" || exit 1
 dpkg-buildpackage -S -I.svn -uc -us -rfakeroot >> $LOG || exit 1
-make genpatches
 popd >> $LOG
-mv ${SRC}/*.changes ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${SVNREV}
+mv ${SRC}/*.changes ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${REVISION}
 echo -e "done.\n"
 
-for changes in ${BUILD_DIR}/r${SVNREV}/*.changes
+for changes in ${BUILD_DIR}/r${REVISION}/*.changes
 do
   debsign $changes
   dput zumastor $changes
