@@ -52,7 +52,7 @@ install: build
 	dh_installdirs
 
 	mkdir -p $(CURDIR)/debian/ddsnap/sbin
-	install -s ddsnap nblock_write $(CURDIR)/debian/ddsnap/sbin
+	install -s ddsnap nblock_write ddsnap-sb $(CURDIR)/debian/ddsnap/sbin
 
 # Build architecture-independent files here.
 binary-indep: build install
