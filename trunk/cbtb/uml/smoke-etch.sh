@@ -16,4 +16,10 @@ ARCH=`dpkg --print-architecture`
 DIST=etch
 time ./setup.sh
 time ./build-${DIST}-${ARCH}.sh
+retval=$?
+if [ $retval != 0 ]
+then
+  echo "Build script failed"
+  exit $retval
+fi
 time DIST=${DIST} ARCH=${ARCH} ./runtests.sh $*

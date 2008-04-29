@@ -78,7 +78,7 @@ do
   hdcsize=`awk -F = '/^HDCSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hdcsize" == "x" ]
   then
-    hdcsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+    hdcsize=`awk -F = '/^DEV2SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   fi
   if [ "x$hdcsize" != "x" ] ; then
     if [ "$hdcsize" -ge "$largest_hdcsize" ] ; then
@@ -88,7 +88,7 @@ do
   hddsize=`awk -F = '/^HDDSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   if [ "x$hddsize" == "x" ]
   then
-    hddsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+    hddsize=`awk -F = '/^DEV3SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   fi
   if [ "x$hddsize" != "x" ] ; then
     if [ "$hddsize" -ge "$largest_hddsize" ] ; then
