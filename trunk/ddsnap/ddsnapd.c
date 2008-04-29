@@ -2421,6 +2421,25 @@ static unsigned int snapbit_tag(struct superblock *sb, unsigned bit)
 }
 #endif
 
+/* find the oldest snapshot with 0 usecnt and lowest priority. */
+static struct snapshot *find_unused(struct superblock *sb)
+{
+	struct snapshot *snaplist = sb->image.snaplist;
+	u32 snapshots = sb->image.snapshots;
+
+	assert(snapshots);
+	struct snapshot *snap, *best = snaplist;
+
+	for (snap = snaplist + 1; snap < snaplist + snapshots; snap++) {
+		if (usecount(sb, snap) && !usecount(sb, best))
+			continue;
+		if ((!usecount(sb, snap) == !usecount(sb, best)) && (snap->prio >= best->prio))
+			continue;
+		best = snap;
+	}
+	return best;
+}
+
 static int create_snapshot(struct superblock *sb, unsigned snaptag)
 {
 	int i, snapshots = sb->image.snapshots;
@@ -2428,7 +2447,9 @@ static int create_snapshot(struct superblock *sb, unsigned snaptag)
 
 	/* check if we are out of snapshots */
 	if (snapshots >= MAX_SNAPSHOTS) {
-	       	auto_delete_snapshot(sb);
+		struct snapshot *victim = find_unused(sb);
+		if (!usecount(sb, victim))
+			delete_snap(sb, victim);
 		if ((snapshots = sb->image.snapshots) >= MAX_SNAPSHOTS) {
 			warn("the number of snapshots is beyond the %d limit", MAX_SNAPSHOTS);
 			return -EFULL;
