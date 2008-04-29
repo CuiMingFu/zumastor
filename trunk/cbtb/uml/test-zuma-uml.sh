@@ -66,25 +66,36 @@ largest_hddsize=0
 for f in ${execfiles}
 do
   hdbsize=`awk -F = '/^HDBSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hdbsize" == "x" ]
+  then
+    hdbsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  fi
   if [ "x$hdbsize" != "x" ] ; then
     if [ "$hdbsize" -ge "$largest_hdbsize" ] ; then
       largest_hdbsize=$hdbsize
     fi
   fi
   hdcsize=`awk -F = '/^HDCSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hdcsize" == "x" ]
+  then
+    hdcsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  fi
   if [ "x$hdcsize" != "x" ] ; then
     if [ "$hdcsize" -ge "$largest_hdcsize" ] ; then
       largest_hdcsize=$hdcsize
     fi
   fi
   hddsize=`awk -F = '/^HDDSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  if [ "x$hddsize" == "x" ]
+  then
+    hddsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
+  fi
   if [ "x$hddsize" != "x" ] ; then
     if [ "$hddsize" -ge "$largest_hddsize" ] ; then
       largest_hddsize=$hddsize
     fi
   fi
 done
-
 
 hd=""
 hd2=""
@@ -299,6 +310,7 @@ if [ "x$killer3" != "x" ] ; then
   kill -0 $killer3 && kill $killer3
 fi
 
-rm -rf ${tmpdir}
+#rm -rf ${tmpdir}
+echo $tmpdir > /tmp/foodirs
 
 exit ${retval}
