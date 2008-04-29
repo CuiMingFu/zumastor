@@ -41,7 +41,7 @@ if [ "x$VERSION" = "x" ] ; then
   echo "Suspect Version file"
   exit 1
 fi
-    
+
 SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 
 
@@ -54,10 +54,22 @@ rootdir=`mktemp -d`
 cp --sparse=always $ext3 $uda
 sudo mount -oloop,rw $uda $rootdir
 
+currentbuilddir=$BUILD_DIR/r${SVNREV}
+zumastorpkg=$currentbuilddir/zumastor_$VERSION-r${SVNREV}_all.deb
+ddsnappkg=$currentbuilddir/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb
+if [ ! -e $zumastorpkg ]
+then
+  echo "The zumastor package was not built!"
+  exit 1
+fi
+if [ ! -e $ddsnappkg ]
+then
+  echo "The ddsnap package was not built!"
+  exit 1
+fi
+
 # install the new zumastor userspace programs
-cp $BUILD_DIR/r${SVNREV}/zumastor_$VERSION-r${SVNREV}_all.deb \
-  $BUILD_DIR/r${SVNREV}/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
-  $rootdir/tmp
+cp $zumastorpkg $ddsnappkg $rootdir/tmp
 
 sudo chroot $rootdir dpkg -i /tmp/ddsnap_$VERSION-r${SVNREV}_$ARCH.deb \
   /tmp/zumastor_$VERSION-r${SVNREV}_all.deb
