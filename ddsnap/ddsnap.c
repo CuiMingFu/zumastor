@@ -2117,8 +2117,8 @@ int main(int argc, char *argv[])
 	poptFreeContext(mainCon);
 
 	if (strcmp(command, "--version") == 0 || strcmp(command, "-V") == 0) {
-		printf("ddsnap revision %s built on %s by %s@%s\n",
-			VERSION, BUILD_DATE, BUILD_USER, BUILD_HOST);
+		printf("ddsnap %s built on %s by %s@%s\n",
+			VERSION_STRING, BUILD_DATE, BUILD_USER, BUILD_HOST);
 		exit(0);
 	}
 
