@@ -33,6 +33,7 @@
 #include "sock.h"
 #include "trace.h"
 #include "build.h"
+#include "event.h"
 
 /* Utilities */
 

@@ -15,9 +15,9 @@ ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
 testdir = tests
 
 ddsnap_binaries = ddsnap
-binaries = $(ddsnap_binaries) devspam nblock_write
+binaries = $(ddsnap_binaries) devspam nblock_write ddsnap-sb
 
-all: $(binaries) ddsnap.8.gz nblock_write.8.gz
+all: $(binaries) ddsnap.8.gz nblock_write.8.gz ddsnap-sb.8.gz
 .PHONY: all
 
 clean:
@@ -28,7 +28,7 @@ clean:
 install:
 	mkdir -p $(INSTDIR) || true
 	install -s -v $(binaries) $(INSTDIR)
-	install -v --mode=644 ddsnap.8.gz devspam.8.gz nblock_write.8.gz $(PREFIX)/$(MANDIR)/man8/
+	install -v --mode=644 ddsnap.8.gz nblock_write.8.gz ddsnap-sb.8.gz $(PREFIX)/$(MANDIR)/man8/
 .PHONY: install
 
 genpatches:
@@ -69,10 +69,15 @@ ddsnap: ddsnap.c ddsnapd.o buffer.o event.o ddsnap.agent.o xdelta/xdelta3.o delt
 devspam: tests/devspam.c trace.h
 	$(CC) $< $(CFLAGS) $(CPPFLAGS) -o $@
 
+ddsnap-sb: ddsnap-sb.c diskio.o buffer.o $(deps)
+	$(CC) ddsnap-sb.c $(CFLAGS) $(CPPFLAGS) buffer.o diskio.o -o $@
+
 ddsnap.8.gz: ./man/ddsnap.8
 	gzip -c --best ./man/ddsnap.8 > ddsnap.8.gz
 nblock_write.8.gz: ./man/nblock_write.8
 	gzip -c --best ./man/nblock_write.8 > nblock_write.8.gz
+ddsnap-sb.8.gz: ./man/ddsnap-sb.8
+	gzip -c --best ./man/ddsnap-sb.8 > ddsnap-sb.8.gz
 
 build.h: $(ddsnap_agent_deps) $(ddsnapd_deps) $(ddsnap_deps) 
 	rm -f $@
