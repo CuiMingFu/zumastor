@@ -25,10 +25,6 @@ DEV2SIZE=8
 #DEV1NAME=/dev/null
 #DEV2NAME=/dev/null
 
-# Feature request.  http://code.google.com/p/zumastor/issues/detail?id=26
-EXPECT_FAIL=1
-
-
 slave=${IPADDR2}
 
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
