@@ -16,8 +16,11 @@ rc=0
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=2400
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # See test 7 below.  Found race condition in samba/smbfs deleting files.
 EXPECT_FAIL=1
@@ -41,7 +44,7 @@ timeout_file_wait() {
   [ -e $file ]
   return $?
 }
-                        
+
 
 
 
@@ -49,7 +52,7 @@ echo "1..8"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
@@ -90,7 +93,7 @@ cat > /etc/samba/smb.conf << EOF
 EOF
 
 # update-inetd tries to do tricky things to /dev/tty
-rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd    
+rm /usr/sbin/update-inetd && ln -s /bin/true /usr/sbin/update-inetd
 apt-get update
 DEBIAN_FRONTEND=noninteractive aptitude install -y samba
 

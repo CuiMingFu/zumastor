@@ -12,7 +12,9 @@ set -e
 
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
-HDBSIZE=1024
+NUMDEVS=1
+DEV1SIZE=1024
+#DEV1NAME=/dev/null
 
 # Terminate test in 10 minutes.  Read by test harness.
 TIMEOUT=600
@@ -72,8 +74,8 @@ aptitude install -y e2fsprogs
 
 echo "1..7"
 
-pvcreate -ff /dev/sdb
-vgcreate testvg /dev/sdb
+pvcreate -ff ${DEV1NAME}
+vgcreate testvg ${DEV1NAME}
 lvcreate --size 16M -n test testvg
 lvcreate --size 16M -n test_snap testvg
 
@@ -93,8 +95,8 @@ echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
 
-${SSH} root@${slave} pvcreate -ff /dev/sdb
-${SSH} root@${slave} vgcreate testvg /dev/sdb
+${SSH} root@${slave} pvcreate -ff ${DEV1NAME}
+${SSH} root@${slave} vgcreate testvg ${DEV1NAME}
 ${SSH} root@${slave} lvcreate --size 16M -n test testvg
 ${SSH} root@${slave} lvcreate --size 16M -n test_snap testvg
 

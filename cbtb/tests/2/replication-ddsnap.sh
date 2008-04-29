@@ -18,8 +18,11 @@ rc=0
 TIMEOUT=1200
 
 # Extra disk sizes required
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 slave=${IPADDR2}
 SSH='ssh -o StrictHostKeyChecking=no -o BatchMode=yes'
@@ -45,7 +48,7 @@ ${SSH} root@${slave} hostname slave
 echo ok 2 - slave network set up
 
 
-ddsnap initialize /dev/sdc /dev/sdb
+ddsnap initialize ${DEV2NAME} ${DEV1NAME}
 echo ok 5 - master ddsnap initialize
 
 controlsocket="/tmp/control"
@@ -58,11 +61,11 @@ mkdir /tmp/server
 # TODO: when b/892805 is fixed, last element of socket may be something
 # other than $volname
 serversocket="/tmp/server/$volname"
-ddsnap server /dev/sdc /dev/sdb $controlsocket $serversocket
+ddsnap server ${DEV2NAME} ${DEV1NAME} $controlsocket $serversocket
 echo ok 7 - master ddsnap server
 sleep $SLEEP
 
-${SSH} root@${slave} ddsnap initialize /dev/sdc /dev/sdb
+${SSH} root@${slave} ddsnap initialize ${DEV2NAME} ${DEV1NAME}
 echo ok 8 - slave ddsnap initialize
 sleep $SLEEP
 
@@ -72,16 +75,16 @@ sleep $SLEEP
 
 ${SSH} root@${slave} mkdir /tmp/server
 ${SSH} root@${slave} \
-  ddsnap server /dev/sdc /dev/sdb $controlsocket $serversocket
+  ddsnap server ${DEV2NAME} ${DEV1NAME} $controlsocket $serversocket
 echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
 size=`ddsnap status $serversocket --size` 
-echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket -1 | dmsetup create $volname
+echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} $controlsocket -1 | dmsetup create $volname
 echo ok 11 - master create $volname
 sleep $SLEEP
 
-$SSH root@${slave} "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket -1 | dmsetup create $volname"
+$SSH root@${slave} "echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} $controlsocket -1 | dmsetup create $volname"
 echo ok 12 - slave create $volname
 sleep $SLEEP
 
@@ -97,7 +100,7 @@ ddsnap create $serversocket $tosnap
 echo ok 14 - ddsnap create $tosnap
 sleep $SLEEP
 
-echo 0 $size ddsnap /dev/sdc /dev/sdb \
+echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
 echo ok 15 - create $volname\($tosnap\) block device on master
@@ -122,7 +125,7 @@ echo ok 18 - create snapshot $tosnap on slave
 sleep $SLEEP
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+  "echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
 echo ok 19 - create $volname\($tosnap\) block device on slave
 
 hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
@@ -142,7 +145,7 @@ ddsnap create $serversocket $tosnap
 echo ok 22 - ddsnap create $tosnap
 sleep $SLEEP
 
-echo 0 $size ddsnap /dev/sdc /dev/sdb \
+echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} \
   $controlsocket $tosnap | \
   dmsetup create $volname\($tosnap\)
 echo ok 23 - create $volname\($tosnap\) block device on master
@@ -165,7 +168,7 @@ $SSH root@$slave \
 echo ok 26 - create snapshot $tosnap on slave
 
 $SSH root@$slave \
-  "echo 0 $size ddsnap /dev/sdc /dev/sdb $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
+  "echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} $controlsocket $tosnap | dmsetup create $volname\($tosnap\)"
 echo ok 27 - create $volname\($tosnap\) block device on slave
 
 hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`

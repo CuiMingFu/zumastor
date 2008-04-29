@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # $Id$
 #
@@ -89,3 +89,6 @@ done
 echo
 cat $summary
 rm -f $summary
+
+# Kill any testers still hanging around
+pgrep test-zuma-uml|xargs kill -9
