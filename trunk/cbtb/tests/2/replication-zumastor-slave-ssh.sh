@@ -16,8 +16,13 @@ set -e
 
 # Terminate test in 20 minutes.  Read by test harness.
 TIMEOUT=1200
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
+
+# why it fails goes here
 EXPECT_FAIL=1
 
 slave=${IPADDR2}
@@ -77,7 +82,7 @@ echo testroot::0:0:root:/testroot:/bin/bash | \
 $SSH root@${slave} rm /root/.ssh/authorized_keys
 
 
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
@@ -85,10 +90,10 @@ ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
 echo ok 1 - master testvol set up
 
-${SSH} testroot${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+${SSH} testroot${slave} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 ${SSH} testroot${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
- 
+
 zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
@@ -111,7 +116,7 @@ then
   $SSH testroot${slave} ls -alR /var/run/zumastor
   $SSH testroot${slave} zumastor status --usage
   $SSH testroot${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 6 - replication manually from master
   exit 6
 else
@@ -122,7 +127,7 @@ fi
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if ! timeout_file_wait 30 /var/run/zumastor/mount/testvol
 then
@@ -150,7 +155,7 @@ then
   $SSH testroot${slave} ls -alR /var/run/zumastor
   $SSH testroot${slave} zumastor status --usage
   $SSH testroot${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 8 - testvol has migrated to slave
   exit 8
 else
@@ -163,7 +168,7 @@ then
   $SSH testroot${slave} ls -alR /var/run/zumastor
   $SSH testroot${slave} zumastor status --usage
   $SSH testroot${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 9 - testfile has migrated to slave
   exit 9
 else

@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 # build packages and UML test kernel natively on Debian/etch i386
 

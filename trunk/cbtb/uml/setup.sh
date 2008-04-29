@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 # Run this only on Debian or Debian-derivative systems for now.
 # Manually inspect and run the components modified as necessary on

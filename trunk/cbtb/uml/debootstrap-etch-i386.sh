@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 #
 # Make a tarball of the root system of a basic Ubunutu/dapper system,

@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 
 # Run the zumastor distribution and arch ext3 image using UML COW verify that it works.
 # The template should be left unmodified.

@@ -19,8 +19,11 @@ set -e
 # times out due to the zumastor define source in step 4, so a very tight
 # limit has been given to this test to speed up runs of the entire suite.
 TIMEOUT=300
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Feature request.  http://code.google.com/p/zumastor/issues/detail?id=26
 EXPECT_FAIL=1
@@ -38,7 +41,7 @@ timeout_file_wait() {
   local file=$2
   local count=0
   while [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -53,7 +56,7 @@ timeout_remote_file_wait() {
   local file=$3
   local count=0
   while $SSH $remote [ ! -e $file ] && [ $count -lt $max ]
-  do 
+  do
     count=$(($count + 1))
     sleep 1
   done
@@ -67,7 +70,7 @@ echo "1..10"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
@@ -79,7 +82,7 @@ echo ${IPADDR} master | ${SSH} root@${slave} "cat >>/etc/hosts"
 echo ${IPADDR2} slave | ${SSH} root@${slave} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave} hostname slave
-${SSH} root@${slave} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+${SSH} root@${slave} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
  
@@ -107,7 +110,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 6 - replication manually from master
   exit 6
 else
@@ -122,7 +125,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 7 - first slave snapshot
   exit 7
 else
@@ -132,7 +135,7 @@ fi
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if ! timeout_file_wait 30 /var/run/zumastor/mount/testvol
 then
@@ -147,7 +150,7 @@ fi
 
 hash=`md5sum /var/run/zumastor/mount/testvol/testfile|cut -f1 -d\ `
 
-$SSH root@${slave} zumastor snapshot testvol hourly 
+$SSH root@${slave} zumastor snapshot testvol hourly
 #
 # schedule an immediate replication cycle
 #
@@ -161,7 +164,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 9 - testvol has migrated to slave
   exit 9
 else
@@ -174,7 +177,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 10 - testfile has migrated to slave
   exit 10
 else
@@ -216,7 +219,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 12 - second slave snapshot
   exit 12
 else

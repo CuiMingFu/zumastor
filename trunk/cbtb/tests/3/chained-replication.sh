@@ -10,8 +10,11 @@ set -e
 
 # Terminate test in 10 minutes.
 TIMEOUT=600
-HDBSIZE=4
-HDCSIZE=8
+NUMDEVS=2
+DEV1SIZE=4
+DEV2SIZE=8
+#DEV1NAME=/dev/null
+#DEV2NAME=/dev/null
 
 # Feature request.  http://code.google.com/p/zumastor/issues/detail?id=27
 EXPECT_FAIL=1
@@ -45,7 +48,7 @@ echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave1 >>/etc/hosts
 echo ${IPADDR3} slave2 >>/etc/hosts
 hostname master
-zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 mkfs.ext3 /dev/mapper/testvol
 zumastor define master testvol; zumastor define schedule testvol -h 24 -d 7
 zumastor status --usage
@@ -60,7 +63,7 @@ echo ${IPADDR2} slave1 | ${SSH} root@${slave1} "cat >>/etc/hosts"
 echo ${IPADDR3} slave2 | ${SSH} root@${slave1} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave1}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave1} hostname slave1
-${SSH} root@${slave1} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+${SSH} root@${slave1} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 ${SSH} root@${slave1} zumastor status --usage
 echo ok 2 - slave1 testvol set up
 
@@ -69,10 +72,10 @@ echo ${IPADDR2} slave1 | ${SSH} root@${slave2} "cat >>/etc/hosts"
 echo ${IPADDR3} slave2 | ${SSH} root@${slave2} "cat >>/etc/hosts"
 ${SCP} ${HOME}/.ssh/known_hosts root@${slave2}:${HOME}/.ssh/known_hosts
 ${SSH} root@${slave2} hostname slave2
-${SSH} root@${slave2} zumastor define volume testvol /dev/sdb /dev/sdc --initialize
+${SSH} root@${slave2} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 ${SSH} root@${slave2} zumastor status --usage
 echo ok 3 - slave2 testvol set up
- 
+
 zumastor define target testvol slave1 -p 30
 zumastor status --usage
 ${SSH} root@${slave1} zumastor define source testvol master --period 600
@@ -97,7 +100,7 @@ then
   $SSH root@${slave2} "df -h ; mount"
   $SSH root@${slave2} ls -alR /var/run/zumastor
   $SSH root@${slave2} zumastor status --usage
-  
+
   echo not ok 5 - initial replication reaches the second target
   exit 5
 else
