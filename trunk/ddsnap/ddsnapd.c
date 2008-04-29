@@ -4302,7 +4302,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 	int listenfd, getsigfd, agentfd, ret;
 
 	if (!valid_sb(sb))
-		error("Invalid superblock\n");
+		error("Invalid superblock: please run 'ddsnap-sb' first to upgrade the superblock.\n");
 
 	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;
 	if (cachesize_bytes == 0) {

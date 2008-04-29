@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <errno.h>
-#include "event.h"
 
 #define u8 unsigned char
 #define s8 char
