@@ -5,6 +5,16 @@
 set -e
 
 DIST=etch
+
+# Currently, if you use this on hardy or above, it will break with libc fun
+# times. Please use something less modern for now [dapper or gutsy?]
+. /etc/lsb-release
+if [ "x$DISTRIB_CODENAME" = "xhardy" ]
+then
+  echo "Failing because your OS is too new. This script will fail on hardy"
+  exit 8
+fi
+
 ARCH=i386
 
 # Get the directory paths (grandparent)
