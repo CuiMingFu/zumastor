@@ -12,6 +12,13 @@
 #
 #
 
+if [ "x$LINENO" = "x" ]
+then
+  echo "Looks like you are not using bash"
+  echo "Please re-run with bash"
+  exit 1
+fi
+
 ARCH=`dpkg --print-architecture`
 DIST=etch
 time ./setup.sh
@@ -22,4 +29,4 @@ then
   echo "Build script failed"
   exit $retval
 fi
-time DIST=${DIST} ARCH=${ARCH} ./runtests.sh $*
+time env DIST=${DIST} ARCH=${ARCH} ./runtests.sh $*

@@ -48,6 +48,11 @@ $SUDO ssh-keygen -q -P '' -N '' -t dsa -f $rootdir/root/.ssh/id_dsa
 $SUDO cat $rootdir/root/.ssh/id_dsa.pub >$stagefile
 
 # Authorize the user to ssh into this virtual instance
+if [ "x`cat ~/.ssh/*.pub`" = "x" ]
+then
+  echo "No ssh public key for your user found. Create one and try again"
+  exit 1
+fi
 cat ~/.ssh/*.pub >>$stagefile
 $SUDO mv $stagefile $rootdir/root/.ssh/authorized_keys
 $SUDO chown root:root $rootdir/root/.ssh/authorized_keys
@@ -116,7 +121,7 @@ $SUDO umount $ext3dir
 $SUDO chown $USER $ext3dev
 [ -d $BUILD_DIR/r$SVNREV ] || mkdir $BUILD_DIR/r$SVNREV
 mv $ext3dev $BUILD_DIR/r$SVNREV/$DIST-$ARCH-r$SVNREV.ext3
-ln -sf r${SVNREV}/$DIST-$ARCH-r$SVNREV.ext3 $BUILD_DIR/$DIST-$ARCH.ext3 
+ln -sf r${SVNREV}/$DIST-$ARCH-r$SVNREV.ext3 $BUILD_DIR/$DIST-$ARCH.ext3
 
 # cleanup
 $SUDO rm -rf $rootdir
