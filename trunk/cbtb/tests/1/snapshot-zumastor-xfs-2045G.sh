@@ -44,8 +44,8 @@ timeout_file_wait() {
 
 echo "1..6"
 
-apt-get update
-aptitude install -y xfsprogs
+apt-get -q -y --force-yes update
+apt-get install -q -y --force-yes xfsprogs
 
 mount
 ls -l $DEV1NAME $DEV2NAME
