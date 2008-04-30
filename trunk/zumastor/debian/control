@@ -1,7 +1,7 @@
 Source: zumastor
 Section: utils
 Priority: optional
-Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
+Maintainer: Will Nowak <compbrain@gmail.com>
 Build-Depends: debhelper (>= 4.0.0), rsync
 Standards-Version: 3.6.2
 

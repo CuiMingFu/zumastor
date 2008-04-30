@@ -1,7 +1,7 @@
 Source: ddsnap
 Section: utils
 Priority: optional
-Maintainer: Shapor Naghibzadeh <shapor@gmail.com>
+Maintainer: Will Nowak <compbrain@gmail.com>
 Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev, libc6-dev
 Standards-Version: 0.1.0
 
