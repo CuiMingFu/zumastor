@@ -70,8 +70,8 @@
  * kernel headers. Make sure that these are same when
  * building with a new kernel. 
  */
-#define PR_SET_LESS_THROTTLE 21
-#define PR_SET_MEMALLOC	22
+#define PR_SET_LESS_THROTTLE 23
+#define PR_SET_MEMALLOC	24
 #define MAX_NEW_METACHUNKS 10
 
 #define trace trace_off
