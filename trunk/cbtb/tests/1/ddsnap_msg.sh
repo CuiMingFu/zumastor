@@ -70,7 +70,7 @@ echo "ok 14 - snapshot status"
 ### Cleanup
 dmsetup remove test
 dmsetup remove test\(0\)
-killall ddsnap || true
+pkill -f 'ddsnap agent' || true
 echo 'ok 15 - cleanup'
 
 exit 0

@@ -89,7 +89,7 @@ echo ok 12 - testvol==testvol\(2\) new snapshot correct
 dmsetup remove testvol\(2\)
 dmsetup remove testvol\(0\)
 dmsetup remove testvol
-killall ddsnap || true
+pkill -f 'ddsnap agent' || true
 echo 'ok 13 - cleanup'
 
 exit $rc
