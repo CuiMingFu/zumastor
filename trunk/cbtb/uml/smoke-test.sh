@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 # $Id: smoke.sh 1198 2007-12-22 11:43:15Z drake.diedrich $
 #
@@ -25,13 +25,19 @@ ARCH=`dpkg --print-architecture`
 
 if [ "x$DIST" = "x" ]
 then
-  DIST=etch
+  DIST=hardy
 fi
 
 if [ "x$LINUXDISTRIBUTION" = "x" ]
 then
-  LINUXDISTRIBUTION=debian
+  LINUXDISTRIBUTION=ubuntu
 fi
+
+
+echo "Starting to smoke-test zumastor"
+echo "Using $LINUXDISTRIBUTION $DIST for $ARCH"
+echo "If you wish to test another combination, you may pass environment vars"
+echo "or you may need to change your host arch."
 
 envstring="env DIST=$DIST ARCH=$ARCH LINUXDISTRIBUTION=$LINUXDISTRIBUTION"
 

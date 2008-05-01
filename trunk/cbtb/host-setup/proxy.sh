@@ -62,8 +62,8 @@ cat <<EOF >>/etc/apache2/sites-available/proxy
   </Proxy>
 
   <Directory /debian/>
-    ProxyPass http://ftp.us.debian.org/debian/
-    ProxyPassReverse http://ftp.us.debian.org/debian/
+    ProxyPass http://mirrors.usc.edu/debian/
+    ProxyPassReverse http://mirrors.usc.edu/debian/
     Allow from $VIRTNET
   </Directory>
 
@@ -74,8 +74,8 @@ cat <<EOF >>/etc/apache2/sites-available/proxy
   </Directory>
 
   <Directory /ubuntu/>
-    ProxyPass http://archive.ubuntu.com/ubuntu/
-    ProxyPassReverse http://archive.ubuntu.com/ubuntu/
+    ProxyPass http://mirrors.usc.edu/ubuntu/
+    ProxyPassReverse http://mirrors.usc.edu/ubuntu/
     Allow from $VIRTNET
   </Directory>
 
