@@ -12,6 +12,8 @@
 #
 #
 
+set -e
+
 if [ "x$LINENO" = "x" ]
 then
   echo "Looks like you are not using bash"
@@ -20,13 +22,19 @@ then
 fi
 
 ARCH=`dpkg --print-architecture`
-DIST=etch
-time ./setup.sh
-time ./build-${DIST}-${ARCH}.sh
-retval=$?
-if [ $retval != 0 ]
+
+if [ "x$DIST" = "x" ]
 then
-  echo "Build script failed"
-  exit $retval
+  DIST=etch
 fi
-time env DIST=${DIST} ARCH=${ARCH} ./runtests.sh $*
+
+if [ "x$LINUXDISTRIBUTION" = "x" ]
+then
+  LINUXDISTRIBUTION=debian
+fi
+
+envstring="env DIST=$DIST ARCH=$ARCH LINUXDISTRIBUTION=$LINUXDISTRIBUTION"
+
+time $envstring ./setup.sh
+time $envstring ./build.sh
+time $envstring ./runtests.sh $*

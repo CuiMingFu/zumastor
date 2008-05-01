@@ -222,7 +222,7 @@ if [ "x$IPADDR3" != "x" ] ; then
   params="${params} IPADDR3=${IPADDR3}"
 fi
 
-params="${params} DEV1NAME=/dev/sdb DEV2NAME=/dev/sdc DEV3NAME=/dev/sdd"
+params="${params} DEV1NAME=/dev/ubdb DEV2NAME=/dev/ubdc DEV3NAME=/dev/ubdd"
 
 # execute any parameters here, but only if all instances booted
 if [ "x${execfiles}" != "x" ] && [ $retval -eq 0 ]

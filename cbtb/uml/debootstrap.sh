@@ -19,8 +19,24 @@ cd ../..
   SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 cd $OLDPWD
 
-ARCH=i386
-DIST=etch
+if [ "x$ARCH" = "x" ]
+then
+  echo "This script requires an ARCH env variable"
+  exit 1
+fi
+
+if [ "x$DIST" = "x" ]
+then
+  echo "This script requires a DIST env variable"
+  exit 1
+fi
+
+if [ "x$LINUXDISTRIBUTION" = "x" ]
+then
+  echo "This script requires a LINUXDISTRIBUTION env variable"
+  exit 1
+fi
+
 DEBOOTSTRAP=/usr/sbin/debootstrap
 SUDO=sudo
 
@@ -40,7 +56,7 @@ EXCLUDE=alsa-base,alsa-utils,eject,console-data,libasound2,linux-sound-base,memt
 
 $SUDO $DEBOOTSTRAP --arch $ARCH \
   --include=$TESTDEPENDENCIES,$BUILDDEPEDENCIES \
-  $DIST $rootdir http://$VIRTHOST/debian
+  $DIST $rootdir http://$VIRTHOST/$LINUXDISTRIBUTION
 
 # create and authorize a local ssh key for root
 $SUDO mkdir -p $rootdir/root/.ssh
@@ -98,6 +114,7 @@ mkdir -p $ext3dir/proc
 $SUDO mount -t proc proc $ext3dir/proc
 $SUDO chroot $ext3dir /bin/bash <<EOF
 cd /dev
+ln -sf /sbin/MAKEDEV /dev/MAKEDEV
 /dev/MAKEDEV ubd
 EOF
 $SUDO umount $ext3dir/proc
