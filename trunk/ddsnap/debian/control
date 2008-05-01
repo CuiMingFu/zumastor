@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev, libc6-dev
 Standards-Version: 0.1.0
 
 Package: ddsnap
-Architecture: any
+Architecture: amd64 i386
 Depends: dmsetup, libpopt0, zlib1g, libc6
 Provides: nblock-write
 Description: userspace daemons for block level snapshot and replication
