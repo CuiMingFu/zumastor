@@ -80,7 +80,7 @@ blockdev --flushbufs /dev/mapper/testvol
 echo 0 $size ddsnap $DEV2NAME $DEV1NAME /tmp/src.control $count | dmsetup create testvol\($count\)
 echo "ok 9 - dmsetup create for the new snapshot"
 
-dmsetup ls | grep testvol | awk '{ print $1 }' | xargs -i dmsetup remove {}
+dmsetup ls | grep testvol | awk '{ print $1 }' | xargs -L1 dmsetup remove
 pkill -f 'ddsnap agent' || true
 echo 'ok 10 - cleanup'
 
