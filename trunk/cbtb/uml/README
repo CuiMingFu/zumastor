@@ -1,25 +1,36 @@
-Running the cbtb tests locally, before you submit:
+UML CBTB Tests
+--------------
+Prereqs:
+- Debian/Ubuntu Machine
+- ssh-key, if it requires a password make sure it is available in a ssh-agent
+(to generate run ssh-keygen)
+- Ability to sudo as root with the current user
 
+Notes:
+- If you have a local or fast ubuntu/debian mirror, after running setup.sh
+  edit /etc/apache2/sites-enabled/proxy to reflect that.
+- The test environment is Debian Etch by default
+- If you want to test with a hardy env, make sure you set DIST=hardy and
+  LINUXDISTRIBUTION=ubuntu as environment variables prior to running `bash
+  smoke-test.sh`
 
-Be on a 32-bit kernel, or a very recently patched 64-bit kernel (bugs in
-ptrace affect 32-bit UML on 64-bit hosts).  
+Running tests:
+- `bash setup.sh` -- You probably want to do this once by hand
+- `bash smoke-test.sh` -- You might want to see the notes for a
+  non-debian-etch test.
 
-Configured sudo so you can use it.  Speed and avoiding extra layers and
-software like fakechroot that aren't yet widely available.
-
-Make sure you have an ssh key in your ssh daemon.  ssh-add
-
+Other old notes below here. may not be relevant
+------------------
 Add CONCURRENCY_LEVEL := 2 or more to /etc/kernel-pkg.conf to speed up
 kernel builds on multi-core systems).  Kernels and packages are built in the
 host environment, so the host must be a Debian-derived system, and probably
 no newer than Debian/etch and have the zumastor/ddsnap/kernel build
-dependencies installed.  See builddepends.sh. 
+dependencies installed.  See builddepends.sh.
 
 For fast compiles install ccache using local disk and symlink gcc to it:
    apt-get install ccache
    [if on NFS] ln -s /somelocalfilesystem ~/.ccache
    ln -sf /usr/bin/ccache /usr/local/bin/gcc
-
 
 cd cbtb/uml
 time ./smoke-etch.sh

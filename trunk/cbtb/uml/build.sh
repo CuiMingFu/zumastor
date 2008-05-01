@@ -4,18 +4,23 @@
 
 set -e
 
-DIST=etch
-
-# Currently, if you use this on hardy or above, it will break with libc fun
-# times. Please use something less modern for now [dapper or gutsy?]
-. /etc/lsb-release
-if [ "x$DISTRIB_CODENAME" = "xhardy" ]
+if [ "x$DIST" = "x" ]
 then
-  echo "Failing because your OS is too new. This script will fail on hardy"
-  exit 8
+  echo "This script needs a DIST env variable"
+  exit 1
 fi
 
-ARCH=i386
+if [ "x$ARCH" = "x" ]
+then
+  echo "This script needs an ARCH env variable"
+  exit 1
+fi
+
+if [ "x$LINUXDISTRIBUTION" = "x" ]
+then
+  echo "This script needs a LINUXDISTRIBUTION env variable"
+  exit 1
+fi
 
 # Get the directory paths (grandparent)
 OLDPWD=$PWD
@@ -34,7 +39,8 @@ ext3=$BUILD_DIR/$DIST-$ARCH.ext3
 
 if [ ! -e $ext3 ]
 then
-  ./debootstrap-$DIST-$ARCH.sh
+  env DIST=$DIST ARCH=$ARCH LINUXDISTRIBUTION=$LINUXDISTRIBUTION \
+   ./debootstrap.sh
 fi
 
 # Get the versions of the kernel and repository.
