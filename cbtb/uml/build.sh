@@ -62,7 +62,7 @@ SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || 
 
 
 # Build the userspace debs and the UML kernel
-./buildcurrent.sh kernel/config/$KERNEL_VERSION-um-uml
+./buildcurrent.sh kernel/config/$KERNEL_VERSION-um-$ARCH-uml
 
 # Unpack the userspace into a fresh, sparse filesystem
 uda=`mktemp`

@@ -53,8 +53,24 @@ EXCLUDE=alsa-base,alsa-utils,eject,console-data,libasound2,linux-sound-base,memt
 
 # Basic dapper software installed into $rootdir
 #  --exclude=$EXCLUDE
-
-$SUDO $DEBOOTSTRAP --arch $ARCH \
+url=http://zumastor.googlecode.com/files/$DIST-$ARCH.tar.gz
+tries=0
+if [ ! -f /tmp/$DIST-$ARCH.tgz ]
+then
+  while true
+  do
+    [ $tries -gt 5 ] && sh -c 'echo "Failed to download base tarball"; exit 1;'
+    tries=$(($tries + 1))
+    (wget -c $url -O /tmp/$DIST-$ARCH.tgz)
+    if [ $? -eq 0 ]
+    then
+      break
+    else
+      rm -f /tmp/$DIST-$ARCH.tgz
+    fi
+  done
+fi
+$SUDO $DEBOOTSTRAP --arch $ARCH --unpack-tarball /tmp/$DIST-$ARCH.tgz \
   --include=$TESTDEPENDENCIES,$BUILDDEPEDENCIES \
   $DIST $rootdir http://$VIRTHOST/$LINUXDISTRIBUTION
 
@@ -119,12 +135,6 @@ ln -sf /sbin/MAKEDEV /dev/MAKEDEV
 EOF
 $SUDO umount $ext3dir/proc
 
-# create symlinks from sd* to the ubd* devices so the tests have the
-# disk names they expect
-$SUDO ln -s /dev/ubda $ext3dir/dev/sda
-$SUDO ln -s /dev/ubdb $ext3dir/dev/sdb
-$SUDO ln -s /dev/ubdc $ext3dir/dev/sdc
-$SUDO ln -s /dev/ubdd $ext3dir/dev/sdd
 
 # Some logic in the installer is hosed under debootstrap
 # Just make sure this exists or DHCP will fail
