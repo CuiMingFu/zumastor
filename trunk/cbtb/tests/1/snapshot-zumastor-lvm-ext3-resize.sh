@@ -60,7 +60,7 @@ size_check() {
 }
 
 snapshot_size_check() {
-  local -r id=$1
+  local id=$1
   if [ $id -eq -1 ]; then
     snapsize=`blockdev --getsize /dev/mapper/testvol`
   else
