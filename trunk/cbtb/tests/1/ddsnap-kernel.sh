@@ -11,6 +11,7 @@
 set -e
 
 TIMEOUT=1200
+NUMDEVS=0
 
 echo "1..4"
 

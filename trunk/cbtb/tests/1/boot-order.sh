@@ -12,6 +12,7 @@
 set -e
 
 TIMEOUT=1200
+NUMDEVS=0
 
 env
 
