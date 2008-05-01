@@ -74,8 +74,8 @@ cat <<EOF >>/etc/apache2/sites-available/proxy
   </Directory>
 
   <Directory /ubuntu/>
-    ProxyPass http://mirrors.usc.edu/ubuntu/
-    ProxyPassReverse http://mirrors.usc.edu/ubuntu/
+    ProxyPass http://mirrors.usc.edu/pub/linux/distributions/ubuntu/
+    ProxyPassReverse http://mirrors.usc.edu/pub/linux/distributions/ubuntu/
     Allow from $VIRTNET
   </Directory>
 
