@@ -227,6 +227,12 @@ params="${params} DEV1NAME=/dev/ubdb DEV2NAME=/dev/ubdc DEV3NAME=/dev/ubdd"
 # execute any parameters here, but only if all instances booted
 if [ "x${execfiles}" != "x" ] && [ $retval -eq 0 ]
 then
+  if tunctl 2>&1 | grep -q Failed
+  then
+    echo "Hmm.  Somebody secured /dev/net/tun since cbtb/uml/setup.sh was run."
+    sudo chmod 666 /dev/net/tun
+  fi
+
   ${CMDTIMEOUT} ${SCP} ${execfiles} root@${IPADDR}: </dev/null || true
   for f in ${execfiles}
   do
