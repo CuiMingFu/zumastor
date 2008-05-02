@@ -1,0 +1,12 @@
+Source: zumastor
+Section: utils
+Priority: optional
+Maintainer: Will Nowak <compbrain@gmail.com>
+Build-Depends: debhelper (>= 4.0.0), rsync
+Standards-Version: 3.6.2
+
+Package: zumastor
+Architecture: all
+Depends: ddsnap (>= 0.8.0), nblock-write, bash (>= 3.1), cron, dmsetup, util-linux (>= 2.12), ${shlibs:Depends}, ${misc:Depends}
+Description: Linux enterprise storage manager for ddsnap
+ Provides snapshot and replication management for the ddsnap package

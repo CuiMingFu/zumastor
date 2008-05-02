@@ -1,0 +1,40 @@
+To do:
+
+ - graceful handling of nearly full snapshot stores
+ - snapshot and replicate commands should wait on ok/err message?
+ - track filesystem information (type, mount options)
+ - freeze filesytem before taking snapshots
+ - use sudo to not require root keys
+ - better success/failure messages
+ - many FIXME TODO's in code, many input validation
+ - recover from interrupted replication
+
+Done:
+
+ - skip this replication cycle if no chunks have been updated
+ - cleanup unreferenced snapshots on replication failure and remove send file
+ - get rid of Pseudo-terminal will not be allocated because stdin is not a terminal. message
+   (as well as stdin error, 'echo cmd | ssh -T host sh')
+ - forget volume needs to clean up sources and targets
+ - log consistently and with correct pid
+
+ - snapshot rotation
+ - init script
+ - snapshot, replication daemons
+ - admin database editing commands
+ - Hook up master snapshot schedule to cron
+ - set up development tree
+ - install/uninstall/develop scripts
+ - create/delete ddsnap sockets
+ - start ddsnap daemons
+ - create/delete devmapper device on snapshot create/delete
+ - mount/unmount device on snapshot create/delete
+ - add use counts
+
+ - Remote operations
+    - ssh to start downstream listen
+       - confirm downstream holds expected snapshot
+    - ssh to set new downstream snapshot
+    - downstream node kicks upstream on zumastor start via ssh
+
+ - make "receive" commands log locally

@@ -1,0 +1,1063 @@
+
+Clustered Snapshots
+Detailed Design
+(Draft)
+
+Revised May 8, 2004
+
+Daniel Phillips, Red Hat Inc.
+
+   1. _D_e_s_i_g_n_ _O_v_e_r_v_i_e_w
+         1. _O_v_e_r_v_i_e_w_ _o_f_ _D_a_t_a_ _s_t_r_u_c_t_u_r_e_s
+         2. _S_n_a_p_s_h_o_t_ _S_t_o_r_e_ _L_a_y_o_u_t
+         3. _S_u_p_e_r_b_l_o_c_k_ _a_n_d_ _M_e_t_a_b_l_o_c_k
+   2. _C_l_i_e_n_t_-_S_e_r_v_e_r_ _M_e_s_s_a_g_e_s
+         1. _S_y_n_c_h_r_o_n_i_z_a_t_i_o_n_ _v_i_a_ _s_e_r_v_e_r_ _m_e_s_s_a_g_e_s
+         2. _M_e_s_s_a_g_e_ _S_e_q_u_e_n_c_e_s
+               1. _S_e_q_u_e_n_c_e_s_ _I_n_i_t_i_a_t_e_d_ _b_y_ _a_n_ _O_r_i_g_i_n_ _C_l_i_e_n_t
+               2. _S_e_q_u_e_n_c_e_s_ _I_n_i_t_i_a_t_e_d_ _b_y_ _a_ _S_n_a_p_s_h_o_t_ _C_l_i_e_n_t
+               3. _S_e_q_u_e_n_c_e_s_ _I_n_i_t_i_a_t_e_d_ _b_y_ _t_h_e_ _S_n_a_p_s_h_o_t_ _S_e_r_v_e_r
+   3. _S_e_r_v_e_r_ _O_p_e_r_a_t_i_o_n
+         1. _E_x_c_e_p_t_i_o_n_ _T_r_e_e_ _F_o_r_m_a_t
+               1. _L_e_a_f_ _n_o_d_e_s
+               2. _I_n_d_e_x_ _n_o_d_e_s
+         2. _J_o_u_r_n_a_l
+         3. _D_u_r_a_b_i_l_i_t_y
+         4. _C_h_u_n_k_ _A_l_l_o_c_a_t_i_o_n_ _B_i_t_m_a_p_s
+         5. _A_l_l_o_c_a_t_i_o_n_ _P_o_l_i_c_y
+         6. _E_x_p_a_n_d_i_n_g_ _t_h_e_ _S_n_a_p_s_h_o_t_ _S_t_o_r_e
+         7. _L_o_c_k_i_n_g
+         8. _S_n_a_p_s_h_o_t_ _D_e_l_e_t_i_o_n
+         9. _S_e_r_v_e_r_ _S_t_a_t_i_s_t_i_c_s
+   4. _C_l_i_e_n_t_ _O_p_e_r_a_t_i_o_n
+   5. _I_n_t_e_g_r_a_t_i_o_n_ _w_i_t_h_ _C_l_u_s_t_e_r_ _I_n_f_r_a_s_t_r_u_c_t_u_r_e
+         1. _S_e_r_v_e_r_ _S_t_a_r_t
+         2. _S_e_r_v_e_r_ _S_h_u_t_d_o_w_n
+         3. _F_a_i_l_u_r_e_ _R_e_c_o_g_n_i_t_i_o_n
+               1. _S_n_a_p_s_h_o_t_ _S_e_r_v_e_r_ _F_a_i_l_u_r_e
+               2. _C_l_u_s_t_e_r_ _M_a_n_a_g_e_r_ _F_a_i_l_u_r_e
+         4. _S_e_r_v_e_r_ _R_e_s_t_a_r_t
+         5. _C_l_i_e_n_t_-_S_e_r_v_e_r_ _C_o_n_n_e_c_t_i_o_n_s
+               1. _I_n_i_t_i_a_l_ _c_o_n_n_e_c_t_i_o_n
+               2. _D_i_s_c_o_n_n_e_c_t
+               3. _R_e_c_o_n_n_e_c_t
+   6. _P_e_r_f_o_r_m_a_n_c_e_ _C_h_a_r_a_c_t_e_r_i_s_t_i_c_s
+         1. _E_f_f_e_c_t_ _o_f_ _c_h_u_n_k_ _s_i_z_e
+         2. _E_f_f_e_c_t_ _o_f_ _m_e_t_a_d_a_t_a_ _b_l_o_c_k_ _s_i_z_e
+         3. _E_f_f_e_c_t_ _o_f_ _H_o_l_d_i_n_g_ _M_u_l_t_i_p_l_e_ _S_n_a_p_s_h_o_t_s
+         4. _A_s_s_u_m_p_t_i_o_n_s
+         5. _O_r_i_g_i_n_ _R_e_a_d_ _P_e_r_f_o_r_m_a_n_c_e
+         6. _S_e_q_u_e_n_t_i_a_l_ _O_r_i_g_i_n_ _W_r_i_t_e_ _P_e_r_f_o_r_m_a_n_c_e
+         7. _R_a_n_d_o_m_ _O_r_i_g_i_n_ _W_r_i_t_e_ _P_e_r_f_o_r_m_a_n_c_e
+         8. _S_n_a_p_s_h_o_t_ _R_e_a_d_ _P_e_r_f_o_r_m_a_n_c_e
+         9. _S_n_a_p_s_h_o_t_ _W_r_i_t_e_ _P_e_r_f_o_r_m_a_n_c_e
+        10. _N_e_t_w_o_r_k_ _P_e_r_f_o_r_m_a_n_c_e
+        11. _O_v_e_r_a_l_l_ _P_e_r_f_o_r_m_a_n_c_e
+   7. _P_a_r_a_l_l_e_l_i_z_i_n_g_ _t_h_e_ _A_r_c_h_i_t_e_c_t_u_r_e
+   8. _A_d_a_p_t_a_t_i_o_n_ _t_o_ _S_i_n_g_l_e_ _N_o_d_e_ _C_l_i_e_n_t
+DDeessiiggnn OOvveerrvviieeww
+The required functionality of the clustered snapshot target, documented in
+detail elsewhere, is briefly reviewed here.  This target implements a virtual
+block device that sits on top of some other block device, allowing the creation
+of multiple writable snapshots of the state of the underlying device.  Each
+snapshot is also a virtual block device implemented by the target.  Multiple
+snapshots and the origin device can be active simultaneously on multiple nodes
+of a cluster.  These virtual devices must act like real devices, that is, they
+must be durable in the sense that once data is written to the origin or to a
+snapshot it will never be lost even in the event of a system crash or power
+outage.  Performance of the virtual devices must not be too much less than the
+underlying device.  To save space, snapshots must share data chunks with the
+origin volume and with each other as much as possible.
+
+This design implements a client-server architecture where almost everything
+interesting happens in the server.  For a write request to the origin, the
+client sends a message to the snapshot server instructing it to ensure that the
+write will not interfere with any snapshot by copying data from the origin to
+snapshot store if necessary.  The server signals that it has accomplished this
+by acknowledging the message, and the client proceeds to carry out the write. 
+A snapshot client handles writes in a similar way with the difference that the
+server informs the client in its response which of the chunks the client wishes
+to write to are located in the snapshot store, and where.  Snapshot reads
+require some special handling.  The snapshot client sends a message to the
+server indicating which chunks it wishes to read.  The server locks any of
+those chunks that lie on the origin and thus are at risk of being overwritten
+by a client simultaneously active on the origin.  The server informs the
+snapshot client which chunks it has locked, and after reading them, the client
+sends a message to the server that the chunks may be unlocked.  This
+interaction between client and server via messages provides all the
+synchronization necessary to ensure that multiple simultaneously active origin
+and snapshot clients do not interfere with each other, preserving the illusion
+that these virtual targets are real devices.
+
+There is a fair amount of mechanism behind the scenes in order for the server
+to carry out the work required by the above messages faithfully and
+efficiently.  This mechanism is implemented in the metadata server, the main
+focus of this design document.
+
+The metadata server maintains the current state of all snapshots in a single
+disk-based btree.  The btree permits a variable number of exceptions to be
+stored per chunk.  Within btree leaf nodes, bitmaps are used to to record the
+sharing of snapshot store data.  Each bitmap is the same size as a logical
+address, 64 bits, giving a maximum of 64 simultaneous snapshots.  Btree nodes
+are operated on directly as primary data, as 64 bit alignment of objects within
+the nodes is considered desireable for efficiency and to support the stringent
+alignment requirements of some architectures.
+
+Free space within the snapshot store is tracked with bitmaps with a granularity
+of one bit per chunk.  Metadata structures  on the other hand may have a finer
+granularity than a chunk, typically 4K, which is the current limitation on the
+size of a kernel buffer.  When possible, metadata allocations will be made
+metadata_blocksize / chunksize blocks at a time; where this is not possible,
+the system must track partially allocated chunks.  The current plan is to
+remember only the most recent partially allocated chunk and to do metadata
+allocations from it until it is completely filled.  (This simple approach
+limits the ability to optimize metadata layout by setting allocation goal, so
+this strategy needs to be looked at critically.)
+
+A journal is used for durable/atomic updating of snapshot metadata.
+
+  - Changes to the superblock
+  - Changes to the metaroot
+  - Current state of the BTree
+  - State of all partially allocated chunks
+
+Each origin client caches a bitmap indicating which origin chunks are known not
+to be shared by any snapshot, and thus can be written without synchronization. 
+Each snapshot client similarly caches a table of exception store addresses of
+chunks that are known not to be shared.
+OOvveerrvviieeww ooff DDaattaa ssttrruuccttuurreess
+This section describes the main data structures used by the server and client,
+to provide context for the detailed discussions below.
+
+Data structures used by the server are disk-resident and partially cached in
+memory.  Client caches are memory-resident.
+    * Server On-disk Structures
+
+          o Superblock and Metaroot
+            Static global data, e.g., chunk size; location of the root of the
+            exception btree and journal; size of the origin volume and snapshot
+            store; allocation bitmap stride and base
+          o Metablock
+            Miscellaneous variable data, e.g., snapshot list; snapshot deletes
+            in progress; list of chunks allocated for metadata but only
+            partially used; freespace total [do we really need this?]
+          o Journal
+            For atomic updating and durability, changes to the exception btree,
+            allocation bitmaps and miscellaneous other structures are written
+            first to the journal then to their final destinations.  Without
+            such measures, snapshot virtual volumes would be vulnerable to disk
+            corruption in the event of unexpected system failure, which is
+            undesirable and unlike a physical volume.
+          o Allocation bitmaps
+            Free chunks in the snapshot store are tracked via bitmaps located
+            just about the journal in the snapshot store, indexed via a full-
+            populated radix tree
+          o Exception Btree
+            Indexed by chunk address; for each chunk address that has
+            exceptions, stores a list of exceptions.  Each exception is paired
+            with a bitmap indicating which snapshots share the exception
+
+    * Client Cache
+
+          o Unique bitmap (for origin client)
+            Each one bit in this bitmap indicates that all snapshots have
+            exceptions for the given chunk and so the client may write the
+            chunk without interacting the snapshot server.  A zero means the
+            chunk is shared or its status is unknown, in either case the client
+            must
+          o Unique exception map (for snapshot client)
+            Each exception in the table may be zero if its state is unknown or
+            the chunk does not have an exception, or the sector address of an
+            exception store chunk, with the low bit one if the chunk is known 
+            not to be shared by any other snapshot.
+[need a diagram]
+SSnnaappsshhoott SSttoorree LLaayyoouutt
+From low to high disk address:
+
+[ superblock ]
+[ fixed size journal ]
+[ bitmaps, btree leaves and nodes ]
+[ exceptions ]
+
+[need a diagram]
+
+The dividing line between metadata and exceptions is not fixed, but rather is
+determined by allocation policy.
+SSuuppeerrbblloocckk aanndd MMeettaabblloocckk
+The first 4K block in the snapshot store is the superblock, containing global
+information for the volume set at creation time:
+    * Version
+    * Size of snapshot store
+    * Metadata block size (4K)
+    * Chunk size (binary multiple of metadata block size)
+    * Sector address of the metablock
+    * Sector address of root of allocation bitmap radix tree
+    * Sector address of beginning of journal
+    * Size of journal
+    * ...?
+The metablock contains variable global information:
+    * Status flags
+          o Journal clean bit
+    * Highwater mark of chunk allocation
+    * Total free space
+    * Sector address and allocated size of partially allocated chunk
+    * Bitmask of currently active snapshots
+    * Bitmask of snapshots in process of being deleted
+    * list of sector addresses of roots of snapshot store btrees
+    * ...?
+Metablock data items that change frequently such as the highwater mark,
+freespace and partial allocation are also recorded in the journal tag block
+each time a journal transaction is committed.  Updates to the metablock are
+always journalled.
+CClliieenntt--SSeerrvveerr MMeessssaaggeess
+SSyynncchhrroonniizzaattiioonn vviiaa sseerrvveerr mmeessssaaggeess
+Some form of synchronization is required in order to make clustered origin
+volumes and snapshot devices act as though they are independent devices even
+when they share data.  The obvious approach would be to use a cluster lock
+manager, with shared locks for reads and exclusive locks for writes.  But once
+a client has taken a lock for a write to a given chunk it needs to find out
+from the metadata server whether the original data of the chunk needs to be
+preserved in the snapshot store in the case of a write to the origin or a new
+exception needs to be created in the case of a write to a snapshot.  This
+generates more message traffic than necessary; it turns out that server
+messages alone are sufficient for synchronization.  The following fact is
+helpful in reducing the number of messages required: if a chunk is known to be
+unshared then it can be freely written or read without global synchronization. 
+Furthermore, once an origin chunk becomes unshared it can only become shared
+again by creating a new snapshot.  And once a chunk shared by more than one
+snapshot becomes unshared it will remain unshared until the snapshot is
+deleted.  This property means that once a client is told that a given chunk is
+unshared it can rely on that information for a long period, or more precisely,
+until a new snapshot is created.  A consequence of this is that all origin
+clients must clear their bitmap cache each time a new snapshot is created; a
+server-initiated request/response sequence is provided for that purpose. 
+(Snapshot clients on the other hand do not have to clear their cache because
+snapshot chunks known to be unique reside in the snapshot store, thus cannot
+become shared with a new snapshot.  This is yet another reason why snapshot IO
+performance is expected to ultimately supercede origin IO performance.  [show
+why snapshot creation doesn't interfere with outstanding snapshot reads])
+
+This design is therefore based on the principle that a client will send a
+request to the snapshot server for every chunk that it does not know is
+unshared.  When the client receives the response it knows that all requested
+chunks are unshared.  The server has either determined this by consulting the
+btree or made it so by creating new exceptions.  The client then caches the
+information that the chunks are unshared (in a bitmap) to optimize the case of
+repeated accesses to the same chunk.   Once a chunk is known to be unshared the
+client can proceed with a write operation to the chunk.
+
+Special synchronization is required for snapshot reads, to prevent an origin
+chunk that is read via a snapshot from being overwritten by a write via the
+origin.  Locking is used here, however the locking is internal to the snapshot
+server, except that a snapshot client must send messages to the server to
+unlock chunks that the server has locked on behalf of the client (only for
+snapshot reads, not for writes or origin reads).  Thus the snapshot server acts
+as a minimal lock manager in the case of snapshot reads.
+
+A complete enumeration of cases should clarify the above logic:
+    * Origin write to unshared chunk
+      A write to an origin chunk that is not shared (i.e., all snapshots
+      already have exceptions for the chunk) does not require any global
+      synchronization; it is the responsibility of the higher level application
+      to ensure that no other reads or writes race with this write.
+
+    * Origin write to shared chunk
+      A write to an origin chunk that is shared requires global
+      synchronization.  This synchronization is accomplished by sending a
+      message to the snapshot server which will ensure that the chunk is not
+      shared, by examining the exception btree and creating a new exception if
+      necessary.  When the client receives the reply the chunk is gauranteed
+      not to be shared, which reduces to the case above and the write can
+      proceed.  When the client doesn't know whether a chunk is shared or
+      unshared it must ask the server, so "unknown" is treated the same as
+      "shared" by the client; once the server responds the chunk is known to be
+      unshared and the client can cache this information; the chunk can only
+      become shared again if a new snapshot is set, in which case the client
+      will discard any sharing information it has cached.
+
+    * Origin read from shared or unshared chunk
+      Reads from the origin do not require any global synchronization because
+      the higher level application has the responsibility of ensuring that
+      these do not race with writes to the same volume.  Snapshot writes do not
+      collide with origin reads because the destination of a snapshot write is
+      always the snapshot store.
+
+    * Snapshot write to unshared chunk
+      A write to a snapshot logical chunk that is not shared does not require
+      global synchronization, as for origin writes.
+
+    * Snapshot write to shared chunk
+      A write to a snapshot chunk that is shared is similar to a write to the
+      origin except that the snapshot server must also return a set of
+      exception store addresses to the client, which the client caches.
+
+    * Snapshot read from unshared chunk
+      A snapshot read from an unshared chunk does not require any global
+      synchronization.
+
+    * Snapshot read from shared chunk
+      A snapshot read of a shared chunk requires global synchronization to
+      ensure that a write to the same chunk via the origin does not overwrite
+      the data while it is being read.  The snapshot server performs this
+      synchronization by locking locally on the snapshot server between writers
+      and readers of shared chunks, details below.  Chunks that are locked for
+      reading on a snapshot have to be unlocked after the read is complete,
+      which requires an additional message from the client to the server.
+      Similarly to writes to shared chunks, if the client doesn't know that a
+      chunk is shared it must contact the server.  The server's response
+      indicates which chunks are unshared and the client can cache this
+      information.
+Each chunk in the original message, once acknowledged, is guaranteed to be
+unique because the metadata server has either determined that each chunk is
+already unique or it has completed a copy to snapshot store to make it unique. 
+[note:  chunks are not necessarily acknowledged in the requested order]  The
+only way a unique chunk can become shared is when a new snapshot is set, in
+fact, at the time a new snapshot is set all its chunks are shared with at least
+the origin.  For this reason, setting a new snapshot requires that all origin
+clients discard their bitmaps.  Thus, the server sends a "new snapshot" message
+to every client and thenew snap shot does not become writeable until every
+client has acknowledged this message.
+MMeessssaaggee SSeeqquueenncceess
+This section enumerates the messages in each synchronization sequence.
+SSeeqquueenncceess IInniittiiaatteedd bbyy aann OOrriiggiinn CClliieenntt
+    * Origin write
+          o Client sends unique request
+                # request gives chunk address range
+          o Server responds with initiate
+                # empty message, i.e., "write can proceed"
+                # server has verified each chunk is unshared or created new
+                  exceptions as necessary
+                # all chunks are now unique so unique cache can be updated for
+                  these chunks
+SSeeqquueenncceess IInniittiiaatteedd bbyy aa SSnnaappsshhoott CClliieenntt
+    * Snapshot write
+          o Client sends unique request
+                # request gives chunk address range
+          o Client responds with initiate
+                # response lists exception addresses, if any
+                # after verifying each chunk is unshared, or creating new
+                  exceptions where not
+    * Snapshot read
+          o client sends read lock request
+                # request chunk address range
+          o Server responds with initiate
+                # lists exception addresses for non-origin chunks
+                # lists which chunks need to be unlocked because they are not
+                  unique
+          o Client sends unlock when done
+                # for non-unique chunks above
+
+    * Snapshot create
+          o client sends snapshot create message
+          o server sends snapshot create advice to each origin client
+          o each origin client clears its bitmap cache and acknowledges create
+          o server returns create acknowlege
+          o (I'm not completely satisfied with this sequence)
+SSeeqquueenncceess IInniittiiaatteedd bbyy tthhee SSnnaappsshhoott SSeerrvveerr
+[snapshot create]; cluster management messages; error messages; shutdown
+message; [fixme]
+SSeerrvveerr OOppeerraattiioonn
+EExxcceeppttiioonn TTrreeee FFoorrmmaatt
+Exceptions for all snapshots are stored in a single btree indexed by logical
+chunk address.  For each chunk, a list of exceptions is stored.  Each exception
+consists of a snapshot address and a bitmap indicating which snapshots share
+that exception.
+
+Rather than serving only as a disk format to be translated into some more
+efficient cache format, the btree is meant to be operated on directly by the
+snapshot server.  To this end, data structures in the btree nodes and leafs are
+designed for direct memory access, e.g., all numeric values are aligned
+according to their size.
+
+An attempt has been made to keep the btree compact by designing the node
+formats carefully, without going to extremes such as using a serial compressed
+encoding which is unpacked into a memory structure in order to be accessed.  In
+other words, difficult tradeoffs have been made here between compactness,
+simplicity and efficiency.
+LLeeaaff nnooddeess
+Leaf block format is optimized for rapid lookup and efficient insertion.  At
+the bottom of each leaf is a header and a directory map that grows up towards a
+table of exceptions, which grows down.  Each entry in the directory map gives
+the logical chunk address relative to a base address stored in the header, and
+has a pointer to one of the exceptions in the table at the top of the block. 
+The entries are stored in sorted order according to logical chunk address and
+the pointers increase monotonically.
+
+[need a diagram]
+
+Using relative addresses allows the map entries to be more compact.  In the
+current prototype map entries consist of two 32 bit numbers, however two 16 bit
+numbers might work just as well and save more space, although a 16 bit relative
+block number might be so small as to cause a noticeable increase in the number
+of leaf blocks if exceptions.are distributed sparsely.  With 32 bit map
+numbers, a single exception requires 24 bytes; with 16 bit map numbers that
+would fall to 20 bytes, a 16% savings.  The final determination of which is
+best should probably be determined experimentally.
+
+The difference between each two pointers in the map gives the number of
+exceptions for the chunk.  The last entry in the map is a sentinel and points
+at the top of the block (this could be designed out to save a few bytes).  Each
+entry in the exception table has the 64 bit sector address of an exception in
+the snapshot store and a bitmap to indicate which snapshots share the
+exception.
+
+The basic operations to locate and determine sharing of exceptions are quite
+efficient.  A binary search is used to locate the target chunk address in the
+map, if it is present.  This yields a list of exceptions on which efficient
+bitwise operations can be performed to determine sharing. From the point of
+view of the origin, a logical chunk is shared unless all active snapshots have
+exceptions for that chunk.  From the point of view of a snapshot, a logical
+chunk is shared if it has no exception (i.e., is shared with the origin) or it
+has the same snapshot store address as another snapshot.
+
+A slight drawback of this leaf format is that insertion requires memory moves
+in order to maintain the entries in sorted order, and the memory moves get
+longer as the leaf block fills up.  For relatively small leaf blocks, i.e. 4K,
+it is probably not a problem.  This will be determined experimentally.  Other,
+equivalently efficient leaf formats are certainly possible, though perhaps they
+will not be as simple.
+
+A more serious drawback of this leaf format is that as the number of snapshots
+increases, update overhead of the btree will increase more or less linearly. 
+It is thus desirable to adopt a variant leaf format at some point capable of
+encoding runs of adjacent exceptions efficiently.  [variant leaf format needs
+to be provided for in per-leaf flags and in superblock flags, for backward
+compatibility.]  This issue is treated at greater length in the performance
+section, below.  In brief: this will not be a problem for reasonable numbers of
+simultaneous snapshots.
+IInnddeexx nnooddeess
+An index node contains a table of entries each of which consists of a 64 bit
+logical chunk address key and a 64 bit sector address of a lower level index
+node or, at the lowest index level, a leaf.  The entries are in sorted order by
+logical chunk address.  Two successive keys bound the range of entries
+contained by the lower level node.
+
+To locate the leaf block in which exceptions, if any, are stored for a given
+logical address, we descend recursively from the root, doing a binary search on
+the address key in each block and descending recursively into the node
+referenced by the sector address lying between the two keys that bound the
+target key.
+
+We search all the way to a leaf node even if we are examining a region of the
+address space that is completely empty.  For write requests this is not
+inefficient because we will immediately add an exception to the  leaf node we
+found if one is not present.  For read requests it's a little more work than
+necessary but we probably do not care since this only affects snapshot reads,
+and only by a small amount (origin reads do not involve the server).
+JJoouurrnnaall
+Any altered metadata block, i.e, btree leaf and index nodes, allocation
+bitmaps, etc, are written to a journal before being written to their final
+destinations.  This gaurantees that the metadata can be restored reliably to
+the state of the most recently committed exception or other metadata change.
+
+The size and location of the journal are determined at the time the snapshot
+store is created and cannot be changed.
+
+Each journal transaction consists of an arbitrary number of data blocks
+followed by a journal tag block.  The tag block carries a magic number allowing
+it to be identified as such for the purpose of journal replay, and a sequence
+number used to locate the starting point for journal replay. Any data block
+written to the journal that happens to have the same number at the same
+location must be escaped by writing a zero to that location in a copy of the
+data.  The tag block carries a list of snapshot store sector addresses which
+are the final destinations of the data blocks.  The low bit of the address
+carries a bit flag indicating that the data block was escaped and the magic
+number needs to be restored before the data block is finally written.  The tag
+block carries other miscellaneous information such as partial usage status of a
+chunk recently allocated for metadata.
+DDuurraabbiilliittyy
+Thanks to the journal, the entire state of the metadata server (with on
+exception, see below) is always completely recorded on disk at the time any
+write is acknowledged.  Thus, if the metadata server should fail a new one can
+be started, read the metadata root and continue as if nothing had happened.
+
+The one exception to this is that locking state of snapshot read requests
+against origin writes is kept only in memory on the server.  While it is enough
+to simply requre that all outstanding reads on clients must complete before a
+newly started metadata server can resume processing requests, there could be
+cases where this would cause an unnecessary delay of serveral seconds on server
+restart where there is a heavy backlog of IO.  Since it is easy, clients will
+be asked to upload any outstanding locked snapshot reads to the new metadata
+server before the server resumes processing requests.  This should only take a
+few tens of milliseconds.  The total latency of starting a new metadata server
+then should be measured in tens of milliseconds (though detecting that a server
+has failed could easily take much longer).
+
+[more details of journalling]
+[for the kernel implementation, considerations for continued access to metadata
+blocks that are currently in the journal writeout]
+CChhuunnkk AAllllooccaattiioonn BBiittmmaappss
+Freespace in the snapshot store is mangaged via bitmaps with a resolution of
+one bit per chunk.  Each bitmap is one 4K block in size and maps 2**15 chunks. 
+The bitmap blocks are indexed via a radix tree rooted in the header.  Each
+radix tree node contains 512  8-byte sector addresses.  As a slight
+simplification this tree is always 3 levels deep, giving 2^27 * 2^15 =  4
+trillion chunks, or 16 petabytes volume size limit with a minimal 4K chunk
+size.  It is always fully populated, i.e., the tree is created at the time the
+snapshot store is created and changed only if the snapshot store is expanded. 
+The second lowest level of the bitmap index tree is loaded into memory when the
+volume is activated, this will be about 512 KB per terabyte of snapshot store.
+
+Bitmaps are cached in buffers and accessed via getblk.  A pointer is kept to
+the most recently accessed bitmap, i.e., it is not released until a different
+bitmap is accessed, which eliminates the majority of getblk lookups assuming
+reasonably good locality of allocation.  Likewise, a pointer is kept to the
+most recently accessed index block.  Since nearly all accesses to bitmaps are
+associated with changing the bitmap, the bitmaps are kept near the journal
+rather than being distributed throughout the snapshot store.  This is purely a
+matter of allocation policy since the actual locations of bitmaps are
+determined by the radix tree.
+
+Since metadata is allocated in blocks but allocation granualrity is chunks,
+some chunks allocated to metadata may be only partially full.  To avoid leakage
+of this unallocated space on unexpected restart, any partial allocations are
+recorded in the journal tag block.  As a side effect, this means that a few
+metadata blocks can be allocated before a bitmap needs to be modified, saving
+some journal bandwidth.
+AAllllooccaattiioonn PPoolliiccyy
+[coming soon]
+
+[see the performance section re why this is important]
+
+[Should there be hints re total free space in each region?  Probably]
+EExxppaannddiinngg tthhee SSnnaappsshhoott SSttoorree
+To expand the snapshot store, additional bitmaps and associated radix tree
+index blocks need to be allocated, hopefully not too far away from the
+journal.  Besides updating the snapshot store size in the header, this is the
+only change that needs to be made (I think).
+LLoocckkiinngg
+Synchronization via locking is only required between snapshot reads and origin
+writes.  This locking takes place entirely within the server so no cluster lock
+manager is involved.  (In fact the server is a lock manager for the limited
+case of snapshot reads.)  The locks are simple, hashed locks.  The cost of this
+locking will be one hash lookup per snapshot read or origin write of a shared
+chunk, plus the unlock messages.  This locking is only required when snapshot
+and origin virtual devices are active at the same time; e.g., the server does
+not have to take any locks to service origin write requests if no snapshot
+device is active, even if snapshots are being held.
+
+The server takes a (local) lock for each shared chunk in the range of a client
+snapshot read request, if the chunk has no exception for that snapshot and
+therefore might collide with a write to the origin.  Locked chunks are marked
+in the response.  The client sends a message to release the lock after it has
+completed the read.  Meanwhile, the server briefly locks each chunk of a
+client's write request after completing the copy to snapshot store and
+recording the new exception, but before allowing the actual write to proceed by
+replying to the client's request.  This ensures that a contending read always
+completes before the write to the origin takes place or is initiated after the
+new exception has been recorded, thus directing the read to the snapshot store
+instead of the origin.
+SSnnaappsshhoott DDeelleettiioonn
+Because it packs together information for multiple snapshots in each leaf node,
+the exception btree is optimized for lookup and exception insertion as it
+should be.  However, snapshot deletion is not as simple an operation  as it
+would be if each snapshot had its own tree.  (But if each snapshot had its own
+tree then exception creation time would increase with the number of snapshots,
+much more space would be used for multiple snapshots and keeping track of
+exception sharing would be less efficient.)  In general, deleting a snapshot
+requires examining the entire btree and modifying each leaf  block that
+contains an exception for the snapshot.  This could amount to quite a lot of IO
+traffic and take a significant amount of time.  The snapshot server will
+therefore simply log the status of the snapshot as "in process of deleting" and
+indicate completion immediately to the requesting client.  The actual deletion
+will proceed in the background.  When the deletion is finished, which could
+require tens of seconds for a large volume, the snapshot is logged as available
+for reuse.
+
+A possible optimization is to defer deletions until several snapshots can be
+deleted in one pass, which will require less time than deleting each
+individually.  How much less depends on how common it is for exceptions of
+several snapshots being deleted to lie in the same btree node.  Another
+possible optimization is to include in each index node a bitmap indicating
+which snapshots have exceptions in the subtree descending from that node so
+that entire subtrees can be skipped during the traversal if they do not need to
+be modified.
+
+A more aggressive and considerably more difficult optimization would involve
+introducing the concept of snapshot set generations and tagging each leaf block
+with a the snapshot generation as of the most recent alteration.  Then a
+snapshot could be deleted by creating a new generation that does not include
+the deleted snapshot.  A leaf block tagged with an earlier generation would be
+seen as "stale" and would be modified when next encountered, to remap it to the
+current generation, removing exceptions belonging to deleted snapshots in the
+process.  The complexity of this approach makes it unattractive, however if
+snapshot deletion performance turns out to be a problem it could turn out to be
+worth the effort.
+SSeerrvveerr SSttaattiissttiiccss
+The current count of free chunks in the snapshot store is recorded as a 64 bit
+value in the journal tag block.  In the event of unexpected restart this value
+will be exact since it records the value as of the most recent commit, which is
+the state recovered by replaying the journal.
+CClliieenntt OOppeerraattiioonn
+[this section was pasted in from the "barebones client specs" I gave to Patrick
+and needs rewriting]
+
+Client operation is simple: all information required to map an incoming request
+to its destination is obtained from the server, so the clients just need to
+implement some simple message handling and a cache, the latter not being
+essential for correct operations.
+
+Client initialization:
+
+  Our target only needs to know three things from the outside world:
+
+    - device
+    - socket
+    - chunk size
+
+  Later, snapshot clients will need to be tied to the origin client in an
+  as yet unidentified way.
+
+  On initialization the target starts a kernel thread to handle server
+  responses.
+
+Read/write request handling:
+
+  - Each read request is identity-mapped and dm takes care of submitting it.
+
+  - The target places each write request on a deferred list and sends a
+    "prepare write" request to the server.  The prepare write message
+    contains a single range of chunk addresses (for now, later we will add
+    request batching) which the server will make unique.  This range covers
+    the sector range of the corresponding deferred write request.
+
+  - For each "prepare write" response received from the server the target
+    searches the deferred write list for a request with the indicated
+    chunk address, verifies that the chunk count matches, removes it from
+    the list and submits it.
+
+Other messages:
+
+  - We don't need to handle any other messages for now.  Later we will add
+    a variant for handling snapshot prepare write messages and the three-step
+    snapshot read messages.  Later, there will be a snapshot creation message
+    that allows origin clients to discard their 'unique' cache.
+
+Message formats:
+
+  - Messages are in network byte order, halfword aligned.
+
+  - Message header:
+       be_u16 magic;
+       be_u16 msg_id;
+       be_u32 msg_len;
+
+Prepare write message:
+
+  header;
+  be_u16 num_ranges; /* always 1 for now */
+  be_u64 chunk_address;
+  be_u16 chunk_count;
+
+Prepare write response:
+  header;
+  be_u16 num_ranges; /* always 1 for now */
+  be_u64 chunk_address;
+  be_u16 chunk_count;
+
+- Matching chunk addresses to blocked writes
+
+- Caching in client is most of it, and it's optional
+IInntteeggrraattiioonn wwiitthh CClluusstteerr IInnffrraassttrruuccttuurree
+[This section is depends heavily on the cluster management infrastructure CMAN
+and needs updating as a result of recent discussions]
+SSeerrvveerr SSttaarrtt
+Server startup is simple: the server replays the journal if necessary, reads
+the root of the btree, reads one entire level of the bitmap directory into
+memory and waits for connections from clients.
+SSeerrvveerr SShhuuttddoowwnn
+[coming soon]
+FFaaiilluurree RReeccooggnniittiioonn
+ SSnnaappsshhoott SSeerrvveerr FFaaiilluurree
+A client's connection to the snapshot server may be interrupted in several
+ways:
+   1. Client receives a message from the cluster manager to suspend because the
+      server has failed
+          o The client must suspend writes on the origin and all IO on
+            snapshots and wait for further messages
+   2. Client detects an inconsistency in a snapshot server message
+          o The client must report the error to the cluster manager, suspend
+            writes and wait as for 1.
+   3. Client fails to receive a response from the server
+          o Same as 2.
+   4. Client receives a connection error from the operating system
+          o Same as 2, but with no detection lag
+In any case, failing IO is a last resort and will not be done until the client
+receives a message from the cluster manager to do so, or failure of the cluster
+manager itself is detected.
+
+Case 3. above involves timeouts.  I have always hated long timeouts with a
+passion and will go to considerable lengths to eliminate them.  Therefore,
+timeouts should be detected at two levels.  First, the client periodically
+sends a simple message to the server to which the server immediately replies, a
+'challenge'.  If the client does not receive a reply within a few hundredths a
+second then the client will suspect that the server is no longer available and
+send a message to the cluster manager to that effect, as for 2. above.  The
+cluster manager may decide that the timeout is not out of the ordinary and
+instruct the client that no action should be taken, or it may initiate
+diagnostic and/or remedial action before responding.  If the server did in fact
+fail the cluster manager should be able to detect that very quickly and start a
+new server immediately.
+
+The snapshot server might be able to respond to a challenge but still be unable
+to handle client requests, for example, because some physical device has timed
+out.  The client will impatiently send an inquiry to the cluster manager if the
+server fails to respond after a few tenths of a second, that is, with
+considerably more lag than usual.  Normally the cluster manager will indicate
+nothing is wrong and the client will send another inquiry after waiting a
+consderably longer time.  Thus advised, it is the responsiblity of the cluster
+manager to determine whether the server has failed or whether it is just slow.
+
+By introducing the challenge/response mechanism and staging timeouts we allow
+true failures to be detected early while introducing only a small amount of
+additional network traffic.
+ CClluusstteerr MMaannaaggeerr FFaaiilluurree
+If a message to the cluster manager itself times out then the client has no
+choice but to start failing IO requests.  (I would like this to happen quickly
+rather than after a long timeout, but that might be difficult to achieve.)
+SSeerrvveerr RReessttaarrtt
+Nothing special needs to be done to start a new server, that is, there is no
+difference between starting an interrupted snapshot server and restarting it on
+the fly.  Simply replaying the journal ensures that the server is in an
+internally consistent state and that that state is consistent with any write
+requests that have been acknowledged.  Any locking state associated with in-
+progress snapshot reads is lost but that does not matter because the reads will
+have completed by the time the reading client reconnects to the new server.
+
+Clients do not have to discard their 'unique' caches because all the chunks
+known to be unique will still be unique when the new server is started. 
+Similarly, cached snapshot store chunk addresses will not have changed because
+only addresses of unique chunks are cached and these addresses will not change.
+CClliieenntt--SSeerrvveerr CCoonnnneeccttiioonnss
+IInniittiiaall ccoonnnneeccttiioonn
+The cluster communications manager is used to open a socket connection between
+the client and snapshot server. [details]
+DDiissccoonnnneecctt
+A origin client does not have to do anything special to disconnect for the
+snapshot server and prepare itself for reconnection.  A snapshot client just
+has to ensure that any outstanding locked reads complete before the client
+reconnects, because the new server will not know about the those reads.  Simply
+allowing the reads to complete is simpler than providing a means for retaking
+the locks on the new server.  In truth, it is highly unlikely that a new server
+could be started and acknowledge a new, conflicting origin write before the
+outstanding reads complete, but it is best to be sure.
+
+So on receiving a message from the cluster manager to disconnect from the
+server and origin client simply suspends write requests, a snapshot client
+suspends both reads and writes, and both wait for further instructions from the
+cluster manager.  Note that it is not necessary for either kind of client to
+discard its 'unique' cache.
+RReeccoonnnneecctt
+Nothing special needs to be done by the client to connect to a new server.  The
+client simply opens a connection to specified connection address as specified
+in the connect message from the cluster manager.
+PPeerrffoorrmmaannccee CChhaarraacctteerriissttiiccss
+EEffffeecctt ooff cchhuunnkk ssiizzee
+Larger chunk size will help performance for sequential and hurt for random
+write loads.  The total size of metadata reduces linearly with the chunk size,
+saving space, IO bandwidth and seeking.   On the other hand, larger chunks
+increase internal fragmentation of the snapshot store, especially for sparse,
+random access loads, and the overhead of metadata updating is supposed to be
+small in relation to data transfers.  Therefore it is hoped that the
+performance and metadata size cost of small chunk sizes will be outweighed
+reduced internal fragmentation, saving space in the snapshot store.  This
+remains to be tested in practice.
+EEffffeecctt ooff mmeettaaddaattaa bblloocckk ssiizzee
+Larger metadata blocks will improve performance somewhat on largely serial
+write loads due do requiring a fewer number of larger IOs, especially if the
+snapshot metadata is fragmented.  However, for the time being Linux does not
+support IO buffers larger than physical page size, so it is expected that
+metadata block size will not increase until this issue is addressed, at least
+for a kernel implementation of the snapshot metadata server.   For
+compatibility with the expected kernel metadata server, the user space
+implementation will use 4K blocks.
+
+It is thought that communication overhead and server load will not be
+significant performance factors, due to these being highly optimized. 
+Contention on large clusters with parallel loads should not be a significant
+factor either, since a single server should be able to handle the traffic of
+many nodes of similar power to itself.  The exception to this is copy-out
+overhead which could easily saturate a server's bus; a simple solution is
+available: farm out the copy-out traffic to lightly-loaded nodes as necessary.
+EEffffeecctt ooff HHoollddiinngg MMuullttiippllee SSnnaappsshhoottss
+The more snapshots that are held, the more btree leaf nodes will be required to
+hold them.  Journalling the extra btree leaves to disk consumes IO bandwidth,
+causes more seeking and generates cache pressure.  Reading in the extra btree
+nodes increases latency.  However, because exceptions for all snapshots are
+stored adjacent in the btree, the overhead is not as large as if a separate map
+had to be updated on disk for each snapshot.  Importantly, the process of
+determining whether a given chunk is shared never requires more than a single
+leaf node to be examined.
+
+Sharing bitmaps are used within leaf nodes to avoid having to enter any given
+snapshot store address more than once into the node, and also performs the
+function of specifiying which snapshot uses a given snapshot store address.  
+The worst case arises when a given logical chunk is written at least once after
+every snapshot.  Then the leaf node entries for that chunk have a bitmap and a
+snapshot store address for every snapshot.    Since leaf nodes are expected to
+be 50% full in the initial implementation, we can end up with one exception
+stored in each leaf node.  Then the number of btree nodes that have to be
+journalled is equal to the number of chunks written.  The journalled node has
+to be written twice, once to the journal and once to its true destination.  So
+the worst case is a factor of 3 degradation in write performance due to btree
+updating alone.  To ameliorate such degradation it would be wise to use a
+larger chunk size when large numbers of snapshots are expected.
+
+The worst case degradation above can be tempered somewhat by improving the
+btree update algorithm to use a b+tree algorithm, which guarantees 2/3rds leaf
+fullness, enough to hold two exceptions instead of one.  Larger metadata blocks
+will help reduce seeking overhead, when they become practical..   Eventually
+though, the best strategy is to introduce variant leaf node formats that
+optimize for the many-snapshots case by representing ranges of snapshot store
+chunks compactly, especially where the snapshot store chunks are allocated
+sequentially, which is something we want to achieve anyway.
+
+In brief, the metadata update component of origin and snapshot write
+performance will degrade linearly with the number of snapshots held, but with a
+much shallower slope than if snapshot store data were not shared and metadata
+were not grouped together by logical address.  In the latter case, copy-out
+overhead would increase directly with number of snapshots.   Exception table
+update overhead would increase rapidly as well, though the exact rate is harder
+to characterize because it depends on the chunk sharing patterns.
+
+With the maximum number of snapshots held (64) the new design should perform
+better than the old one by a factor of thirty or more.  Furthermore, some
+fairly straightforward improvements to the btree leaf format can make the slope
+much shallower, to the point where the overhead of holding 64 snapshots may be
+hard to notice.
+
+With a single snapshot held, the new design not perform quite as well as the
+existing device-mapper design, but only because the existing design does not
+provide durable recording of snapshot store updates.  In any case, the overhead
+of the durable snapshot recording is expected to be only about 2% worst-case
+overhead vs raw writing, far less than the 200% worst-case overhead of copy-
+outs when a single snapshot is held, and shrinks roughly linearly with the
+chunk size (extra seeking in the metadata region makes this relationship
+slightly more complex).  So by using a 256K chunk size, metadata update can
+most likely be held to a few percent of first-time write overhead even when the
+maximum number of snapshots are held.
+AAssssuummppttiioonnss
+Performance estimates below are based on the assumption that the smallest chunk
+size (4K) is used.   Each new exception uses 20 bytes (exception store address,
+sharing bitmap and directory entry) so each btree leaf node holds a maximum of
+about 200 exceptions.  Due to splitting, leaf nodes are normally not full.  In
+fact worst case fullness of 50% is expected for the early implementations, so
+leaf nodes will hold about 100 exceptions each.
+
+The performance estimates here assume asynchronous IO, which for user space is
+not yet a practical possibility in Linux, therefore a kernel implementation is
+assumed.  The initial implementation however is in user space; without
+asynchronous IO the user space implementation will not perform as well as a
+kernel implementation.  It is expected that both implementations will be
+developed and maintained; that the user implementation will be available first;
+that a kernel implementation will supercede it in performance; and that the
+user space implementation will eventually pull even with the kernel
+implementation by taking advantage of newly available asynchronous IO and user
+space locking facilities.
+OOrriiggiinn RReeaadd PPeerrffoorrmmaannccee
+Origin reads are passed straight through to the underlying volume.  Since the
+overhead of the device mapper handling is insignificant, origin read
+performance is essentially unchanged
+SSeeqquueennttiiaall OOrriiggiinn WWrriittee PPeerrffoorrmmaannccee
+Origin write throughput is affected mainly by the frequency of chunk copy-outs
+and metadata update overhead.   Copy-outs require reading and writing,
+requiring a minimum of 200% additional bandwidth vs raw write and additional
+seeking as well, especially for the single-spindle case where the origin volume
+and snapshot store will be far apart.  Throughput is improved at the expense of
+latency by batching the copy-out reads and copy-out writes, which happens
+naturally with asynchronous IO.  There will thus be fewer long seeks between
+the origin and snapshot store.
+
+Worst case origin write performance is obtained when the snapshot store is
+created with the smallest possible chunk size (4K) and the load requires a
+copy-out for every chunk write.   Such a load is easy to generate, for example
+by setting a snapshot and then immediately unpacking an archive into the
+volume.  Required IO bandwidth will triple, seeking between the origin and
+snapshot store will increase, and metadata updating will increase.  Writing in
+this case should be largely linear and batching amortizes the seeking overhead,
+so the dominant effect is expected to be the increased IO bandwidth.  For this
+load we should expect to see a 3 times slowdown versus raw volume access. 
+Fragmentation of the snapshot store could make this considerably worse, perhaps
+by another factor of three.
+
+Since such a load is easy to generate it is worrisome.  It is possible that in
+the long run, general performance for a snapshot volume could become better
+than for the origin, see below.
+
+Fragmentation of the snapshot store will introduce additional seeking and
+rotational latency penalties.  Reducing such fragmentation by clever snapshot
+store allocation policy will yield significant performance gains, however such
+allocation policy improvements require considerable time to develop.  A highly
+fragmented snapshort store could aggrate worst case write performance by an
+additional factor of a few hundred percent.
+
+[what about latency]
+RRaannddoomm OOrriiggiinn WWrriittee PPeerrffoorrmmaannccee
+A load that consists of 100% single-sector writes distributed randomly over the
+entire volume immediately after setting a snapshot will cause copy-out
+bandwidth to be much more than 200% of raw write bandwidth, and will also cause
+a great deal of additional seeking.  Metadata overhead will also increase
+significantly since typically only a single chunk on each leaf node will be
+updated each time the node is journalled to disk; rotational latency will
+increase significantly during metadata access.  Performance under this random
+load will typically be dominated by seeking rather than bandwidth.  Analysis is
+complex, however I will speculate now that the performance of the snapshotted
+volume could degrade by a factor of 3 to 4 versus the raw volume due to
+additional seeking and rotational latency for copy-outs and metadata updating.
+
+Fragmentation of the snapshot store can and should be addressed over time.  For
+origin writes, nothing that can be done about the copy-out overhead.   Snapshot
+writes on the other hand do not incurr copy-out overhead.  They do incurr
+seeking and rotational penalties due to fragmentation in the snapshot store,
+but so do origin writes.  Furthermore snapshot reads also suffer from
+fragmentation penalties whereas origin reads do not.  Very good snapshot store
+layout optimization could reduce both the penalty for snapshot reading and
+writing, in which case  general performance on a snapshot volume could be
+better than on a snapshotted origin volume.  Whether this can be realized in
+practice remains to be seen.
+
+[what about latency]
+SSnnaappsshhoott RReeaadd PPeerrffoorrmmaannccee
+Unlike origin reads, snapshot read throughput is affected by snapshot store
+fragmentation.  Snapshot read latency is increased by the requirement of
+locking against origin writes.  Readahead results in a kind of lockahead, so
+under loads where readahead is effective, increased snapshot read latency will
+not hurt read throughput.  The predominant visible effect is expected to be
+read fragmentation.  With large chunk sizes, e.g., 256K and up, moderate
+fragmentation should cause only slight degradation in snapshot read
+performance.  However, without special attention to snapshot store allocation
+policy, fragmentation can be expected to be fairly severe, so snapshot read
+performance is not expected to be steller in early implementations. 
+Fortunately, since the main purpose of reading from a snapshot is to back it up
+or restore a few files, some read performance degradation is acceptable and is
+unlikely to be noticed.
+
+In the long run it is desireable to improve snapshot read performance by
+controlling snapshot store fragmentation as much as possible, in order to take
+advantage of the inherently superior performance of  snapshot writing versus
+origin writing.
+SSnnaappsshhoott WWrriittee PPeerrffoorrmmaannccee
+Snapshot writes to not require copy-outs; if an origin chunk or shared snapshot
+store chunk needs to be written, the logical chunk is first remapped to a new
+chunk in the snapshot store.  With some tweaking of the message protocol,
+writing to the chunk could procede as soon as the new allocation is known, in
+parallel with the logging of the new exception.  So snapshot writes are
+inherently quite efficient.
+
+Snapshot write overhead comes from metadata update overhead and snapshot store
+fragmentation.  The former is supposed to be small, on the order of a few
+percent.  The latter could be very large, and probably will be in initial
+implementation, perhaps on the order of a factor of 10.  Larger chunk sizes
+will reduced this seeking overhead, roughly linearly with the chunk size. 
+Careful layout optimization could conceivably reduce this to a few percent,
+even with small chunks.  We shall see.
+NNeettwwoorrkk PPeerrffoorrmmaannccee
+The amount of message data needed for each chunk is small, especially since the
+message format is designed from the outset to handle ranges of chunks and
+multiple ranges in each message.  Except for snapshot reads, each message 
+sequence is only two messages long (note: approximately.  Server responses do
+not correspond exactly requests; e.g., any unshared chunks can be acknowledged
+immediately).  Message traffic is expected to be less than 1% of disk array
+traffic.  Assuming that the general purpose network interconnect and storage
+array interconnect have similar bandwidth, this is where the expectation that
+this architecture will scale linearly to about 100 clients comes from.
+
+[details]
+OOvveerraallll PPeerrffoorrmmaannccee
+It is expected that typical usage of a snapshotted origin volume will show only
+slight reduction of performance versus the raw origin volume, due to reading
+being more common than writing.  Rewriting chunks is optimized by the client's
+bitmap cache, which is compact and probably capable of caching all the hot
+spots of a volume, even for large volumes.  So rewriting should show now
+visible degradation.  The performance of fresh writes to snapshotted chunks
+will degrade significantly, due to copy-out bandwidth, and to snapshot store
+fragmentation, that latter being subject to optimization while the former is
+unavoidable.  In general, more frequent snapshots cause more fresh writes, with
+the frequency of fresh writes peaking just after the snapshot and declining
+over time, till the next snapshot.
+
+So: what will be the balance of fresh writes vs reads and rewrites?  How
+frequently will we see will we see the balance shift for a short time in the
+direction of the worst case?  How bad is the worst case?   How likely is it
+that the user will notice the shifts in write performance?    These all await
+measurement under live loads.  However at this point I will speculate that even
+a relatively  early implementation will show average performance degradation
+versus a raw volume of less than ten percent, and that, at worst, performance
+degradation will be limited to a factor of four or so just after a snapshot. 
+For many users, and particularly enterprise users, the benefits of snapshotting
+will outweigh the performance loss: it is easy to buy bandwidth, not as easy to
+buy live backup capability.   For others, the unavoidable performance
+degradation of origin writing will make snapshotting unattractive enough to
+discourage its use.  Eventually we may be able to satisfy this group as well,
+by improving snapshot store allocation policy to the point where the origin can
+be made optional and all IO take place in the snapshot store.
+
+The pessimism in this section should be tempered by observing that in many
+respects, performance is expected to be good:
+    * Large number of snapshots can be held without affecting performance much
+    * Snapshot store utilization is good
+    * Network traffic is minimal
+    * Rewrites are highly optimized
+In other words, if you need snapshots then this implementation is likely to
+deliver good performance versus alternatives.   Plus there is a clear path
+forward to achieving near-optimal performance, by working towards a system
+where the snapshot store can be used effectively alone, with no origin volume
+PPaarraalllleelliizziinngg tthhee AArrcchhiitteeccttuurree
+Normally the first question I am asked about this clustered snapshot design is
+"why isn't it symmetric"?  The answer: because a) it doesn't have to be in
+order to perform well on today's typical clusters and b) distributing a tree
+structure across independent caches is a complex, error-prone process, and
+introduces overhead of its own.  At some point, however, the single node server
+architecture will become a bottleneck, so I discuss parallelizing strategies
+here.
+
+The easist thing we can do, and with the strongest immediate effect is to have
+the server distribute the copy-out work to underused nodes.  This will take
+significant IO bandwidth load off the server's bus at the expense of a little
+messaging latency.  By doing this, a single server can likely scale to handle a
+hundred or so busy nodes of similar power to itself: the real bottleneck will
+probably be the storage array.  A user who can afford to upgrade the storage
+array to handle even larger numbers of clients can likely afford to upgrade the
+snapshot server as well.
+
+At some point, perhaps two or three hundred clients, the snapshot server
+becomes a bottleneck again.  Further scaling is easily achieved by dividing up
+the work between a number of snapshot servers, by logical address range.  Each
+snapshot server maintains a separate btree in a distinct range of logical
+addresses and operates its own journal.  Care must be taken that allocation
+bitmaps are divided up cleanly; this is not hard (e.g., even if a logical
+address range boundary lies in the middle of a bitmap block, the boundary
+bitmap can be replicated between two nodes, with logic to prevent allocation
+outside the boundary - needed anyway for error checking).  Shared metadata such
+as the current snapshot list, superblock, etc., is updated using a RW locking
+strategy (i.e., using a DLM).  Assuming that workload is distributed relatively
+evenly across the logical address range, this simple parallelization strategy
+will serve up to a thousand clients or so, and the disk will once again be the
+bottleneck.
+
+[It might be best to add the metadata hooks for this range division now since
+we know it's needed eventually]
+
+If we want to scale to far larger numbers of cients  we probably have to bite
+the bullet and distribute the btrees and allocation bitmaps.  However I do not
+think this problem is imminent; there is plenty of time to think about it.
+AAddaappttaattiioonn ttoo SSiinnggllee NNooddee CClliieenntt
+The current device-mapper snapshot design suffers from a number of drawbacks,
+chiefly
+    * copy-out overhead increases linearly with number of snapshots held
+    * snapshot state is not recorded durably, but only at shutdown
+    * all metadata is held in memory, creating excessive cache pressure for
+      large volumes
+It is therefore expected that this design for clustered snapshots will be
+adapted sooner rather than later for use with the normal, non-clustered
+machines that constitute the vast majority of Linux installs.  How best to do
+that?
+
+The message-based synchronization described above may not be the optimal
+solution for an entirely local implementation.  But then, with some tweaking it
+just might be.  Currently I am considering the wisdom of adapting the clustered
+snapshot target for local use by replacing the socket messaging with a
+lightweight ring buffer messaging facility that presents the same interface to
+the rest of the target.  The obvious alternative is to incorporate the server
+operations directly into the client.  It's clear which is easier, but which is
+better?  [feedback invited]

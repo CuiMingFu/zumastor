@@ -1,0 +1,11 @@
+--- 2.6.22.10.clean/mm/page_alloc.c	2007-10-10 10:50:35.000000000 -0700
++++ 2.6.22.10/mm/page_alloc.c	2007-11-16 11:49:49.000000000 -0800
+@@ -1362,7 +1362,7 @@ nofail_alloc:
+ 	}
+ 
+ nopage:
+-	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
++	if (!(gfp_mask & __GFP_NOWARN) && !order && printk_ratelimit()) {
+ 		printk(KERN_WARNING "%s: page allocation failure."
+ 			" order:%d, mode:0x%x\n",
+ 			p->comm, order, gfp_mask);

@@ -1,0 +1,5 @@
+#!/bin/sh
+if [ "$1" = "purge" ] ; then
+	rm -rf /var/lib/zumastor
+	update-rc.d zumastor remove >/dev/null || exit 0
+fi

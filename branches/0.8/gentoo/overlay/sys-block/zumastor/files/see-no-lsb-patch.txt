@@ -1,0 +1,11 @@
+diff -ruNp zumastor/etc/init.d/zumastor zumastor-gentoo/etc/init.d/zumastor
+--- zumastor/etc/init.d/zumastor	2007-10-24 14:55:43.000000000 -0700
++++ zumastor-gentoo/etc/init.d/zumastor	2007-11-22 23:02:38.000000000 -0800
+@@ -21,7 +21,6 @@
+ #                    and network replication to backup fileservers.
+ ### END INIT INFO
+ 
+-. /lib/lsb/init-functions || { echo "$0: unable to load LSB init functions"; exit 1; }
+ . /lib/zumastor/common || { echo "$0: unable to load common zumastor functions"; exit 1; }
+ . /lib/zumastor/ddfake
+ 
