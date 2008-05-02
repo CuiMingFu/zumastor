@@ -57,7 +57,7 @@ time vgcreate testvg $DEV1NAME $DEV2NAME $DEV3NAME
 time lvcreate --size 5124G -n test testvg
 time lvcreate --size 512G -n test_snap testvg
 
-echo "1..6"
+echo "1..7"
 
 zumastor define volume testvol /dev/testvg/test /dev/testvg/test_snap --initialize --mountopts nouuid
 mkfs.xfs /dev/mapper/testvol
@@ -119,5 +119,15 @@ else
   echo "not ok 6 - testfile changed between origin and second snapshot"
   exit 6
 fi
+
+# Cleanup
+zumastor forget volume testvol
+lvremove -f /dev/testvg/test_snap
+lvremove -f /dev/testvg/test
+vgremove /dev/testvg
+pvremove -ff $DEV1NAME
+pvremove -ff $DEV2NAME
+pvremove -ff $DEV3NAME
+echo "ok 7 - cleanup"
 
 exit 0
