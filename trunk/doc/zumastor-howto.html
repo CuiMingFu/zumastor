@@ -607,13 +607,10 @@ If booting hangs, the most likely cause is an hda1 / sda1 confusion.
 Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda1 instead of root=/dev/sda1.
 If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
 through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)</p></div>
-<h3 id="_prebuilt_debian_ubuntu_packages_from_ppa_launchpad_net_pgquiles">8.3. Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles</h3><div style="clear:left"></div>
-<div class="para"><p>We've created https://launchpad.net/~zumastor-team, but are not
-yet building standard Ubuntu kernel packages there.  Until we have that going,
-you can use the ones built by pgquiles for Gutsy.</p></div>
-<div class="para"><p>Caution, his respository contains many other packages, so don't do
-"apt-get upgrade" when using it!</p></div>
-<div class="para"><p>Here are his instructions for installing using his his repository:</p></div>
+<h3 id="_prebuilt_ubuntu_packages_from_ppa_launchpad_net_zumastor_team">8.3. Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team</h3><div style="clear:left"></div>
+<div class="para"><p>We've created https://launchpad.net/~zumastor-team hosting standard Ubuntu
+kernel packages and zumastor/ddsnap packages for i386 and amd64.</p></div>
+<div class="para"><p>Here are his instructions for installing using the ppa repository:</p></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -621,20 +618,19 @@ Add these lines to /etc/apt/sources.list
 </p>
 <div class="literalblock">
 <div class="content">
-<pre><tt>deb http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse
-deb-src http://ppa.launchpad.net/pgquiles/ubuntu gutsy main restricted universe multiverse</tt></pre>
+<pre><tt>deb http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse
+deb-src http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse</tt></pre>
 </div></div>
 <div class="para"><p>Then run <tt>sudo apt-get update</tt>.</p></div>
 </li>
 <li>
 <p>
 Install zumastor, ddsnap, dmsetup, and a zumastor-enabled kernel.
-There are two to choose from: linux-image-zumastor (only zumastor) and
-linux-image-xenzumastor (Xen and Zumastor).  For instance:
+For instance:
 </p>
 <div class="literalblock">
 <div class="content">
-<pre><tt>sudo aptitude install linux-image-zumastor linux-restricted-modules-zumastor linux-backport-modules-zumastor linux-ubuntu-modules-zumastor zumastor ddsnap dmsetup</tt></pre>
+<pre><tt>sudo aptitude install linux-image-2.6.22-14-zumastor zumastor ddsnap</tt></pre>
 </div></div>
 </li>
 </ol></div>
@@ -1007,8 +1003,6 @@ The script takes a parameter which is a .config file for the kernel.
 There is distribution-like config in the repository in
 <a href="http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full">kernel/config/full</a>.
 If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP</tt>.</p></div>
-<div class="para"><p>(Note: see also the debian build files pgquiles has written; see
-"Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles" above.)</p></div>
 <h3 id="_gentoo">8.8. Gentoo</h3><div style="clear:left"></div>
 <div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
 Zumastor using Gentoo's Portage package system. To use the overlay in
@@ -2208,7 +2202,7 @@ time optimizing Zumastor's write performance.)</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.8<br />
-Last updated 2008-04-08 15:01:39 PDT
+Last updated 2008-05-01 17:33:34 PDT
 </div>
 </div>
 </body>
