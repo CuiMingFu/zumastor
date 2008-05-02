@@ -123,12 +123,6 @@ u32 strtobits(char const *string)
 
 char reason[200]; /* detailed error message: nonnull implies nonzero errno */
 
-static void error_exit(char *action)
-{
-	error("could not %s %s%s (%s)", action, strlen(reason) ? "because " : "", reason, strerror(errno));
-	/* never gets here */
-}
-
 static void errprint(char *action)
 {
 	fprintf(stderr, "could not %s %s%s (%s)\n", action, strlen(reason) ? "because " : "", reason, strerror(errno));
@@ -1133,12 +1127,12 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 
 	/* if an extent is being applied */
 	if (!fullvolume && ((snapdev1 = open(dev1name, O_RDONLY)) < 0)) {
-		warn("could not open snapdev file \"%s\" for reading: %s.", dev1name, strerror(-err));
+		warn("could not open snapdev file \"%s\" for reading: %s.", dev1name, strerror(errno));
 		return -errno;
 	}
 
 	if ((snapdev2 = open(dev2name, O_WRONLY)) < 0) {
-		warn("could not open snapdev file \"%s\" for writing: %s.", dev2name, strerror(-err));
+		warn("could not open snapdev file \"%s\" for writing: %s.", dev2name, strerror(errno));
 		if (!fullvolume)
 			close(snapdev1);
 		return -errno;
@@ -1586,7 +1580,6 @@ static int ddsnap_delta_server(int lsock, char const *devstem, const char *progr
                                         break;
 				case SIGTERM:
 				case SIGINT:
-					close(csock);
 					if (pid > 0)
 						kill(pid, SIGKILL);
 					exit(0);
