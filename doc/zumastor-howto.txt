@@ -266,7 +266,7 @@ If that helps, note that you might need to mentally replace /dev/sda3 with /dev/
 through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)
 
 Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We've created https://launchpad.net/~zumastor-team hosting standard Ubuntu
 kernel packages and zumastor/ddsnap packages for i386 and amd64.
 
@@ -573,9 +573,6 @@ The script takes a parameter which is a .config file for the kernel.
 There is distribution-like config in the repository in 
 http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full[kernel/config/full].  
 If you need to use a different config, make sure you enable +CONFIG_DM_DDSNAP+.
-
-(Note: see also the debian build files pgquiles has written; see 
-"Prebuilt Debian / Ubuntu Packages from ppa.launchpad.net/pgquiles" above.)
 
 Gentoo
 ~~~~~~
