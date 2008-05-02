@@ -6,7 +6,7 @@ kernel=./kernel
 INSTDIR=$(PREFIX)/$(BINDIR)
 INCLUDES +=-I$(kernel)
 CPPFLAGS +=-D_FILE_OFFSET_BITS=64 -DDSNAP_MEM_MONITOR=30 $(INCLUDES)
-CFLAGS +=-g -Wall -std=gnu99
+CFLAGS +=-g -Wall -std=gnu99 -O2 -fno-strict-aliasing
 
 deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
 ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
