@@ -744,7 +744,67 @@ debian package repository for use by the UML instances, so it
 may not be everybody's cup of tea.  But it does get the time
 to test small changes to the cbtb test scripts down below ten minutes,
 which should help people developing new automated tests --
-at least if they're willing to run Debian or Ubuntu.
+at least if they're willing to run a particular version of Ubuntu.
+
+These tests are very touchy.
+It may take you hours to get them working, or they may run on the first try.
+They use sudo and ssh a lot, so make sure sudo and ssh are working well.
+Ask on IRC for help if you run into trouble.
+
+Steps to follow:
+
+0) Set up ccache if you want fast kernel compiles after the first run
+(assumes /usr/local/bin is early on your PATH):
+..............................
+ $ sudo apt-get install ccache
+ $ ln -sf /usr/bin/ccache /usr/local/bin/gcc
+..............................
+And if your home directory is on NFS, you have to point to a local
+drive (else the cache will be too slow), e.g.:
+..............................
+ $ mkdir /data/$LOGNAME/ccache.dir
+ $ ln -s /data/$LOGNAME/ccache.dir ~/.ccache
+..............................
+ 
+1) Run the smoke tests
+..............................
+ $ cd cbtb/uml
+ $ bash smoke-test.sh
+..............................
+
+Sounds simple, doesn't it?  Yet there are dozens of problems you might
+hit.  Here are the ones I hit when I tried it, in order:
+
+- doesn't support Ubuntu Gutsy (I switched to Dapper; Hardy may also work)
+
+- ssh prompted for password, but I didn't notice
+
+- I ran the tests with sh instead of bash (we check for that now)
+
+- I mistakenly ran the tests as root (don't do that)
+
+- /dev/net/tun had the wrong permissions, so the script couldn't contact
+the UML instances (the script is now much aggressive about relaxing
+permissions on that file)
+
+- The script to set up the UML environment behaves very badly if
+there are any network errors while accessing the Ubuntu repository
+(we now set up a proxy server, and download an initial tarball, to
+deal with that -- but those add failure modes of their own)
+
+- The script to set up the proxy (../host-setup/proxy.sh) had a bad URL for 
+the ubuntu server, so I had to delete /etc/apache2/sites-enabled/proxy
+and run again. 
+
+- I accidentally ran 'svn update' in a subdirectory rather than
+the top of the tree, and ended up with a mismatched tree.  The
+script warns you about a split repository, but didn't say quite what
+to do about it.  (The script is clearer now.)
+
+Other notes:
+
+- You may append --all to smoke-test.sh's command line if you wish to run all
+  cbtb tests instead of just the smoke tests.
 
 Troubleshooting
 ---------------
