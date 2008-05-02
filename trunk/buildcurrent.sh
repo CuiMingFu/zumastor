@@ -58,7 +58,7 @@ fi
 REVISION=`awk '/^[0-9]+$/ { print $1; }' REVISION || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 if echo "x$REVISION" | grep -q ':'
 then
-  echo "Split repository, svn update!"
+  echo "Split repository.  Go to the top of the tree and do 'svn update'!"
   exit 1
 fi
 if [ "x$REVISION" = "x" ]
