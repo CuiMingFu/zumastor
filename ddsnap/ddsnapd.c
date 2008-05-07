@@ -3982,6 +3982,7 @@ static int incoming(struct superblock *sb, struct client *client)
 
 static int cleanup(struct superblock *sb)
 {
+	event_hook(0, SHUTDOWN_SERVER);  /* event hook for abort action */
 	warn("cleaning up");
 	sb->image.flags &= ~SB_BUSY;
 	set_sb_dirty(sb);

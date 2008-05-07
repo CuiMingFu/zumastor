@@ -21,13 +21,13 @@ notifyemail="zumastor@debian.org"
 
 install_packages="true"
 reboot_after_install="true" # set this to false if you want to check grub and reboot manually
-version="0.6"
+version="0.7.0"
 SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
 SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
 function ssh_setup {
 	local -r host=$1
-	if ssh $SSH_OPTS $host "/bin/true"; then
+	if ! ssh $SSH_OPTS $host "/bin/true"; then
 		echo "set up ssh access to host $host"
 		scp $SCP_OPTS ~/.ssh/id_dsa.pub root@$host:/tmp/
 		ssh $SSH_OPTS $host "cat /tmp/id_dsa.pub >> /root/.ssh/authorized_keys"
@@ -62,9 +62,9 @@ function zuma_install {
 	wget http://zumabuild/trunk/kernel-headers-build_i386.deb
 	wget http://zumabuild/trunk/kernel-image-build_i386.deb
 	cd ..
-	ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
-	scp $SCP_OPTS -r zumabuild root@$source:/root/
-	ssh $SSH_OPTS $source "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $source"; exit 1; }
+	#ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
+	#scp $SCP_OPTS -r zumabuild root@$source:/root/
+	#ssh $SSH_OPTS $source "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $source"; exit 1; }
 	ssh $SSH_OPTS $target "rm -rf /root/zumabuild"
 	scp $SCP_OPTS -r zumabuild root@$target:/root/
 	ssh $SSH_OPTS $target "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $target"; exit 1; }
@@ -84,7 +84,7 @@ function check_ready {
 	[[ $ssh_ready == "false" ]] && return 1
 
 	read revision < zumabuild/buildrev
-	version=`ssh $SSH_OPTS $host "zumastor --version" | awk '{ print $3 }'`
+	version=`ssh $SSH_OPTS $host "zumastor --version" | awk '{ print $4 }'`
 	[[ $version = $revision ]] || { echo "fail to install zumastor-$revision package"; exit 1; }
 	version=`ssh $SSH_OPTS $host "ddsnap --version" |  head -n 1 | cut -d "\"" -f 2`
 	[[ $version = $revision ]] || { echo "fail to install ddsnap-$revision package"; exit 1; }
@@ -154,10 +154,13 @@ start)
 # zumastor volume/replication setup and the initial replication cycle
 ssh $SSH_OPTS $source "zumastor define volume -i $vol $source_orgdev $source_snapdev"
 ssh $SSH_OPTS $source "mkfs.ext3 /dev/mapper/$vol"
-ssh $SSH_OPTS $source "zumastor define master $vol -h 24 -d 7"
+ssh $SSH_OPTS $source "zumastor define master $vol"
+ssh $SSH_OPTS $source "zumastor define schedule $vol -h 24 -d 7"
+ssh $SSH_OPTS $source "zumastor define target $vol $target"
 ssh $SSH_OPTS $target "zumastor define volume -i $vol $target_orgdev $target_snapdev"
-ssh $SSH_OPTS $target "zumastor define source $vol $source -p 3600"
-ssh $SSH_OPTS $source "zumastor define target $vol $target:$target_port -p 3600"
+ssh $SSH_OPTS $target "zumastor define source $vol $source -p 3600 -m"
+ssh $SSH_OPTS $target "zumastor define schedule $vol -h 24 -d 7"
+ssh $SSH_OPTS $target "zumastor start source $vol"
 
 # set up nfs access
 ssh $SSH_OPTS $source "exportfs -o'rw,fsid=1000,crossmnt,nohide' *:/var/run/zumastor/mount/$vol"

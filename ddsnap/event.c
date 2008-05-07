@@ -28,12 +28,11 @@ static const char *csnap_names[] = {
 	"SNAPSHOT_READ_ORIGIN_OK",
 	"SNAPSHOT_READ_ORIGIN_ERROR",
 	"FINISH_SNAPSHOT_READ",
+	"GENERIC_ERROR",
 	"CREATE_SNAPSHOT", 
 	"CREATE_SNAPSHOT_OK", 
-	"CREATE_SNAPSHOT_ERROR", 
 	"DELETE_SNAPSHOT", 
 	"DELETE_SNAPSHOT_OK",
-	"DELETE_SNAPSHOT_ERROR",
 	"DUMP_TREE",
 	"INITIALIZE_SNAPSTORE",
 	"NEED_SERVER",
@@ -187,7 +186,7 @@ void event_hook(int fd, enum csnap_codes id)
 {
 	if (EVENT_ANY != event_want_trigger && id != event_want_trigger)
 		return;
-	if (event_count++ < event_want_count)
+	if (++event_count < event_want_count)
 		return;
 	event_count = 0;
 
