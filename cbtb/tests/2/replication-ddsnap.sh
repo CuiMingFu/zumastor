@@ -109,7 +109,7 @@ sleep $SLEEP
 hash=`md5sum </dev/mapper/$volname`
 hash0=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash0" ] ; then
-  echo -e "not "
+  echo "not "
   rc=16
 fi
 echo ok 16 - $volname==$volname\($tosnap\)
@@ -130,7 +130,7 @@ echo ok 19 - create $volname\($tosnap\) block device on slave
 
 hash0slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash0" != "$hash0slave" ] ; then
-  echo -e "not "
+  echo "not "
   rc=20
 fi
 echo ok 20 - master $volname\($tosnap\) == slave $volname\($tosnap\)
@@ -153,7 +153,7 @@ echo ok 23 - create $volname\($tosnap\) block device on master
 hash=`md5sum </dev/mapper/$volname`
 hash2=`md5sum </dev/mapper/$volname\($tosnap\)`
 if [ "$hash" != "$hash2" ] ; then
-  echo -e "not "
+  echo "not "
   rc=24
 fi
 echo ok 24 - $volname==$volname\($tosnap\)
@@ -173,7 +173,7 @@ echo ok 27 - create $volname\($tosnap\) block device on slave
 
 hash2slave=`$SSH root@$slave "md5sum </dev/mapper/$volname\($tosnap\)"`
 if [ "$hash2" != "$hash2slave" ] ; then
-  echo -e "not "
+  echo "not "
   rc=28
 fi
 echo ok 28 - master $volname\($tosnap\) == slave $volname\($tosnap\)
