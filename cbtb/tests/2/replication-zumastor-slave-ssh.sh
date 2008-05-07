@@ -90,20 +90,20 @@ ssh-keyscan -t rsa slave >>${HOME}/.ssh/known_hosts
 ssh-keyscan -t rsa master >>${HOME}/.ssh/known_hosts
 echo ok 1 - master testvol set up
 
-${SSH} testroot${slave} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
-${SSH} testroot${slave} zumastor status --usage
+${SSH} testroot@${slave} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
+${SSH} testroot@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
 
 zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
 
-${SSH} testroot${slave} zumastor define source testvol master --period 600
-${SSH} testroot${slave} zumastor status --usage
+${SSH} testroot@${slave} zumastor define source testvol master --period 600
+${SSH} testroot@${slave} zumastor status --usage
 echo ok 4 - configured source on target
 
-${SSH} testroot${slave} zumastor start source testvol
-${SSH} testroot${slave} zumastor status --usage
+${SSH} testroot@${slave} zumastor start source testvol
+${SSH} testroot@${slave} zumastor status --usage
 echo ok 5 - replication started on slave
 
 zumastor replicate testvol --wait slave
@@ -112,10 +112,10 @@ zumastor status --usage
 # reasonable wait for these small volumes to finish the initial replication
 if ! timeout_remote_file_wait 120 testroot${slave} /var/run/zumastor/mount/testvol
 then
-  $SSH testroot${slave} "df -h ; mount"
-  $SSH testroot${slave} ls -alR /var/run/zumastor
-  $SSH testroot${slave} zumastor status --usage
-  $SSH testroot${slave} tail -200 /var/log/syslog
+  $SSH testroot@${slave} "df -h ; mount"
+  $SSH testroot@${slave} ls -alR /var/run/zumastor
+  $SSH testroot@${slave} zumastor status --usage
+  $SSH testroot@${slave} tail -200 /var/log/syslog
 
   echo not ok 6 - replication manually from master
   exit 6
@@ -152,9 +152,9 @@ zumastor replicate --wait testvol slave
 # that it is there.  If not, look at the target volume
 if ! timeout_remote_file_wait 120 testroot${slave} /var/run/zumastor/mount/testvol
 then
-  $SSH testroot${slave} ls -alR /var/run/zumastor
-  $SSH testroot${slave} zumastor status --usage
-  $SSH testroot${slave} tail -200 /var/log/syslog
+  $SSH testroot@${slave} ls -alR /var/run/zumastor
+  $SSH testroot@${slave} zumastor status --usage
+  $SSH testroot@${slave} tail -200 /var/log/syslog
 
   echo not ok 8 - testvol has migrated to slave
   exit 8
@@ -165,9 +165,9 @@ fi
 # check separately for the testfile
 if ! timeout_remote_file_wait 120 testroot${slave} /var/run/zumastor/mount/testvol/testfile
 then
-  $SSH testroot${slave} ls -alR /var/run/zumastor
-  $SSH testroot${slave} zumastor status --usage
-  $SSH testroot${slave} tail -200 /var/log/syslog
+  $SSH testroot@${slave} ls -alR /var/run/zumastor
+  $SSH testroot@${slave} zumastor status --usage
+  $SSH testroot@${slave} tail -200 /var/log/syslog
 
   echo not ok 9 - testfile has migrated to slave
   exit 9
@@ -176,7 +176,7 @@ else
 fi
 
 rhash=`${SSH} testroot${slave} md5sum /var/run/zumastor/mount/testvol/testfile` || \
-  ${SSH} testroot${slave} <<EOF
+  ${SSH} testroot@${slave} <<EOF
     mount
     df
     ls -lR /var/run/zumastor/
@@ -192,7 +192,7 @@ else
     df
     ls -lR /var/run/zumastor/
     tail -200 /var/log/syslog
-  ${SSH} testroot${slave} <<EOF
+  ${SSH} testroot@${slave} <<EOF
     mount
     df
     zumastor status --usage
