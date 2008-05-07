@@ -1,6 +1,6 @@
 #!/bin/sh -x
 #
-# Verify ddsnap journal replay works correctly when 
+# Verify ddsnap journal replay works correctly when
 # 'ddsnap server' restarts after an unclean exit
 #
 # Copyright 2008 Google Inc.  All rights reserved
@@ -13,15 +13,14 @@ DEV1SIZE=8
 DEV2SIZE=4
 
 echo "1..5"  # Five checking steps in this test
-apt-get update
 
 # these three environment variables are read by ddsnapd for fault injection
 export DDSNAP_ACTION="abort"
 export DDSNAP_TRIGGER="SHUTDOWN_SERVER"
 export DDSNAP_COUNT=1
 
-[[ -e /tmp/srcsvr.log ]] && rm /tmp/srcsvr.log
-ddsnap initialize -y -c 8k $DEV1NAME $DEV2NAME 
+[ -e /tmp/srcsvr.log ] && rm /tmp/srcsvr.log
+ddsnap initialize -y -c 8k $DEV1NAME $DEV2NAME
 
 ddsnap agent --logfile /tmp/srcagt.log /tmp/src.control
 ddsnap server --logfile /tmp/srcsvr.log $DEV1NAME $DEV2NAME /tmp/src.control /tmp/src.server
@@ -29,7 +28,7 @@ sleep 3
 
 size=`ddsnap status /tmp/src.server --size`
 echo $size
-echo 0 $size ddsnap $DEV1NAME $DEV2NAME /tmp/src.control -1 | dmsetup create testvol 
+echo 0 $size ddsnap $DEV1NAME $DEV2NAME /tmp/src.control -1 | dmsetup create testvol
 
 ddsnap create /tmp/src.server 0
 blockdev --flushbufs /dev/mapper/testvol
