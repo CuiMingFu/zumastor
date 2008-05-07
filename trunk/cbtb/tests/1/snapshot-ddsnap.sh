@@ -54,7 +54,7 @@ echo ok 7 - create testvol\(0\)
 hash=`md5sum </dev/mapper/testvol`
 hash0=`md5sum </dev/mapper/testvol\(0\)`
 if [ "$hash" != "$hash0" ] ; then
-  echo -e "not "
+  echo "not "
   rc=8
 fi
 echo ok 8 - testvol==testvol\(0\)
@@ -63,7 +63,7 @@ echo ok 8 - testvol==testvol\(0\)
 dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/testvol
 hash02=`md5sum </dev/mapper/testvol\(0\)`
 if [ "$hash0" != "$hash02" ] ; then
-  echo -e "not "
+  echo "not "
   rc=9
 fi
 echo ok 9 - testvol\(0\)==testvol\(0\) snapshot stayed unchanged
@@ -80,7 +80,7 @@ echo ok 11 - create testvol\(2\)
 hash=`md5sum </dev/mapper/testvol`
 hash2=`md5sum </dev/mapper/testvol\(2\)`
 if [ "$hash" != "$hash2" ] ; then
-  echo -e "not "
+  echo "not "
   rc=11
 fi
 echo ok 12 - testvol==testvol\(2\) new snapshot correct

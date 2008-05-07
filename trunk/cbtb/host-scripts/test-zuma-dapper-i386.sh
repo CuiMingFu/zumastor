@@ -92,7 +92,7 @@ largest_hddsize=0
 for f in ${execfiles}
 do
   hdbsize=`awk -F = '/^HDBSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
-  if [ "x$hdbsize" == "x" ]
+  if [ "x$hdbsize" = "x" ]
   then
     hdbsize=`awk -F = '/^DEV1SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   fi
@@ -102,7 +102,7 @@ do
     fi
   fi
   hdcsize=`awk -F = '/^HDCSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
-  if [ "x$hdcsize" == "x" ]
+  if [ "x$hdcsize" = "x" ]
   then
     hdcsize=`awk -F = '/^DEV2SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   fi
@@ -112,7 +112,7 @@ do
     fi
   fi
   hddsize=`awk -F = '/^HDDSIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
-  if [ "x$hddsize" == "x" ]
+  if [ "x$hddsize" = "x" ]
   then
     hddsize=`awk -F = '/^DEV3SIZE=[0-9]+$/ { print $2; }' ./${f} | tail -1`
   fi
@@ -252,7 +252,7 @@ EOF
   retval=64
   unset qemu_pid
 fi
-  
+
 if [ "x$MACADDR2" != "x" ] ; then
   count=0
   while [ $count -lt 30 ] && ! ${SSH} root@${IPADDR2} hostname 2>/dev/null
@@ -262,7 +262,7 @@ if [ "x$MACADDR2" != "x" ] ; then
     sleep 10
   done
 
-  if [ $count -ge 30 ] 
+  if [ $count -ge 30 ]
   then
     if [ "x$LOGDIR" != "x" ] ; then
       socat - unix:${MONITOR2} <<EOF
@@ -286,7 +286,7 @@ if [ "x$MACADDR3" != "x" ] ; then
     sleep 10
   done
 
-  if [ $count -ge 30 ] 
+  if [ $count -ge 30 ]
   then
     if [ "x$LOGDIR" != "x" ] ; then
       socat - unix:${MONITOR3} <<EOF
