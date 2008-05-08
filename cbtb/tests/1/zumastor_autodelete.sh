@@ -72,7 +72,7 @@ zumastor snapshot testvol hourly
 sleep 3
 zumastor status --usage
 usecount=`ddsnap usecount /var/run/zumastor/servers/testvol 18`
-[[ $usecount -eq 1 ]] || { echo "not ok 5 - snapshot usecount"; exit 5; }
+[ $usecount -eq 1 ] || { echo "not ok 5 - snapshot usecount"; exit 5; }
 echo "ok 5 - snapshot usecount"
 
 /etc/init.d/zumastor stop
