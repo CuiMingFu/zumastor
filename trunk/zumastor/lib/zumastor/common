@@ -347,7 +347,7 @@ function mount_device {
 	fi
 
 	# mount ro, umount, and re-mount to work around free blocks bug in ext3
-	mount -o "ro,$options" $device $mount || { sleep 3; mount -o "ro,$options" $device $mount || return 1; }
+	mount -o "$options" $device $mount || { sleep 3; mount -o "$options" $device $mount || return 1; }
 	umount $device && \
 	mount -o $options $device $mount || \
 		{ echo "unable to mount $device on $mount"; return 1; }
