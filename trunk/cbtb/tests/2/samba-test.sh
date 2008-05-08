@@ -146,13 +146,22 @@ fi
 #
 rm /var/run/zumastor/mount/testvol/masterfile
 #$SSH root@${slave} ls -l /mnt/ || true
-if $SSH root@${slave} test -f /mnt/masterfile ; then
-  rc=7
-  echo not ok 7 - rm on master did not show up on CIFS client
-else
-  echo ok 7 - rm on master did show up on CIFS client
-fi
-
+attempt=0
+while true
+do
+  attempt=$(($attempt+1))
+  if [ $attempt -gt 30 ]
+  then
+    rc=7
+    echo not ok 7 - rm on master did not show up on CIFS client
+    break
+  fi
+  if ! $SSH root@${slave} test -f /mnt/masterfile
+  then
+    echo ok 7 - rm on master did show up on CIFS client
+    break
+  fi
+done
 ${SSH} root@${slave} rm /mnt/clientfile
 if [ -f /mnt/masterfile ] ; then
   rc=8
