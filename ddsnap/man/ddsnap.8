@@ -8,13 +8,13 @@ ddsnap \- block device snapshot and replication
 [\-V|--version] [-?|--help] [--usage] \fIsubcommand\fP [option\.\.\.] [operand...]
 .br
 .B ddsnap initialize
-[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] [-k|--cachesize \fIcachesize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fImeta_device\fP]
+[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fImeta_device\fP]
 .br
 .B ddsnap agent 
 [\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIagent_socket\fP
 .br
 .B ddsnap server 
-[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fIdev/meta\fP] \fIagent_socket\fP \fIserver_socket\fP
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] [-k|--cachesize \fIcachesize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fIdev/meta\fP] \fIagent_socket\fP \fIserver_socket\fP
 .br
 .B ddsnap create
 .I server_socket snapshot
@@ -130,7 +130,7 @@ Initializes snapshot storage device.
 .br
 Starts the snapshot agent.
 .IP \fBserver
-[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] 
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] [-k|--cachesize \fIcachesize\fP]
 .I snapshot_device origin_device 
 [\fIdev/meta\fP] 
 .I agent_socket server_socket
