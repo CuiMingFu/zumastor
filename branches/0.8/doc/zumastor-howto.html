@@ -446,6 +446,10 @@ but <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">his patch</a>
 </div>
 <h2 id="_release_history">5. Release History</h2>
 <div class="sectionbody">
+<div class="para"><p>Version 0.8, released on 9 May 2008, adds
+several bugfixes (in particular, replication between x86 and x86_64 hosts now works)
+as well as experimental native Hardy packages.  See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3Arelease8&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
 <div class="para"><p>Version 0.7, released on 27 Mar 2008, adds experimental
 "revert to snapshot" and "multilayer replication" features,
 lets downstream replicas retain snapshots on their own schedule,
@@ -607,10 +611,13 @@ If booting hangs, the most likely cause is an hda1 / sda1 confusion.
 Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda1 instead of root=/dev/sda1.
 If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
 through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)</p></div>
-<h3 id="_prebuilt_ubuntu_packages_from_ppa_launchpad_net_zumastor_team">8.3. Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team</h3><div style="clear:left"></div>
-<div class="para"><p>We've created https://launchpad.net/~zumastor-team hosting standard Ubuntu
-kernel packages and zumastor/ddsnap packages for i386 and amd64.</p></div>
-<div class="para"><p>Here are his instructions for installing using the ppa repository:</p></div>
+<h3 id="_experimental_prebuilt_ubuntu_packages_from_ppa_launchpad_net_zumastor_team">8.3. Experimental Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team</h3><div style="clear:left"></div>
+<div class="para"><p>Our team page at launchpad.net (https://launchpad.net/~zumastor-team)
+has a continually-updated repository of standard Ubuntu packages for Zumastor.
+It's hooked up to our trunk right now, so it's only for those interested in
+the very latest untested packages.  But they should be real Hardy packages,
+up to Ubuntu's packaging standards.</p></div>
+<div class="para"><p>Here's how to use that repository, if you dare:</p></div>
 <div class="olist"><ol>
 <li>
 <p>
@@ -2290,7 +2297,7 @@ time optimizing Zumastor's write performance.)</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.8<br />
-Last updated 2008-05-01 17:44:52 PDT
+Last updated 2008-05-09 16:21:12 PDT
 </div>
 </div>
 </body>
