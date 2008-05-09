@@ -9,5 +9,6 @@ ln -s $(pwd)/var/log/zumastor /var/log/zumastor
 ln -s $(pwd)/etc/cron.hourly/zumastor /etc/cron.hourly/zumastor
 ln -s $(pwd)/etc/cron.daily/zumastor /etc/cron.daily/zumastor
 ln -s $(pwd)/etc/cron.weekly/zumastor /etc/cron.weekly/zumastor
+ln -s $(pwd)/etc/cron.monthly/zumastor /etc/cron.monthly/zumastor
 ln -s $(pwd)/etc/init.d/zumastor /etc/init.d/zumastor
 ln -s $(pwd)/etc/zumastor /etc/zumastor
