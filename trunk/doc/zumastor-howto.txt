@@ -87,6 +87,11 @@ but http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz[his patch] has not yet 
 
 Release History
 ---------------
+Version 0.8, released on 9 May 2008, adds
+several bugfixes (in particular, replication between x86 and x86_64 hosts now works)
+as well as experimental native Hardy packages.  See
+http://code.google.com/p/zumastor/issues/list?q=label%3Arelease8&can=1[our issue tracker for the full list of fixed issues].  
+
 Version 0.7, released on 27 Mar 2008, adds experimental 
 "revert to snapshot" and "multilayer replication" features,
 lets downstream replicas retain snapshots on their own schedule,
@@ -265,12 +270,15 @@ Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda
 If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
 through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)
 
-Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We've created https://launchpad.net/~zumastor-team hosting standard Ubuntu
-kernel packages and zumastor/ddsnap packages for i386 and amd64.
+Experimental Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Our team page at launchpad.net (https://launchpad.net/~zumastor-team)
+has a continually-updated repository of standard Ubuntu packages for Zumastor.
+It's hooked up to our trunk right now, so it's only for those interested in
+the very latest untested packages.  But they should be real Hardy packages,
+up to Ubuntu's packaging standards.
 
-Here are his instructions for installing using the ppa repository:
+Here's how to use that repository, if you dare:
 
 1. Add these lines to /etc/apt/sources.list
 +
