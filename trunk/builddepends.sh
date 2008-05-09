@@ -16,8 +16,8 @@ apt-get build-dep ddsnap
 popd
 
 # manually install all build dependencies, including kernel build
-aptitude -y install \
+apt-get -q -y install \
   fakeroot kernel-package devscripts subversion \
   debhelper libpopt-dev zlib1g-dev \
-  debhelper bzip2, rsync, build-essential
+  debhelper bzip2 rsync build-essential
 
