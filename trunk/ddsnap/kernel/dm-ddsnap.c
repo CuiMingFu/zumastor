@@ -22,8 +22,9 @@
 
 #define DM_MSG_PREFIX "ddsnap"
 
-#define warn(string, args...) do { printk("%s: " string "\n", __func__, ##args); } while (0)
-#define error(string, args...) do { warn(string, ##args); BUG(); } while (0)
+#define info(string, args...) do { printk(KERN_INFO "%s: " string "\n", __func__, ##args); } while (0)
+#define warn(string, args...) do { printk(KERN_WARNING "%s: " string "\n", __func__, ##args); } while (0)
+#define error(string, args...) do { printk(KERN_ERR "%s: " string "\n", __func__, ##args); BUG(); } while (0)
 #define assert(expr) do { if (!(expr)) error("Assertion " #expr " failed!\n"); } while (0)
 #define trace_on(args) args
 #define trace_off(args)
@@ -267,13 +268,13 @@ static void ddsnap_stats_update(struct ddsnap_pending_stats *statp, typeof(jiffi
 
 static void ddsnap_stats_display(struct ddsnap_pending_stats *statp, unsigned total)
 {
-	printk("(%u)\n", total);
+	info("(%u)\n", total);
 	if (!total)
 		return;
-	printk("pending time max:min:avg "); 
-	printk("%u ", jiffies_to_msecs(statp->max_time));
-	printk("%u ", jiffies_to_msecs(statp->min_time));
-	printk("%u\n", jiffies_to_msecs(statp->avg_time) / total);
+	info("pending time max:min:avg "); 
+	info("%u ", jiffies_to_msecs(statp->max_time));
+	info("%u ", jiffies_to_msecs(statp->min_time));
+	info("%u\n", jiffies_to_msecs(statp->avg_time) / total);
 }
 
 static void show_pending_requests(struct list_head *hlist, unsigned *total, struct ddsnap_pending_stats *pending_stats)
@@ -283,7 +284,7 @@ static void show_pending_requests(struct list_head *hlist, unsigned *total, stru
 	list_for_each(list, hlist) {
 		struct pending *pending = list_entry(list, struct pending, list);
 		ddsnap_stats_update(pending_stats, (now - pending->timestamp));
-		printk("%u:%Lx:%u ", pending->id, pending->chunk, jiffies_to_msecs(now - pending->timestamp));
+		info("%u:%Lx:%u ", pending->id, pending->chunk, jiffies_to_msecs(now - pending->timestamp));
 		*total = *total + 1;
 	}
 }
@@ -298,7 +299,7 @@ static void show_pending(struct devinfo *info)
 	for (i = 0; i < NUM_BUCKETS; i++) {
 		if (!list_empty(info->pending + i)) {
 			if (!total)
-				printk("[%u]: ", i);
+				info("[%u]: ", i);
 			show_pending_requests(info->pending + i, &total, &pending_stats);
 		}
 	}
@@ -371,7 +372,7 @@ static void show_lock_requests(struct list_head *hlist)
 	list_for_each(list, hlist) {
 		hook = list_entry(list, struct hook, list);
 		ddsnap_stats_update(&lock_stats, (now - hook->timestamp));
-		printk("%Lx:%u ", (long long)hook->sector, jiffies_to_msecs(now - hook->timestamp));
+		info("%Lx:%u ", (long long)hook->sector, jiffies_to_msecs(now - hook->timestamp));
 		total++;
 	}
 	ddsnap_stats_display(&lock_stats, total);
@@ -1258,7 +1259,7 @@ static void sysrq_handle_ddsnap(int key, struct tty_struct *tty)
 	struct mapped_device *md;
 
 	if (!ddsnap_proc_root) {
-		printk("NULL ddsnap proc directory\n");
+		printk(KERN_ERR "NULL ddsnap proc directory\n");
 		return;
 	}
 	down(&ddsnap_proc_sem);
@@ -1266,11 +1267,11 @@ static void sysrq_handle_ddsnap(int key, struct tty_struct *tty)
 	for (de = de->subdir; de; de = de->next) {
 		target = (struct dm_target *) de->data;
 		info = (struct devinfo *) target->private;
-		printk("ddsnap device %s, ", de->name);
+		info("ddsnap device %s, ", de->name);
 		md = dm_table_get_md(target->table);
-		printk("state %s, ", dm_suspended(md) ? "SUSPENDED" : ((info->flags & READY_FLAG) ? "ACTIVE" : "NOT READY"));
+		info("state %s, ", dm_suspended(md) ? "SUSPENDED" : ((info->flags & READY_FLAG) ? "ACTIVE" : "NOT READY"));
 		dm_put(md);
-		printk("inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", dm_inflight_total(target), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
+		info("inflight bio vecs %u, pending requests: %u, query requests %u, release requests %u, locked requests %u\n", dm_inflight_total(target), ddsnap_pending_queries(info), ddsnap_queries_queries(info), ddsnap_releases_queries(info), ddsnap_locked_queries(info));
 		show_pending(info);
 		show_locked(info);
 	}
@@ -1546,7 +1547,7 @@ int __init dm_ddsnap_init(void)
 	/* Jiaying: register /proc/driver/ddsnap */
 	ddsnap_proc_root = proc_mkdir("ddsnap", proc_root_driver);
 	if (!ddsnap_proc_root) {
-		printk("cannot create /proc/driver/ddsnap entry\n");
+		info("cannot create /proc/driver/ddsnap entry\n");
 		goto bad3;
 	}
 	ddsnap_proc_root->owner = THIS_MODULE;
