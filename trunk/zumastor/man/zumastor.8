@@ -81,7 +81,7 @@ The snapshot block and chunk sizes can be specified with the \fBblocksize\fP and
 They may only differ if separate metadata and snapshot devices are specified.
 Note that these values must be specified as powers of two and must be larger than 512 bytes.
 
-The amount of RAM dedicated to the snapshot store cache defaults to min(128MB, system RAM/4), and can be tuned manually with the \fBcachesize\fP option.  For instance, to increase the cache size to 512MB, use --cachesize 512M.
+The amount of RAM dedicated to the snapshot store cache defaults to max(128MB, system RAM/4), and can be tuned manually with the \fBcachesize\fP option.  For instance, to increase the cache size to 512MB, use --cachesize 512M.
 
 A mountpoint may be defined for the volume with the \fBmountpoint\fP option.  It must be a directory with no other file system mounted there.  Mount options that apply to that mount point may be defined with the \fBmountopts\fP option.  The snapshot mountpoint under which the volume snapshots are mounted can be defined with the \fBsnappath\fP option. 
 .IP \fBdefine\ \fBmaster\fP

@@ -82,7 +82,7 @@ Specifies the snapshot chunk size. Input has to be a power of two and must be la
 .IP \fB\-k\ \fIcachesize\fB|--cachesize=\fIcachesize
 .br
 Specifies the amount of RAM to dedicate to the snapshot btree cache.  If not specified or
-if specified as 0 (zero), defaults to min(128MB, system ram size/4).
+if specified as 0 (zero), defaults to max(128MB, system ram size/4).
 .IP \fB-f|--foreground
 .br
 Sets the server to run in the foreground. The default is to run daemonized.
