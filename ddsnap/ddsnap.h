@@ -83,8 +83,19 @@ extern struct change_list *init_change_list(u32 chunksize_bits, u32 src_snap, u3
 extern int append_change_list(struct change_list *cl, u64 chunkaddr);
 extern void free_change_list(struct change_list *cl);
 
+enum runflags { RUN_SB_DIRTY = 1, RUN_SELFCHECK = 2, RUN_DEFER = 4 };
+
 int sniff_snapstore(int metadev);
-int init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits, unsigned cs_bits, unsigned js_bytes);
-int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned long long cachesize_bytes);
+
+int init_snapstore(
+	int orgdev, int snapdev, int metadev,
+	unsigned bs_bits, unsigned cs_bits, unsigned js_bytes);
+
+int start_server(
+	int orgdev, int snapdev, int metadev, 
+	char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile,
+	int nobg, uint64_t cachesize_bytes, enum runflags flags);
+
+/* start_server flags */
 
 #endif // __DDSNAP_H

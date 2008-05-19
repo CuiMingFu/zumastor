@@ -1994,7 +1994,7 @@ int main(int argc, char *argv[])
 		POPT_TABLEEND
 	};
 
-	int nobg = 0;
+	int debug = 0, experimental = 0, nobg = 0;
 	char const *logfile = NULL;
 	char const *pidfile = NULL;
 	char const *progress_file = NULL;
@@ -2002,6 +2002,8 @@ int main(int argc, char *argv[])
 	char const *cachesize_str = NULL;
 	char const *ratelimit_str = NULL;
 	struct poptOption serverOptions[] = {
+		{ "debug", 'D', POPT_ARG_NONE, &debug, 0, "turn on debugging checks", NULL }, // !!! should turn on debug logging too
+		{ "experimental", 'X', POPT_ARG_NONE, &experimental, 0, "use experimental optimizations", NULL },
 		{ "foreground", 'f', POPT_ARG_NONE, &nobg, 0, "run in foreground. daemonized by default.", NULL }, // !!! unusual semantics, we should be foreground by default, and optionally daemonize
 		{ "logfile", 'l', POPT_ARG_STRING, &logfile, 0, "use specified log file", NULL },
 		{ "cachesize", 'k', POPT_ARG_STRING, &cachesize_str, 0, "Buffer cache size (default = max(128M,1/4 sys RAM)", "size" },
@@ -2444,7 +2446,12 @@ int main(int argc, char *argv[])
 
 		poptFreeContext(serverCon);
 
-		return start_server(orgdev_, snapdev_, metadev_, agent_sockname, server_sockname, logfile, pidfile, nobg, cachesize_bytes);
+		enum runflags flags = experimental * RUN_DEFER | debug * RUN_SELFCHECK;
+
+		return start_server(
+			orgdev_, snapdev_, metadev_,
+			agent_sockname, server_sockname, logfile, pidfile,
+			nobg, cachesize_bytes, flags);
 	}
 	if (strcmp(command, "create") == 0) {
 		if (argc != 4) {
