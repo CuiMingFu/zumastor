@@ -48,9 +48,6 @@
 #define DEFAULT_JOURNAL_SIZE (100 * CHUNK_SIZE)
 #define INPUT_ERROR 0
 
-#define SB_DIRTY 1
-#define SB_BUSY 2
-#define SB_SELFCHECK 4
 #define SB_SECTOR 8			/* Sector where superblock lives.     */
 #define SB_SECTORS 8			/* Size of ddsnap super block in sectors */
 #define SB_MAGIC { 't', 'e', 's', 't', 0xdd, 0x07, 0x06, 0x04 } /* date of latest incompatible sb format */
@@ -73,9 +70,16 @@
 #define PR_SET_LESS_THROTTLE 23
 #define PR_SET_MEMALLOC	24
 #define MAX_NEW_METACHUNKS 10
+#define MAX_DEFERRED_ALLOCS 500
 
+#ifndef trace
 #define trace trace_off
+#endif
+
+#ifndef jtrace
 #define jtrace trace_off
+#endif
+
 //#define BUSHY // makes btree nodes very small for debugging
 
 #define DIVROUND(N, D) (((N)+(D)-1)/(D))
@@ -206,6 +210,8 @@ static inline struct exception *emap(struct eleaf *leaf, unsigned i)
 	return	(struct exception *)((char *) leaf + leaf->map[i].offset);
 }
 
+enum sbflags { SB_BUSY = 2 };
+
 struct disksuper
 {
 	typeof((char[])SB_MAGIC) magic;
@@ -248,6 +254,38 @@ struct allocspace { // everything bogus here!!!
 					/* tree node. (metadata only).        */
 };
 
+/*
+ * Deferred allocation
+ *
+ * Each time a block is allocated a bitmap must be updated then written both
+ * to the journal and the physical bitmap location synchronously before a
+ * write request can be acknowledged.
+ *
+ * The deferred allocation optimization avoids updating bitmaps at the time
+ * a block is allocated, by remembering up to one contiguous range of block
+ * allocations per journal commit block.  Eventually, before the journal
+ * wraps (fuzzy definition alert!!!) all the deferred allocations are actually
+ * written to the bitmaps and the bitmaps are updated in a single journal
+ * transaction, called a "barrier".  This never requires more total writes and
+ * should save a large number of bitmap writes by combining updates within a
+ * given bitmap block.  It also reduces seeking between the journal and bitmap
+ * blocks.
+ *
+ * At the lowest level of the block allocator, a successful allocation (how do
+ * we avoid double allocations???) is remembered in the super block instead
+ * of being updated in the bitmap. (!!! this won't work, we need to set the
+ * bitmap to avoid re-using the allocation !!! does our cycle counter save us?
+ * yes, but need to flush deferred allocs if cyclic allocator wraps, which will
+ * not work well except for cyclic allocation, which is a bad idea in the long
+ * run.  Just for now...)
+ *
+ * Note!!!  Does not work for separate data/metadata yet.  Need to think
+ * about how to make that work.  Simply disable the optimization in the
+ * separate case for now.
+ */
+
+struct alloc_range { u64 chunk; u32 barrier:1, count:31; u32 pad; };
+
 struct superblock
 {
 	/* Persistent, saved to disk */
@@ -256,18 +294,18 @@ struct superblock
 	char bogopad[4096 - sizeof(struct disksuper) - 2*sizeof(struct allocspace) ];
 
 	/* Derived, not saved to disk */
-	u64 snapmask;			/* Bitmask of all valid snapshots.    */
-	unsigned flags;
+	u64 snapmask; // bitmask of all valid snapshots
+	unsigned runflags;
 	unsigned snapdev, metadev, orgdev;
 	unsigned snaplock_hash_bits;
 	struct snaplock **snaplocks; // forward ref!!!
 	unsigned copybuf_size;
 	char *copybuf;
-	chunk_t source_chunk;
-	chunk_t dest_exception;
-	unsigned copy_chunks;
-	unsigned max_commit_blocks;
+	chunk_t source_chunk, dest_exception;
+	unsigned copy_chunks, deferred_allocs;
+	unsigned max_commit_blocks; // physical addresses that fit in a commit block
 	u16 usecount[MAX_SNAPSHOTS]; // transient usecount for connected devices
+	struct alloc_range deferred_alloc[MAX_DEFERRED_ALLOCS], defer;
 };
 
 static int valid_sb(struct superblock *sb)
@@ -295,6 +333,11 @@ static inline unsigned chunk_sectors(struct allocspace *space)
 	return 1 << space->chunk_sectors_bits;
 }
 
+static int deferring(struct superblock *sb)
+{
+	return !!(sb->runflags & RUN_DEFER);
+}
+
 /*
  * Journalling
  */
@@ -309,6 +352,7 @@ struct commit_block
 	u32 entries;
 	u64 snapfree;
 	u64 metafree;
+	struct alloc_range alloc;
 	u64 sector[];
 } PACKED;
 
@@ -321,7 +365,7 @@ static sector_t journal_sector(struct superblock *sb, unsigned i)
 	return sb->image.journal_base + (i << sb->metadata.chunk_sectors_bits);
 }
 
-static inline struct commit_block *buf2block(struct buffer *buf)
+static inline struct commit_block *buf2commit(struct buffer *buf)
 {
 	return (void *)buf->data;
 }
@@ -340,6 +384,22 @@ static int is_commit_block(struct commit_block *block)
 {
 	return !memcmp(&block->magic, JMAGIC, sizeof(block->magic));
 }
+/*
+ * Note!!!  This relies on knowing that this magic number can never
+ * occur in a journal data block.  This is true only of btree leaf
+ * index blocks, not of bitmap blocks, which may carry arbitrary
+ * data in the magic number position, which means that journal data
+ * could mistakenly be interpreted as a commit block.  The chance
+ * of this is very small, on the order of one in a billion replays.
+ * To get rid of the possibility completely, data at the magic
+ * position could be zeroed out if it happened to match the magic
+ * number, and a bit shared with the physical block address in the
+ * commit block could indicate this for each affected data block.
+ * Then the data would be restored on journal replay.  This
+ * is a lot of code to fix something that is highly unlikely ever
+ * to rank highly as a possible failure mode.  One day, perhaps
+ * this little chink in the armor should be filled.
+ */
 
 static u32 checksum_block(struct superblock *sb, u32 *data)
 {
@@ -376,16 +436,69 @@ static int bytebits(unsigned char c)
 	return count;
 }
 
+static inline int get_bitmap_bit(unsigned char *bitmap, unsigned bit)
+{
+	return bitmap[bit >> 3] & (1 << (bit & 7));
+}
+
+static inline void set_bitmap_bit(unsigned char *bitmap, unsigned bit)
+{
+	bitmap[bit >> 3] |= 1 << (bit & 7);
+}
+
+static inline void clear_bitmap_bit(unsigned char *bitmap, unsigned bit)
+{
+	bitmap[bit >> 3] &= ~(1 << (bit & 7));
+}
+
+/*
+ * flag = 0: check if bits for chunks from start_chunk to end_chunk are all zero
+ * flag = 1: set bits for chunks from start_chunk to end_chunk
+ * flag = 2: clear bits for chunks from start_chunk to end_chunk
+ */
+static int change_bits(struct superblock *sb, chunk_t start, chunk_t count, chunk_t base, int flag)
+// !!! do sector shift inside here
+{
+	chunk_t chunk, limit = start + count;
+	unsigned bitmap_shift = sb->metadata.asi->allocsize_bits + 3;
+	u64 bitmap_mask = (1 << bitmap_shift ) - 1;
+	sector_t sector = (base >> SECTOR_BITS) + ((start >> bitmap_shift) << sb->metadata.chunk_sectors_bits);
+	trace(warn("start %Lu, count %Lu, base %Lu, flag %d, sector %Lu", start, count, base, flag, sector);)
+	for (chunk = start; chunk < limit; sector += chunk_sectors(&sb->metadata)) {
+		struct buffer *buffer = bread(sb->metadev, sector, sb->metadata.allocsize);
+		do {
+			if (!flag && get_bitmap_bit(buffer->data, chunk & bitmap_mask)) {
+				warn("chunk %Lu is in use", chunk);
+				return -1;
+			}
+			if (flag == 1)
+				set_bitmap_bit(buffer->data, chunk & bitmap_mask);
+			if (flag == 2)
+				clear_bitmap_bit(buffer->data, chunk & bitmap_mask);
+			chunk++;
+		} while ((chunk & bitmap_mask) && (chunk < limit));
+		if (flag)
+			set_buffer_dirty(buffer);
+		brelse(buffer);
+	}
+	return 0;
+}
+
+void set_allocated(struct superblock *sb, chunk_t chunk, unsigned count)
+{
+	change_bits(sb, chunk, count, sb->image.metadata.bitmap_base << SECTOR_BITS, 1);
+}
+
 /*
  * Walk the given allocation space bitmap and count the number of
  * free blocks.
  */
-static chunk_t count_free(struct superblock *sb, struct allocspace *alloc)
+static chunk_t count_zeros(struct superblock *sb, struct allocspace *alloc)
 {
 	unsigned blocksize = sb->metadata.allocsize;
 	unsigned char zeroes[256];
-	unsigned i;
-	for (i = 0; i < 256; i++)
+
+	for (int i = 0; i < 256; i++)
 		zeroes[i] = bytebits(~i);
 	chunk_t count = 0, block = 0, bytes = (alloc->asi->chunks + 7) >> 3;
 	while (bytes) {
@@ -404,21 +517,30 @@ static chunk_t count_free(struct superblock *sb, struct allocspace *alloc)
 	return count;
 }
 
+static chunk_t count_deferred(struct superblock *sb, struct allocspace *alloc)
+{
+	unsigned count = sb->defer.count;
+	for (int i = 0; i < sb->deferred_allocs; i++)
+		count += sb->deferred_alloc[i].count;
+	return count;
+}
+
+static chunk_t count_free(struct superblock *sb, struct allocspace *alloc)
+{
+	return count_zeros(sb, alloc) - count_deferred(sb, alloc);
+}
+
 static void check_freespace(struct superblock *sb)
 {
-	if (metafree(sb) != sb->metadata.asi->freechunks)
-		warn("metadata freechunks out of sync with used counts (%Lu, %Li)", (llu_t) metafree(sb), sb->metadata.asi->freechunks);
 	chunk_t counted = count_free(sb, &sb->metadata);
-	if (counted != sb->metadata.asi->freechunks) {
+	if (sb->metadata.asi->freechunks != counted) {
 		warn("metadata free chunks count wrong: counted %Lu, free = %Li", (llu_t) counted, sb->metadata.asi->freechunks);
 		sb->metadata.asi->freechunks = counted;
 	}
 	if (combined(sb)) // !!! should be able to lose this now
 		return;
-	if (snapfree(sb) != sb->snapdata.asi->freechunks)
-		warn("snapdata freechunks out of sync with used counts (%Lu, %Li)", (llu_t) snapfree(sb), sb->snapdata.asi->freechunks);
 	counted = count_free(sb, &sb->snapdata);
-	if (counted != sb->snapdata.asi->freechunks) {
+	if (sb->snapdata.asi->freechunks != counted) {
 		warn("snapdata free chunks count wrong: counted %Lu, free = %Li", (llu_t) counted, sb->snapdata.asi->freechunks);
 		sb->snapdata.asi->freechunks = counted;
 	}
@@ -426,9 +548,29 @@ static void check_freespace(struct superblock *sb)
 
 static void selfcheck_freespace(struct superblock *sb)
 {
-	if ((sb->flags & SB_SELFCHECK))
+	if ((sb->runflags & RUN_SELFCHECK))
 		check_freespace(sb);
 }
+
+static void flush_deferred_allocs(struct superblock *sb)
+{
+	for (int i = 0; i < sb->deferred_allocs; i++)
+		set_allocated(sb, sb->deferred_alloc[i].chunk, sb->deferred_alloc[i].count);
+	sb->deferred_allocs = 0;
+}
+
+/*
+ * Deferred allocations are written to the journal one (for now) per commit
+ * block.  Do not commit so many deferred allocations that the barrier commit
+ * required to flush them to bitmaps will overwrite the oldest deferred alloc
+ * in the journal, otherwise deferred allocations will be forgotten and double
+ * allocations will result, followed by severe corruption shortly after.
+ *
+ * The limit chosen below is arbitrary and pessimistic.  Repeat: must use a
+ * pessimal flush critereon otherwise corruption is possible following journal
+ * replay.  Do eventually develop a tighter limit by tracking the number of
+ * bitmap blocks that will actually be dirtied by the flush.
+ */
 
 /*
  * For now there is only ever one open transaction in the journal, the newest
@@ -441,11 +583,17 @@ static void selfcheck_freespace(struct superblock *sb)
  * the dirty list didn't change between the two passes.  When ansynchronous
  * IO arrives here, this all has to be handled a lot more carefully.
  */
-static void commit_transaction(struct superblock *sb)
+static void commit_transaction(struct superblock *sb, int barrier)
 {
-	if (list_empty(&dirty_buffers))
+	if (list_empty(&dirty_buffers) && !sb->defer.count)
 		return;
 
+	if (sb->deferred_allocs >= sb->image.journal_size / 2) {
+		flush_deferred_allocs(sb);
+		barrier = 1;
+	}
+
+//warn(">>> %i <<<", sb->image.sequence);
 	struct list_head *list;
 	int safety = dirty_buffer_count;
 
@@ -455,7 +603,7 @@ static void commit_transaction(struct superblock *sb)
 	list_for_each(list, &dirty_buffers) {
 		struct buffer *buffer = list_entry(list, struct buffer, dirty_list);
 		unsigned pos = next_journal_block(sb);
-		jtrace(warn("journal data sector = %Lx [%u]", buffer->sector, pos););
+		jtrace(warn("journal data block @%Lx [%u]", buffer->sector, pos););
 		if (!buffer_dirty(buffer)) {
 			warn("non-dirty buffer %i of %i found on dirty list, state = %i",
 				dirty_buffer_count - safety + 1, dirty_buffer_count, buffer->state);
@@ -476,7 +624,7 @@ static void commit_transaction(struct superblock *sb)
 	unsigned pos = next_journal_block(sb);
 	struct buffer *commit_buffer = jgetblk(sb, pos);
 	memset(commit_buffer->data, 0, sb->metadata.allocsize);
-	struct commit_block *commit = buf2block(commit_buffer);
+	struct commit_block *commit = buf2commit(commit_buffer);
 	*commit = (struct commit_block){ .magic = JMAGIC, .sequence = sb->image.sequence++ };
 
 	list_for_each(list, &dirty_buffers) {
@@ -490,8 +638,18 @@ static void commit_transaction(struct superblock *sb)
 	commit->checksum = -checksum_block(sb, (void *)commit);
 	commit->snapfree = snapfree(sb);
 	commit->metafree = metafree(sb);
+
+	if (sb->defer.count) {
+		commit->alloc = (struct alloc_range){ .chunk = sb->defer.chunk, .count = sb->defer.count };
+		sb->deferred_alloc[sb->deferred_allocs++] = commit->alloc;
+		sb->defer.count = 0;
+	}
+
+	if (barrier)
+		commit->alloc.barrier = 1;
+
 	if (write_buffer_to(commit_buffer, journal_sector(sb, pos)))
-		jtrace(warn("unable to write checksum fro commit block"););
+		jtrace(warn("unable to write checksum from commit block");); // what does this mean?
 	brelse(commit_buffer);
 
 	/*
@@ -510,148 +668,154 @@ static void commit_transaction(struct superblock *sb)
 	selfcheck_freespace(sb);
 }
 
-static int replay_journal(struct superblock *sb)
+static void commit_deferred_allocs(struct superblock *sb)
 {
-	struct buffer *buffer;
-	typeof(((struct commit_block *)NULL)->sequence) sequence = -1;
-	int scribbled = -1, last_block = -1, newest_block = -1;
-	int data_from_start = 0, data_from_last = 0;
-	int size = sb->image.journal_size;
-	char const *why = "";
-	unsigned i;
-	warn("Replaying journal");
-
-	/* Scan full journal, find newest commit */
-	// this replay code is nigh on impossible to read and needs to die
-	// instead have two passes, the first finds all the commits and
-	// stores details in a table, the second runs through oldest to newest
-	// transaction with the help of the table -- DP
-	for (i = 0; i < size; brelse(buffer), i++) {
-		buffer = jread(sb, i);
-		struct commit_block *block = buf2block(buffer);
-
-		if (!is_commit_block(block)) {
-			jtrace(warn("[%i] <data>", i););
-			if (sequence == -1)
-				data_from_start++;
-			else
-				data_from_last++;
-			continue;
-		}
-
-		if (checksum_block(sb, (void *)block)) {
-			warn("block %i failed checksum", i);
-			//hexdump(block, 40);
-			if (scribbled != -1) {
-				why = "Too many scribbled blocks in journal";
-				goto failed;
-			}
-
-			if (newest_block != -1 && newest_block != last_block) {
-				why = "Bad block not last written";
-				goto failed;
-			}
-
-			scribbled = i;
-			if (last_block != -1)
-				newest_block = last_block;
-			sequence++;
-			continue;
-		}
-
-		jtrace(warn("[%i] seq=%i entries=%i metafree=%Lu snapfree=%Lu", i, block->sequence, block->entries, block->metafree, block->snapfree););
-
-		if (last_block != -1 && block->sequence != sequence + 1) {
-			int delta = sequence - block->sequence;
-
-			if  (delta <= 0 || delta > size) {
-				why = "Bad sequence";
-				goto failed;
-			}
-
-			if (newest_block != -1) {
-				why = "Multiple sequence wraps";
-				goto failed;
-			}
-
-			if (!(scribbled == -1 || scribbled == i - 1)) {
-				why = "Bad block not last written";
-				goto failed;
-			}
-			newest_block = last_block;
-		}
-		data_from_last = 0;
-		last_block = i;
-		sequence = block->sequence;
-	}
-
-	if (last_block == -1) {
-		why = "No commit blocks found";
-		goto failed;
-	}
-
-	if (newest_block == -1) {
-		/* test for all the legal scribble positions here */
-		newest_block = last_block;
-	}
-
-	jtrace(warn("found newest commit [%u]", newest_block););
-	buffer = jread(sb, newest_block);
-	struct commit_block *commit = buf2block(buffer);
-	unsigned entries = commit->entries;
-
-	for (i = 0; i < entries; i++) {
-		unsigned pos = (newest_block - entries + i + size) % size;
-		struct buffer *databuf = jread(sb, pos);
-		struct commit_block *block = buf2block(databuf);
-
-		if (is_commit_block(block)) {
-			error("data block [%u] marked as commit block", pos);
-			continue;
-		}
-
-		jtrace(warn("write journal [%u] data to %Lx", pos, commit->sector[i]););
-		write_buffer_to(databuf, commit->sector[i]);
-		brelse(databuf);
-	}
-	sb->image.journal_next = (newest_block + 1 + size) % size;
-	sb->image.sequence = commit->sequence + 1;
-	sb->image.snapdata.freechunks = commit->snapfree;
-	sb->image.metadata.freechunks = commit->metafree;
-	brelse(buffer);
-	check_freespace(sb);
-	return 0;
-
-failed:
-	errno = EIO; /* return a misleading error (be part of the problem) */
-	error("Journal recovery failed, %s", why);
-	return -1;
+	commit_transaction(sb, 0);
+	flush_deferred_allocs(sb);
+	commit_transaction(sb, 1);
 }
 
-#if 0
+/* Journal Replay */
+
+#ifdef SHOW_HELPERS
+static void show_alloc_range(struct alloc_range *range, char *sep)
+{
+	printf("%Li@%Li%s", (long long)range->count, (long long)range->chunk, sep);
+}
+
 static void _show_journal(struct superblock *sb)
 {
-	int i, j;
-	for (i = 0; i < sb->image.journal_size; i++) {
-		struct buffer *buf = jread(sb, i);
-		struct commit_block *block = buf2block(buf);
+	for (int i = 0; i < sb->image.journal_size; i++) {
+		struct buffer *buffer = jread(sb, i);
+		struct commit_block *commit = buf2commit(buffer);
 
-		if (!is_commit_block(block)) {
+		if (!is_commit_block(commit)) {
 			printf("[%i] <data>\n", i);
 			continue;
 		}
 
-		printf("[%i] seq=%i (%i)", i, block->sequence, block->entries);
-		for (j = 0; j < block->entries; j++)
-			printf(" %Lx", (long long)block->sector[j]);
+		printf("[%i] seq=%i (%i) ", i, commit->sequence, commit->entries);
+		for (int j = 0; j < commit->entries; j++)
+			printf("%Lx ", (long long)commit->sector[j]);
+		struct alloc_range alloc = commit->alloc;
+		if (commit->alloc.barrier)
+			printf("<barrier> ");
+		if (alloc.count)
+			show_alloc_range(&commit->alloc, " deferred ");
+
 		printf("\n");
-		brelse(buf);
+		assert(buffer->count == 1);
+		brelse(buffer);
+		evict_buffer(buffer); /* avoid data alias on next show */
 	}
+	printf("defered: (");
+	show_alloc_range(&sb->defer, ") ");
+	for (int i = 0; i < sb->deferred_allocs; i++)
+		show_alloc_range(sb->deferred_alloc + i, " ");
 	printf("\n");
 }
 
 #define show_journal(sb) do { warn("Journal..."); _show_journal(sb); } while (0)
 #endif
+
+#define fieldtype(structname, fieldname) typeof(((struct structname *)NULL)->fieldname)
+
+static int replay_journal(struct superblock *sb)
+{
+	struct buffer *buffer;
+	int jblocks = sb->image.journal_size, commits = 0;;
+	char const *why = "";
+
+	warn("Replaying journal");
+	fieldtype(commit_block, sequence) seq[jblocks];
+	unsigned pos[jblocks], newest = -1;
+
+	/* Scan the entire journal for commit blocks */
+	for (int i = 0; i < jblocks; i++) {
+		if (!(buffer = jread(sb, i))) {
+			why = "block read failed";
+			goto failed_buffer;
+		}
+
+		struct commit_block *commit = buf2commit(buffer);
+		if (is_commit_block(commit)) {
+			if (checksum_block(sb, (void *)commit)) {
+				why = "corrupt journal block";
+				goto failed_buffer;
+			}
+			seq[commits] = commit->sequence;
+			pos[commits] = i;
+			commits++;
+		}
+		brelse(buffer);
+	}
+
+	//for (int i = 0; i < commits; i++)
+	//	printf("found commit [%i]\n", seq[i]);
+	/* Find the one commit where sequence does not increase by one */
+	for (int i = 0; i < commits; i++) {
+		unsigned seq_plus_one = (seq[i] + 1) & (typeof(seq[0]))~0;
+		unsigned next_recorded_seq = seq[(i + 1) % commits];
+
+		if (next_recorded_seq != seq_plus_one) {
+			if (newest != -1) {
+				why = "unexpected gap in journal sequence";
+				goto failed;
+			}
+			newest = i;
+		}
+	}
+	jtrace(warn("found newest commit [%u]", pos[newest]););
+
+	/* Pick up any deferred allocs */
+	int i = newest + 1;
+	do {
+		if (i == commits)
+			i = 0;
+		buffer = jread(sb, pos[i]);
+		struct commit_block *commit = buf2commit(buffer);
+		struct alloc_range alloc = commit->alloc;
+		if (alloc.barrier)
+			sb->deferred_allocs = 0;
+		if (alloc.count) {
+			jtrace(show_alloc_range(&alloc, " deferred\n");)
+			sb->deferred_alloc[sb->deferred_allocs++] = (struct alloc_range){
+				.chunk = alloc.chunk, .count = alloc.count };
+		}
+		brelse(buffer);
+	} while (i++ != newest);
+
+	/* For now, only the newest commit needs to be replayed */
+	buffer = jread(sb, pos[newest]);
+	struct commit_block *commit = buf2commit(buffer);
+	unsigned entries = commit->entries;
+
+	for (int i = 0; i < entries; i++) {
+		unsigned replay = (pos[newest] - entries + i + jblocks) % jblocks;
+		struct buffer *databuf = jread(sb, replay);
+		if (is_commit_block(buf2commit(databuf)))
+			error("data block [%u] marked as commit block", replay);
+		jtrace(warn("write journal [%u] data to %Lx", replay, commit->sector[i]););
+		write_buffer_to(databuf, commit->sector[i]);
+		brelse(databuf);
+	}
+
+	/* Recover durable state from newest commit */
+	sb->image.journal_next = (pos[newest] + 1 + jblocks) % jblocks;
+	sb->image.sequence = commit->sequence + 1;
+	sb->image.snapdata.freechunks = commit->snapfree;
+	sb->image.metadata.freechunks = commit->metafree;
+	brelse(buffer);
+
+	check_freespace(sb); // passes for a fsck (need more)
+	return 0;
+
+failed_buffer:
+	brelse(buffer);
+failed:
+	error("Journal recovery failed, %s", why);
+	return -1;
+}
 
 /*
  * btree leaf editing
@@ -961,36 +1125,21 @@ static void init_leaf(struct eleaf *leaf, int block_size)
 
 static void set_sb_dirty(struct superblock *sb)
 {
-	sb->flags |= SB_DIRTY;
+	sb->runflags |= RUN_SB_DIRTY;
 }
 
 static void save_sb(struct superblock *sb)
 {
-	if (sb->flags & SB_DIRTY) {
+	if (sb->runflags & RUN_SB_DIRTY) {
 		if (diskwrite(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
 			warn("Unable to write superblock to disk: %s", strerror(errno));
-		sb->flags &= ~SB_DIRTY;
+		sb->runflags &= ~RUN_SB_DIRTY;
 	}
 }
 
 /*
  * Allocation bitmaps
  */
-
-static inline int get_bitmap_bit(unsigned char *bitmap, unsigned bit)
-{
-	return bitmap[bit >> 3] & (1 << (bit & 7));
-}
-
-static inline void set_bitmap_bit(unsigned char *bitmap, unsigned bit)
-{
-	bitmap[bit >> 3] |= 1 << (bit & 7);
-}
-
-static inline void clear_bitmap_bit(unsigned char *bitmap, unsigned bit)
-{
-	bitmap[bit >> 3] &= ~(1 << (bit & 7));
-}
 
 /*
  * Round "chunks" up to the next even block boundary based on the number of
@@ -1016,8 +1165,7 @@ static u64 calc_bitmap_blocks(struct superblock *sb, u64 chunks)
  * and indeed may also take a fractional byte.  In the latter case,
  * we cheat by using the whole byte but marking the last few chunks
  * (those past the end of the volume) as used.  They'll never be freed
- * so we don't have to worry about dealing with the partial byte in
- * alloc_chunk_from_range().
+ * so we don't have to worry about dealing with the partial byte.
  */
 static void init_bitmap_blocks(struct superblock *sb, unsigned bitmap_base, unsigned bitmaps, u64 chunks, u64 reserved_chunks)
 {
@@ -1151,6 +1299,31 @@ static void grab_chunk(struct superblock *sb, struct allocspace *as, chunk_t chu
 }
 #endif
 
+static int chunk_within(chunk_t chunk, chunk_t start, chunk_t count)
+{
+	return chunk - start < count; // chunk_t must be unsigned!
+}
+
+static int is_deferred_alloc(struct superblock *sb, chunk_t chunk)
+{
+	if (chunk_within(chunk, sb->defer.chunk, sb->defer.count))
+		return 1;
+	for (int i = 0; i < sb->deferred_allocs; i++)
+		if (chunk_within(chunk, sb->deferred_alloc[i].chunk, sb->deferred_alloc[i].count))
+			return 1;
+	return 0;
+}
+
+static void show_deferred_alloc(struct superblock *sb)
+{
+	unsigned count = sb->defer.count;
+	printf("deferred chunk %Li count %u\n", sb->defer.chunk, count);
+	for (int i = 0; i < sb->deferred_allocs; i++) {
+		count = sb->deferred_alloc[i].count;
+		printf("deferred chunk %Li count %u\n", sb->deferred_alloc[i].chunk, count);
+	}
+}
+
 /*
  * Allocate a single chunk out of a given range of chunks from the given
  * allocation space.
@@ -1189,56 +1362,55 @@ static chunk_t alloc_chunk_from_range(struct superblock *sb, struct allocspace *
 		if (!buffer)
 			return -1;
 		unsigned char c, *p = buffer->data + offset;
-		/*
-		 * Get number of bytes in the rest of the block and the
-		 * number of bytes we're actually going to scan.
-		 */
 		unsigned tail = sb->metadata.allocsize - offset, n = tail > length? length: tail;
-
 		trace(printf("search %u bytes of bitmap %Lx from offset %u\n", n, blocknum, offset););
-		// dump_buffer(buffer, 4086, 10);
-
-		/*
-		 * Scan this block for a free chunk.
-		 */
 		for (length -= n; n--; p++)
-			if ((c = *p) != 0xff) { /* Any free chunks in this byte? */
-				/* WARNING: Shadows 'bit' in outer block. */
-				int i, bit;
-				trace_off(printf("found byte at offset %u of bitmap %Lx = %hhx\n",
-					p - buffer->data, blocknum, c););
-				/*
-				 * Scan the byte for the chunk we found.
-				 */
-				for (i = 0, bit = 1;; i++, bit <<= 1)
-					/* Free chunk?  Return it! */
-					if (!(c & bit)) {
-						chunk_t chunk;
+			if ((c = *p) != 0xff) {
+				trace_off(printf("found byte at offset %u of bitmap %Lx = %hhx\n", p - buffer->data, blocknum, c););
+				/* Scan the byte for the free chunk that must be there */
+				for (int i = 0, bit = 1; i <= 7; i++, bit <<= 1)
+					if (!(c & bit) ) {
+						chunk_t chunk = i + ((p - buffer->data) << 3) + (blocknum << bitmap_shift);
 
-						chunk = i + ((p - buffer->data) << 3) + (blocknum << bitmap_shift);
+						if (is_deferred_alloc(sb, chunk))
+							continue;
+
+						if (get_bitmap_bit(buffer->data, chunk & bitmap_mask)) {
+							warn("chunk %Li already in use", chunk);
+							show_deferred_alloc(sb);
+						}
 						assert(!get_bitmap_bit(buffer->data, chunk & bitmap_mask));
+						if (deferring(sb) && sb->deferred_allocs < MAX_DEFERRED_ALLOCS) {
+							if (!sb->defer.count) {
+								sb->defer.chunk = chunk;
+								sb->defer.count = 1;
+								goto success;
+							}
+							if (chunk == sb->defer.chunk + 1) {
+								sb->defer.count++;
+								goto success;
+							}
+						}
 						set_bitmap_bit(buffer->data, chunk & bitmap_mask);
-						brelse_dirty(buffer);
+						set_buffer_dirty(buffer);
+success:
+						brelse(buffer);
 						as->asi->freechunks--;
 						set_sb_dirty(sb); // !!! optimize this away
 						return chunk;
 					}
 			}
-		/*
-		 * Scan failed, release that block.  If we've exhausted the
-		 * range we were going to scan, return failure.
-		 */
+		/* No free chunk in that block, did we run out? */
 		brelse(buffer);
 		if (!length)
 			return -1;
-		/*
-		 * Go to the next block, wrapping if necessary.
-		 */
+		/* Go to the next block with wrap */
 		if (++blocknum == as->asi->bitmap_blocks)
 			 blocknum = 0;
 		offset = 0;
 		trace_off(printf("go to bitmap %Lx\n", blocknum););
 	}
+
 }
 
 /*
@@ -1422,7 +1594,12 @@ static void show_tree_range(struct superblock *sb, chunk_t start, chunk_t finish
 	brelse(buffer);
 }
 
-/* Remove btree entries */
+#ifdef SHOW_HELPERS
+static void show_tree(struct superblock *sb)
+{
+	show_tree_range(sb, 0, -1);
+}
+#endif
 
 static void check_leaf(struct eleaf *leaf, u64 snapmask)
 {
@@ -1457,7 +1634,7 @@ static void dirty_buffer_count_check(struct superblock *sb)
 			warn("number of dirty buffers %d is too large for journal %u", dirty_buffer_count, sb->image.journal_size);
 			abort();
 		}
-		commit_transaction(sb);
+		commit_transaction(sb, 0);
 	}
 }
 
@@ -1658,7 +1835,7 @@ static int delete_tree_range(struct superblock *sb, u64 snapmask, chunk_t resume
 	if (!(leafbuf = probe(sb, resume, path)))
 		return -ENOMEM;
 
-	commit_transaction(sb);
+	commit_transaction(sb, 0);
 	while (1) { /* in-order leaf walk */
 		trace_off(show_leaf(buffer2leaf(leafbuf)););
 		if (delete_snapshots_from_leaf(sb, buffer2leaf(leafbuf), snapmask))
@@ -1765,7 +1942,7 @@ keep_prev_node:
 					brelse(prevleaf);
 					brelse_path(hold, levels);
 					if (dirty_buffer_count)
-						commit_transaction(sb);
+						commit_transaction(sb, 0);
 					sb->snapmask &= ~snapmask;
 					set_sb_dirty(sb);
 					save_sb(sb); /* we don't call save_state after a squash */
@@ -1876,7 +2053,7 @@ static int delete_snap(struct superblock *sb, struct snapshot *snap)
 		trace_on(warn("snapshot squashed, skipping tree delete"););
 		return 0;
 	}
-	/* Remove entries for this snapshot from the B-tree. */
+	commit_deferred_allocs(sb);
 	return delete_tree_range(sb, mask, 0);
 }
 
@@ -1887,9 +2064,8 @@ static int delete_snap(struct superblock *sb, struct snapshot *snap)
 /*
  * Allocate a chunk from the passed allocation space.
  *
- * Calls alloc_chunk_from_range() to actually do the allocate.  The search
- * for a free chunk is optimized by starting from the position of the last
- * allocation and searching forward to the end of the allocation space.  If
+ * The search for a free chunk is optimized by starting from the position of the
+ * last allocation and searching forward to the end of the allocation space.  If
  * no free chunk is found, then search from the beginning of the space to the
  * last allocation position.  Fail if both searches turn up nothing.
  */
@@ -1901,7 +2077,7 @@ static chunk_t alloc_chunk(struct superblock *sb, struct allocspace *as)
 	    (found = alloc_chunk_from_range(sb, as, 0, last)) != -1) {
 		as->asi->last_alloc = found;
 		set_sb_dirty(sb);
-		return (found);
+		return found;
 	}
 	warn("failed to allocate chunk");
 	return -1;
@@ -1946,7 +2122,7 @@ static struct buffer *new_leaf(struct superblock *sb)
 	trace(printf("New leaf\n"););
 	struct buffer *buffer = new_block(sb); 
 	if (!buffer)
-		return buffer;
+		return NULL;
 	memset(buffer->data, 0, sb->metadata.allocsize);
 	init_leaf(buffer2leaf(buffer), sb->metadata.allocsize);
 	set_buffer_dirty(buffer);
@@ -2267,6 +2443,7 @@ static int auto_delete_snapshot(struct superblock *sb)
 	}
 	warn("releasing snapshot %u", victim->tag);
 	if (usecount(sb, victim)) {
+		commit_deferred_allocs(sb);
 		err = delete_tree_range(sb, 1ULL << victim->bit, 0);
 		sb->usecount[victim->bit] = 0;
 		victim->bit = SNAPSHOT_SQUASHED;
@@ -2511,7 +2688,6 @@ struct client
 	u32 flags; 
 };
 
-
 /*
  * Cross-client Locking strategy
  *
@@ -2652,7 +2828,7 @@ static void free_snaplock_wait(struct superblock *sb, struct snaplock_wait *p)
 
 static unsigned snaplock_hash(struct superblock *sb, chunk_t chunk)
 {
-	unsigned bin = ((u32)(chunk * 3498734713U)) >> (32 - sb->snaplock_hash_bits);
+	unsigned bin = ((u32)(chunk * 3498734713U)) >> (32 - sb->snaplock_hash_bits); // !!! wordsize braindamage !!!
 	assert(bin >= 0 && bin < (1 << sb->snaplock_hash_bits));
 	return bin;
 }
@@ -2910,9 +3086,6 @@ static void setup_sb(struct superblock *sb)
 	sb->copybuf_size = 32 * sb->snapdata.allocsize;
 	if ((err = posix_memalign((void **)&(sb->copybuf), SECTOR_SIZE, sb->copybuf_size)))
 	    error("unable to allocate buffer for copyout data: %s", strerror(err));
-	sb->snapmask = 0;
-	sb->flags = 0;
-
 	sb->max_commit_blocks = (sb->metadata.allocsize - sizeof(struct commit_block)) / sizeof(sector_t);
 
 	unsigned snaplock_hash_bits = 8;
@@ -2923,38 +3096,7 @@ static void setup_sb(struct superblock *sb)
 	sb->snapdata.asi = combined(sb) ? &(sb)->image.metadata : &(sb)->image.snapdata;
 }
 
-/* 
- * flag = 0: check if bits for chunks from start_chunk to end_chunk are all zero
- * flag = 1: set bits for chunks from start_chunk to end_chunk
- * flag = 2: clear bits for chunks from start_chunk to end_chunk
- */
-static int change_bits(struct superblock *sb, u64 start_chunk, u64 end_chunk, u64 base, int flag)
-{
-	u64 chunk;
-	unsigned bitmap_shift = sb->metadata.asi->allocsize_bits + 3;
-	u64 bitmap_mask = (1 << bitmap_shift ) - 1;
-	sector_t sector = (base >> SECTOR_BITS) + ((start_chunk >> bitmap_shift) << sb->metadata.chunk_sectors_bits);
-	warn("start_chunk %Lu, end_chunk %Lu, base %Lu, flag %d, sector %Lu", start_chunk, end_chunk, base, flag, sector);
-	for (chunk = start_chunk; chunk <= end_chunk; sector += chunk_sectors(&sb->metadata)) {
-		struct buffer *buffer = bread(sb->metadev, sector, sb->metadata.allocsize);
-		do {
-			if (!flag && get_bitmap_bit(buffer->data, chunk & bitmap_mask)) {
-				warn("chunk %Lu is in use", chunk);
-				return -1;
-			}
-			if (flag == 1)
-				set_bitmap_bit(buffer->data, chunk & bitmap_mask);
-			if (flag == 2)
-				clear_bitmap_bit(buffer->data, chunk & bitmap_mask);
-			chunk ++;
-		} while ((chunk & bitmap_mask) && (chunk <= end_chunk));
-		if (flag)
-			brelse_dirty(buffer);
-	}
-	return 0;
-}
-
-/* 
+/*
  * Shrink snapshot store: clear bits for shrinked space and free unused bitmap chunks
  * Expand snapshot store:
  *   If we don't need more bitmap chunks, just update last bytes.
@@ -2966,16 +3108,16 @@ static int change_bits(struct superblock *sb, u64 start_chunk, u64 end_chunk, u6
  *     Reserve new bitmap chunks in new bitmap
  */
 
-static int update_bitmap(struct superblock *sb, struct allocspace *as, u64 newchunks, u64 new_basechunk, u64 new_metachunks)
+static int adjust_bitmap(struct superblock *sb, struct allocspace *as, u64 newchunks, u64 new_basechunk, u64 new_metachunks)
 {
-	u64 oldchunks = as->asi->chunks;
+	chunk_t oldchunks = as->asi->chunks;
 	unsigned oldbitmaps = as->asi->bitmap_blocks;
 	unsigned newbitmaps = calc_bitmap_blocks(sb, newchunks);
-	u64 oldbase = as->asi->bitmap_base << SECTOR_BITS;
-	u64 newbase = new_basechunk << sb->metadata.asi->allocsize_bits;
+	chunk_t oldbase = as->asi->bitmap_base << SECTOR_BITS;
+	chunk_t newbase = new_basechunk << sb->metadata.asi->allocsize_bits;
 	unsigned blockshift = sb->metadata.asi->allocsize_bits;
 	unsigned blocksize = sb->metadata.allocsize;
-	u64 oldchunks_meta = oldbase >> sb->metadata.asi->allocsize_bits;
+	chunk_t oldchunks_meta = oldbase >> sb->metadata.asi->allocsize_bits;
 	sector_t sector;
 	int i;
 
@@ -2983,13 +3125,13 @@ static int update_bitmap(struct superblock *sb, struct allocspace *as, u64 newch
 	/* snapshot shrinking */
 	if (newchunks <= oldchunks) {
 		/* check if any chunk to be freed is currently in use */
-		if (change_bits(sb, newchunks, oldchunks - 1, oldbase, 0)) {
+		if (change_bits(sb, newchunks, oldchunks - newchunks, oldbase, 0)) {
 			warn("some chunks to be freed are still in use!!!");
 			return -1;
 		}
 		/* clear bits for unused bitmap chunks */
 		if (newbitmaps < oldbitmaps) {
-			change_bits(sb, oldchunks_meta + newbitmaps, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
+			change_bits(sb, oldchunks_meta + newbitmaps, oldbitmaps - newbitmaps, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
 			as->asi->bitmap_blocks = newbitmaps;
 		}
 		return 0;
@@ -3048,8 +3190,8 @@ static int update_bitmap(struct superblock *sb, struct allocspace *as, u64 newch
 	as->asi->bitmap_blocks = newbitmaps;
 
 	/* clear bits for old bitmap chunks and reserve new bitmap chunks at new bitmap base */
-	change_bits(sb, oldchunks_meta, oldchunks_meta + oldbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
-	change_bits(sb, new_basechunk, new_basechunk + newbitmaps - 1, sb->image.metadata.bitmap_base << SECTOR_BITS, 1);
+	change_bits(sb, oldchunks_meta, oldbitmaps, sb->image.metadata.bitmap_base << SECTOR_BITS, 2);
+	change_bits(sb, new_basechunk, newbitmaps, sb->image.metadata.bitmap_base << SECTOR_BITS, 1);
 	return 0;
 }
 
@@ -3067,7 +3209,7 @@ static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize,
 		if (sb->image.metadata.chunks) {
 			new_bitmap_basechunk = sb->image.metadata.chunks;
 			new_metachunks = metachunks - sb->image.metadata.chunks;
-			if (update_bitmap(sb, &sb->metadata, metachunks, new_bitmap_basechunk, new_metachunks) < 0)
+			if (adjust_bitmap(sb, &sb->metadata, metachunks, new_bitmap_basechunk, new_metachunks) < 0)
 				return -1;
 			new_bitmap_basechunk += sb->metadata.asi->bitmap_blocks;
 			new_metachunks -= sb->metadata.asi->bitmap_blocks;
@@ -3087,7 +3229,7 @@ static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize,
 			 */
 			if (sb->image.snapdata.chunks) {
 				u64 oldbitmaps = sb->image.snapdata.bitmap_blocks;
-				if (update_bitmap(sb, &sb->snapdata, snapchunks, new_bitmap_basechunk, new_metachunks) < 0)
+				if (adjust_bitmap(sb, &sb->snapdata, snapchunks, new_bitmap_basechunk, new_metachunks) < 0)
 					return -1;
 				sb->image.metadata.freechunks += oldbitmaps - sb->image.snapdata.bitmap_blocks;
 			}
@@ -3130,29 +3272,11 @@ static int sb_get_device_sizes(struct superblock *sb)
 	return 0;
 }
 
-static int load_sb(struct superblock *sb)
+static void save_sb_check(struct superblock *sb)
 {
-	if (diskread(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
-		error("Unable to read superblock: %s", strerror(errno));
-	assert(valid_sb(sb));
-	setup_sb(sb);
-	sb->snapmask = calc_snapmask(sb);
-	trace(printf("Active snapshot mask: %016llx\n", sb->snapmask););
-	if (sb_get_device_sizes(sb))
-		error("FIXME!!! don't exit from load_sb, return -1 instead");
-#if 0
-	// make this a startup option !!!
-	sb->metadata.chunks_used = sb->metadata.asi->chunks - count_free(sb, &sb->metadata);
-	if (combined(sb))
-		return;
-	sb->snapdata.chunks_used = sb->snapdata.asi->chunks - count_free(sb, &sb->snapdata);
-#endif
-	return 0;
-}
-
-static void save_state(struct superblock *sb)
-{
-	(void)flush_buffers();
+	commit_deferred_allocs(sb);
+	if (dirty_buffer_count)
+		warn("%i dirty buffers when all should be clean!", dirty_buffer_count);
 	save_sb(sb);
 }
 
@@ -3417,7 +3541,7 @@ static int incoming(struct superblock *sb, struct client *client)
 					}
 				}
 			finish_copyout(sb);
-			commit_transaction(sb);
+			commit_transaction(sb, 0);
 			/*
 			 * If waitfor_chunk() detected a pending readlock and
 			 * queued this write for it, just update the "pending"
@@ -3461,7 +3585,7 @@ static int incoming(struct superblock *sb, struct client *client)
 				*(snap.top)++ = exception;
 			}
 		finish_copyout(sb);
-		commit_transaction(sb);
+		commit_transaction(sb, 0);
 		finish_reply(client->sock, &snap, ret_msgcode, body->id);
 		break;
 	case QUERY_SNAPSHOT_READ:
@@ -3632,7 +3756,7 @@ static int incoming(struct superblock *sb, struct client *client)
 			outerror(sock, -err, error);
 			break;
 		}
-		save_state(sb);
+		save_sb_check(sb);
 		if (outbead(sock, CREATE_SNAPSHOT_OK, struct { }) < 0)
 			warn("unable to reply to create snapshot message");
 		break;
@@ -3647,7 +3771,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		else if (delete_snap(sb, snapshot))
 			outerror(sock, EIO, "fail to delete snapshot");
 		else {
-			save_state(sb);
+			save_sb_check(sb);
 			if (outbead(sock, DELETE_SNAPSHOT_OK, struct { }) < 0)
 				warn("unable to reply to delete snapshot message"); // !!! return message
 		}
@@ -3666,11 +3790,25 @@ static int incoming(struct superblock *sb, struct client *client)
 	case START_SERVER:
 	{
 		warn("Activating server");
-		load_sb(sb);
+		if (diskread(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
+			error("Unable to read superblock: %s", strerror(errno));
+		assert(valid_sb(sb));
+		setup_sb(sb);
+		sb->snapmask = calc_snapmask(sb);
+		trace(printf("Active snapshot mask: %016llx\n", sb->snapmask););
+		if (sb_get_device_sizes(sb))
+			error("FIXME!!! don't exit from load_sb, return -1 instead");
+#if 0
+		// make this a startup option !!!
+		sb->metadata.chunks_used = sb->metadata.asi->chunks - count_free(sb, &sb->metadata);
+		if (combined(sb))
+			return;
+		sb->snapdata.chunks_used = sb->snapdata.asi->chunks - count_free(sb, &sb->snapdata);
+#endif
 		if (sb->image.flags & SB_BUSY) {
 			warn("Server was not shut down properly");
 			//jtrace(show_journal(sb););
-			replay_journal(sb);
+			replay_journal(sb); // !!! handle error
 		} else {
 			sb->image.flags |= SB_BUSY;
 			set_sb_dirty(sb);
@@ -3982,11 +4120,11 @@ static int incoming(struct superblock *sb, struct client *client)
 
 static int cleanup(struct superblock *sb)
 {
-	event_hook(0, SHUTDOWN_SERVER);  /* event hook for abort action */
-	warn("cleaning up");
+	event_hook(0, SHUTDOWN_SERVER); /* event hook for abort action */
+	commit_deferred_allocs(sb);
 	sb->image.flags &= ~SB_BUSY;
 	set_sb_dirty(sb);
-	save_state(sb);
+	save_sb(sb);
 	return 0;
 }
 
@@ -4284,7 +4422,7 @@ int init_snapstore(int orgdev, int snapdev, int metadev, unsigned bs_bits, unsig
 		goto fail;
 	if (init_journal(sb) < 0)
 		goto fail;
-	save_state(sb);
+	save_sb_check(sb);
 	free(sb->copybuf);
 	free(sb->snaplocks);
 	free(sb);
@@ -4294,9 +4432,15 @@ fail:
 	return -1;
 }
 
-int start_server(int orgdev, int snapdev, int metadev, char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile, int nobg, unsigned long long cachesize_bytes)
+int start_server(
+	int orgdev, int snapdev, int metadev, 
+	char const *agent_sockname, char const *server_sockname, char const *logfile, char const *pidfile,
+	int nobg, uint64_t cachesize_bytes, enum runflags flags)
 {
 	struct superblock *sb = new_sb(metadev, orgdev, snapdev);
+
+	if (!sb)
+		error("unable to allocate superblock\n");
 
 	if (diskread(sb->metadev, &sb->image, 4096, SB_SECTOR << SECTOR_BITS) < 0)
 		warn("Unable to read superblock: %s", strerror(errno));
@@ -4305,6 +4449,7 @@ int start_server(int orgdev, int snapdev, int metadev, char const *agent_socknam
 
 	if (!valid_sb(sb))
 		error("Invalid superblock: please run 'ddsnap-sb' first to upgrade the superblock.\n");
+	sb->runflags = flags;
 
 	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;
 	if (cachesize_bytes == 0) {
