@@ -23,7 +23,7 @@ export DDSNAP_COUNT=1
 ddsnap initialize -y -c 8k $DEV1NAME $DEV2NAME
 
 ddsnap agent --logfile /tmp/srcagt.log /tmp/src.control
-ddsnap server --logfile /tmp/srcsvr.log $DEV1NAME $DEV2NAME /tmp/src.control /tmp/src.server
+ddsnap server --logfile /tmp/srcsvr.log $DEV1NAME $DEV2NAME /tmp/src.control /tmp/src.server -X -D
 sleep 3
 
 size=`ddsnap status /tmp/src.server --size`
