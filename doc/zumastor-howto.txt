@@ -104,7 +104,7 @@ added a way to run our autobuilder tests before committing changes.)
 See
 http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
 
-Version 0.5, released on 10 Jan 1008,
+Version 0.5, released on 10 Jan 2008,
 added support for volumes larger than 2TB
 and for exporting snapshots via NFS and CIFS.  See 
 http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&can=1[our issue tracker for the full list of fixed issues].  
