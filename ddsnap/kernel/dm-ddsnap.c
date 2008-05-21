@@ -189,6 +189,7 @@ struct devinfo {
 	struct dm_dev *snapdev;
 	struct file *sock;
 	struct file *control_socket;
+	char *control_socket_path;
 	struct semaphore server_in_sem;
 	struct semaphore server_out_sem;
 	struct semaphore more_work_sem;
@@ -1341,6 +1342,7 @@ static void ddsnap_destroy(struct dm_target *target)
 		dm_put_device(target, info->orgdev);
 	snprintf(proc_name, 8, "%d", info->snap); 
 	ddsnap_remove_proc(proc_name);
+	kfree(info->control_socket_path);
 	kfree(info);
 }
 
@@ -1424,6 +1426,12 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 		.chunksize_bits = chunksize_bits,
 		.chunkshift = chunksize_bits - SECTOR_SHIFT};
 	target->private = info;
+
+	if (!(info->control_socket_path = 
+			kmalloc(strlen(argv[2] + 1), GFP_NOIO|__GFP_NOFAIL)))
+		goto eek;
+	strcpy(info->control_socket_path, argv[2]);
+
 	sema_init(&info->server_in_sem, 0);
 	sema_init(&info->server_out_sem, 0);
 	sema_init(&info->recover_sem, 0);
@@ -1505,8 +1513,8 @@ static int ddsnap_status(struct dm_target *target, status_type_t type, char *res
 	case STATUSTYPE_TABLE:
 		format_dev_t(orgbuffer, info->orgdev->bdev->bd_dev);
 		format_dev_t(snapbuffer, info->snapdev->bdev->bd_dev);
-		snprintf(result, maxlen, "%s %s %u",
-			 orgbuffer, snapbuffer, 1 << info->chunksize_bits);
+		snprintf(result, maxlen, "%s %s %s %d",
+			 snapbuffer, orgbuffer, info->control_socket_path, info->snap);
 		break;
 	}
 
@@ -1515,7 +1523,7 @@ static int ddsnap_status(struct dm_target *target, status_type_t type, char *res
 
 static struct target_type ddsnap = {
 	.name = "ddsnap",
-	.version = {0, 0, 0},
+	.version = {0, 0, 1},
 	.module = THIS_MODULE,
 	.ctr = ddsnap_create,
 	.dtr = ddsnap_destroy,
