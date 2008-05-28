@@ -17,6 +17,7 @@
 #include <linux/sysrq.h>
 #include <linux/jiffies.h>
 #include <linux/vmalloc.h>
+#include <linux/dm-ioctl.h>
 #include "dm.h"
 #include "dm-ddsnap.h"
 
@@ -190,6 +191,7 @@ struct devinfo {
 	struct file *sock;
 	struct file *control_socket;
 	char *control_socket_path;
+	char *devname;
 	struct semaphore server_in_sem;
 	struct semaphore server_out_sem;
 	struct semaphore more_work_sem;
@@ -1287,11 +1289,27 @@ static struct sysrq_key_op sysrq_ddsnap_op = {
 };
 /* end of sysrq operation */
 
+static char *ddsnap_get_device_name(struct dm_target *target)
+{
+	char *devname, *uuid;
+	int err;
+	struct mapped_device *md;
+	if (!(devname = kmalloc(DM_NAME_LEN, GFP_NOIO|__GFP_NOFAIL)) || !(uuid = kmalloc(DM_UUID_LEN, GFP_NOIO|__GFP_NOFAIL)))
+		return NULL;
+	md = dm_table_get_md(target->table);
+	if ((err = dm_copy_name_and_uuid(md, devname, uuid))) {
+		warn("dm_copy_name_and_uuid() failed, err %d", err);
+		return NULL;
+	}
+	dm_put(md);
+	kfree(uuid);
+	return devname;
+}
+
 static void ddsnap_destroy(struct dm_target *target)
 {
 	struct devinfo *info = target->private;
 	int err; /* I have no mouth but I must scream */
-	char proc_name[8];
 	trace(warn("%p", target);)
 	if (!info)
 		return;
@@ -1340,8 +1358,9 @@ static void ddsnap_destroy(struct dm_target *target)
 		dm_put_device(target, info->snapdev);
 	if (info->orgdev)
 		dm_put_device(target, info->orgdev);
-	snprintf(proc_name, 8, "%d", info->snap); 
-	ddsnap_remove_proc(proc_name);
+	if (info->devname)
+		ddsnap_remove_proc(info->devname);
+	kfree(info->devname);
 	kfree(info->control_socket_path);
 	kfree(info);
 }
@@ -1468,7 +1487,9 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 	if ((err = kernel_thread((void *)control, target, CLONE_FILES)) < 0)
 		goto eek;
 	warn("Created snapshot device snapstore=%s origin=%s socket=%s snapshot=%i", argv[0], argv[1], argv[2], snap);
-	ddsnap_add_proc(argv[3], target); // use snapshot number as file name
+
+	if ((info->devname = ddsnap_get_device_name(target)) != NULL)
+		ddsnap_add_proc(info->devname, target); // !!! Need to fix the device renaming case.
 
 	/*
 	 * This down call needs to be interruptible. Otherwise, a 'dmsetup create' command
