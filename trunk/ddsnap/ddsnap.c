@@ -1887,6 +1887,12 @@ static int ddsnap_get_status(int serv_fd, u32 snaptag, int verbose)
 		printf("\n");
 
 		free(column_totals);
+
+		if (separate)
+			commas(number1, sizeof(number1), (reply->meta.total - reply->meta.free) << reply->meta.chunksize_bits);
+		else
+			commas(number1, sizeof(number1), (reply->meta.total - reply->meta.free - total_chunks) << reply->meta.chunksize_bits);
+		printf("Metadata usage: %s bytes\n", number1);
 	}
 
 	free(reply);
