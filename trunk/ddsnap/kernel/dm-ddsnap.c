@@ -1577,7 +1577,7 @@ int __init dm_ddsnap_init(void)
 	ddsnap_proc_root = proc_mkdir("ddsnap", proc_root_driver);
 	if (!ddsnap_proc_root) {
 		info("cannot create /proc/driver/ddsnap entry\n");
-		goto bad3;
+		goto bad4;
 	}
 	ddsnap_proc_root->owner = THIS_MODULE;
 
@@ -1585,6 +1585,9 @@ int __init dm_ddsnap_init(void)
 	sema_init(&ddsnap_proc_sem, 1);
 
 	return 0;
+bad4:
+	if ((err = dm_unregister_target(&ddsnap)))
+		DMERR("Snapshot unregister failed %d", err);
 bad3:
 	kmem_cache_destroy(end_io_cache);
 bad2:

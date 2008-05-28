@@ -55,7 +55,7 @@ fi
 
 # Get the svn revision number from the file REVISION, svnversion, or by scraping
 # the output of svn log, in order until one is successful
-REVISION=`awk '/^[0-9]+$/ { print $1; }' REVISION || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+REVISION=`awk '/^[0-9]+$/ { print $1; }' REVISION 2>/dev/null || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 if echo "x$REVISION" | grep -q ':'
 then
   echo "Split repository.  Go to the top of the tree and do 'svn update'!"
