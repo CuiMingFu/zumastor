@@ -23,16 +23,39 @@ fi
 
 ARCH=`dpkg --print-architecture`
 
+[ -f /etc/lsb-release ] && . /etc/lsb-release
+
+pick_dist_ver() {
+  if [ "x$DISTRIB_CODENAME" = "xhardy" ] || [ "x$DISTRIB_CODENAME" = "xintrepid" ]
+  then
+    echo "hardy"
+    return 0
+  else
+    echo "etch"
+    return 0
+  fi
+}
+
+pick_dist() {
+  if [ "x$DISTRIB_CODENAME" = "xhardy" ] || [ "x$DISTRIB_CODENAME" = "xintrepid" ]
+  then
+    echo "ubuntu"
+    return 0
+  else
+    echo "debian"
+    return 0
+  fi
+}
+
 if [ "x$DIST" = "x" ]
 then
-  DIST=hardy
+  DIST=`pick_dist_ver`
 fi
 
 if [ "x$LINUXDISTRIBUTION" = "x" ]
 then
-  LINUXDISTRIBUTION=ubuntu
+  LINUXDISTRIBUTION=`pick_dist`
 fi
-
 
 echo "Starting to smoke-test zumastor"
 echo "Using $LINUXDISTRIBUTION $DIST for $ARCH"
