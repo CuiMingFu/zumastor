@@ -72,11 +72,15 @@ SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null
 TIME=`date +%s`
-if [ `uname -m || echo i386` = "x86_64" ]
+ARCH="$ARCH"
+if [ -z "$ARCH" ]
 then
-  ARCH=amd64
-else
-  ARCH=i386
+  if [ `uname -m || echo i386` = "x86_64" ]
+  then
+    ARCH=amd64
+  else
+    ARCH=i386
+  fi
 fi
 HOSTARCH=$ARCH
 
