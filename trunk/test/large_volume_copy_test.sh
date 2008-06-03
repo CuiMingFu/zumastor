@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copy a large volume to an exported zumastor volume via nfs, with hourly 
+# Copy a large volume to an exported zumastor volume via nfs, with hourly
 # replication running between the zumastor-nfs server and a backup server.
 #
 # Copyright 2007 Google Inc. All rights reserved.
@@ -10,36 +10,35 @@ set -e
 # change the configurations according to the machine setup
 source="host1.debian.org"
 target="host2.debian.org"
-target_port=11235
 vol="software"
-source_orgdev="/dev/sysvg/vol-1G"
-source_snapdev="/dev/sysvg/vol-2G"
-target_orgdev="/dev/sysvg2/vol-3G"
-target_snapdev="/dev/sysvg2/vol-10G"
+source_orgdev="/dev/sysvg/vol-350G"
+source_snapdev="/dev/sysvg/vol-100G"
+target_orgdev="/dev/sysvg/vol-350G"
+target_snapdev="/dev/sysvg/vol-100G"
 copy_path="/terabyte-volume"
 notifyemail="zumastor@debian.org"
 
 install_packages="true"
-reboot_after_install="true" # set this to false if you want to check grub and reboot manually
-version="0.7.0"
+reboot_after_install="fale" # set this to false if you want to check grub and reboot manually
+version="0.9.0"
 SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
 SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
 function ssh_setup {
 	local -r host=$1
-	if ! ssh $SSH_OPTS $host "/bin/true"; then
+	if ! ssh $SSH_OPTS -o PasswordAuthentication=false $host "/bin/true"; then
 		echo "set up ssh access to host $host"
-		scp $SCP_OPTS ~/.ssh/id_dsa.pub root@$host:/tmp/
-		ssh $SSH_OPTS $host "cat /tmp/id_dsa.pub >> /root/.ssh/authorized_keys"
+		scp $SCP_OPTS ~/.ssh/id_rsa.pub root@$host:/tmp/
+		ssh $SSH_OPTS $host "cat /tmp/id_rsa.pub >> /root/.ssh/authorized_keys"
 	fi
 }
 
 function remote_ssh_setup {
 	local -r source=$1
 	local -r target=$2
-	if ! ssh $SSH_OPTS $source "ssh $SSH_OPTS $target /bin/true"; then
-		ssh $SSH_OPTS $source "ls /root/.ssh/id_dsa.pub" || ssh $SSH_OPTS $source "ssh-keygen -t dsa -f /root/.ssh/id_dsa -P ''"
-		scp $SCP_OPTS root@$source:/root/.ssh/id_dsa.pub ~/.ssh/$source.pub
+	if ! ssh $SSH_OPTS $source "ssh $SSH_OPTS -o PasswordAuthentication=false $target /bin/true"; then
+		ssh $SSH_OPTS $source "ls /root/.ssh/id_rsa.pub" || ssh $SSH_OPTS $source "ssh-keygen -t rsa -f /root/.ssh/id_rsa -P ''"
+		scp $SCP_OPTS root@$source:/root/.ssh/id_rsa.pub ~/.ssh/$source.pub
 		scp $SCP_OPTS ~/.ssh/$source.pub root@$target:/root/.ssh/
 		ssh $SSH_OPTS $target "cat /root/.ssh/$source.pub >> /root/.ssh/authorized_keys"
 	fi
@@ -54,17 +53,17 @@ function zuma_install {
 	rm -rf zumabuild
 	mkdir zumabuild
 	cd zumabuild
-	wget http://zumabuild/trunk/buildrev
-	read revision < buildrev
+	wget http://zumabuild/trunk/testrev
+	read revision <testrev
 	echo version $version revision $revision
 	wget http://zumabuild/trunk/r$revision/ddsnap_${version}-r${revision}_i386.deb
-	wget http://zumabuild/trunk/r$revision/zumastor_${version}-r${revision}_i386.deb
+	wget http://zumabuild/trunk/r$revision/zumastor_${version}-r${revision}_all.deb
 	wget http://zumabuild/trunk/kernel-headers-build_i386.deb
 	wget http://zumabuild/trunk/kernel-image-build_i386.deb
 	cd ..
-	#ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
-	#scp $SCP_OPTS -r zumabuild root@$source:/root/
-	#ssh $SSH_OPTS $source "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $source"; exit 1; }
+	ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
+	scp $SCP_OPTS -r zumabuild root@$source:/root/
+	ssh $SSH_OPTS $source "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $source"; exit 1; }
 	ssh $SSH_OPTS $target "rm -rf /root/zumabuild"
 	scp $SCP_OPTS -r zumabuild root@$target:/root/
 	ssh $SSH_OPTS $target "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $target"; exit 1; }
@@ -130,10 +129,11 @@ function monitor_replication {
 	pgrep rsync >& /dev/null || { echo | mail -s 'ZUMASTOR LARGE VOLUME COPY TEST FINISHED' $notifyemail ; exit 0; }
 }
 
+[[ $# -eq 1 ]] || { echo "usage: $0 install|start|monitor|stop"; exit 1; }
 case $1 in
 install)
 # initial ssh setup, requires user interaction
-[[ -e ~/.ssh/id_dsa.pub ]] || ssh-keygen -t dsa -f ~/.ssh/id_dsa -P ''
+[[ -e ~/.ssh/id_rsa.pub ]] || ssh-keygen -t rsa -f ~/.ssh/id_rsa -P ''
 ssh_setup $source
 ssh_setup $target
 remote_ssh_setup $source $target
@@ -187,5 +187,9 @@ ssh $SSH_OPTS $source "zumastor forget volume $vol"
 ssh $SSH_OPTS $source "/etc/init.d/nfs-kernel-server start"
 ssh $SSH_OPTS $target "zumastor forget volume $vol"
 ;;
+
+*)
+echo "usage: $0 install|start|monitor|stop"
+exit 1
 
 esac
