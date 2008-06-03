@@ -10,6 +10,7 @@ fi
 DOWNLOAD_CACHE="$ZUMA_REPOSITORY/build"
 fs_image=Debian-4.0-x86-root_fs
 WORKDIR="working"
+ARCH=i386
 
 LOG=`mktemp`
 host_tap_ip=192.168.100.111
@@ -17,4 +18,4 @@ host_tap_ip=192.168.100.111
 SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
 SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
-SKIP_CHECKSUM_CHECKING=no
+SKIP_CHECKSUM_CHECKING=yes
