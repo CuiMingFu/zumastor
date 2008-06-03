@@ -19,12 +19,12 @@ copy_path="/terabyte-volume"
 notifyemail="zumastor@debian.org"
 
 install_packages="true"
-reboot_after_install="fale" # set this to false if you want to check grub and reboot manually
+reboot_after_install="false" # set this to false if you want to check grub and reboot manually
 version="0.9.0"
 SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
 SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
-function ssh_setup {
+ssh_setup() {
 	local -r host=$1
 	if ! ssh $SSH_OPTS -o PasswordAuthentication=false $host "/bin/true"; then
 		echo "set up ssh access to host $host"
@@ -33,7 +33,7 @@ function ssh_setup {
 	fi
 }
 
-function remote_ssh_setup {
+remote_ssh_setup() {
 	local -r source=$1
 	local -r target=$2
 	if ! ssh $SSH_OPTS $source "ssh $SSH_OPTS -o PasswordAuthentication=false $target /bin/true"; then
@@ -44,7 +44,7 @@ function remote_ssh_setup {
 	fi
 }
 
-function zuma_install {
+zuma_install() {
 	local -r version=$1
 	local -r source=$2
 	local -r target=$3
@@ -69,7 +69,7 @@ function zuma_install {
 	ssh $SSH_OPTS $target "dpkg -i --force-confnew /root/zumabuild/*.deb" || { echo "fail to install zumastor packages on host $target"; exit 1; }
 }
 
-function check_ready {
+check_ready() {
 	local -r host=$1
 	local revision version
 	ssh_ready="false"
@@ -95,7 +95,7 @@ function check_ready {
 	return 0
 }
 
-function monitor_replication {
+monitor_replication() {
 	local -r vol=$1
 	local smodify tmodify scurrent tcurrent shangtime thangtime
 
