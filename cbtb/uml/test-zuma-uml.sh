@@ -47,6 +47,7 @@ fi
 retval=0
 
 execfiles="$*"
+testname=`echo "$execfiles" | tr -s " " | sed -e "s: :+:g" -e "s:/:_:g"`
 
 if [ "x$MACFILE" = "x" -o "x$MACADDR" = "x" -o "x$IFACE" = "x" \
      -o "x$IPADDR" = "x" ] ; then
@@ -144,29 +145,39 @@ if [ $largest_hddsize -gt 0 ] ; then
   fi
 fi
 
+exec 5>$build/r${SVNREV}/bootlog-$testname-1.log
 $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
   ubd0=${tmpdir}/hda.img,$templateimg $hd \
   mem=512M \
   eth0=tuntap,$IFACE,$MACADDR,$VIRTHOST \
+  con0=fd:5,fd:5 \
   con=null \
   & uml_pid=$!
+exec 5>&-
+
 
 if [ "x$MACADDR2" != "x" ] ; then
+  exec 6>$build/r${SVNREV}/bootlog-$testname-2.log
   $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
     ubd0=${tmpdir}/hda2.img,$templateimg $hd2 \
     mem=512M \
     eth0=tuntap,$IFACE2,$MACADDR2,$VIRTHOST \
+    con0=fd:6,fd:6 \
     con=null \
     & uml2_pid=$!
+  exec 6>&-
 fi
 
 if [ "x$MACADDR3" != "x" ] ; then
+  exec 7>$build/r${SVNREV}/bootlog-$testname-3.log
   $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
     ubd0=${tmpdir}/hda3.img,$templateimg $hd3 \
     mem=512M \
     eth0=tuntap,$IFACE3,$MACADDR3,$VIRTHOST \
+    con0=fd:7,fd:7 \
     con=null \
     & uml3_pid=$!
+  exec 7>&-
 fi
 
 
