@@ -18,14 +18,14 @@ popd
 
 echo Applying patches...
 cd linux-${KERNEL_VERSION} || exit 1
-for patch in $ZUMA_REPOSITORY/zumastor/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/ddsnap/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/*; do
+for patch in `ls $ZUMA_REPOSITORY/zumastor/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/ddsnap/patches/${KERNEL_VERSION}/* $ZUMA_REPOSITORY/test/uml/patches/${KERNEL_VERSION}/* 2>/dev/null`; do
         echo "   $patch"
         < $patch patch -p1 || exit 1
 done
 echo -e "done.\n"
 
 echo -n Building kernel...
-cp $ZUMA_REPOSITORY/kernel/config/${KERNEL_VERSION}-um-uml .config
+cp $ZUMA_REPOSITORY/kernel/config/${KERNEL_VERSION}-um-${ARCH}-uml .config
 make oldconfig ARCH=um || exit 1
 make linux ARCH=um || exit 1
 cd ..

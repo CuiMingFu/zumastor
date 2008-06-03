@@ -21,8 +21,8 @@ cp /etc/resolv.conf /mnt/etc/resolv.conf \
 	|| umount_exit 'Failed to copy resolv.conf to UML'
 echo "deb ftp://ftp.us.debian.org/debian/ stable main contrib non-free" > /mnt/etc/apt/sources.list
 chroot /mnt apt-get -q update
-chroot /mnt dpkg -s build-essential liburi-perl libpopt-dev zlib1g-dev \
-	|| chroot /mnt apt-get -q -y install build-essential liburi-perl libpopt-dev zlib1g-dev
+chroot /mnt dpkg -s build-essential liburi-perl libpopt-dev zlib1g-dev rsync \
+	|| chroot /mnt apt-get -q -y install build-essential liburi-perl libpopt-dev zlib1g-dev rsync
 chroot /mnt dpkg -s devscripts fakeroot debhelper \
 	|| chroot /mnt apt-get -q -y install devscripts fakeroot debhelper
 echo -e "done.\n"
