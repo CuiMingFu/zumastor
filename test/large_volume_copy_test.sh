@@ -8,25 +8,39 @@
 set -e
 
 # change the configurations according to the machine setup
-source="host1.debian.org"
-target="host2.debian.org"
-vol="software"
-source_orgdev="/dev/sysvg/vol-350G"
-source_snapdev="/dev/sysvg/vol-100G"
-target_orgdev="/dev/sysvg/vol-350G"
-target_snapdev="/dev/sysvg/vol-100G"
-copy_path="/terabyte-volume"
-notifyemail="zumastor@debian.org"
+################################################################
+# Source/target machine fqdns
+test -n "$SOURCE_MACHINE" || SOURCE_MACHINE="host1.debian.org"
+test -n "$TARGET_MACHINE" || TARGET_MACHINE="host1.debian.org"
+# Name to use with zumastor define volume
+test -n "$VOLUME_NAME"    || VOLUME_NAME="software"
+# Source/target machine orgin/snapshot device names
+test -n "$SOURCE_ORGDEV"  || SOURCE_ORGDEV="/dev/sysvg/vol-350G"
+test -n "$SOURCE_SNAPDEV" || SOURCE_SNAPDEV="/dev/sysvg/vol-100G"
+test -n "$TARGET_ORGDEV"  || TARGET_ORGDEV="/dev/sysvg/vol-350G"
+test -n "$TARGET_SNAPDEV" || TARGET_SNAPDEV="/dev/sysvg/vol-100G"
+# Source to get data to use in the big copy test run
+test -n "$COPY_SOURCE"    || COPY_SOURCE="/terabyte-volume"
+# Email address to send status updates to
+test -n "$NOTIFY_EMAIL"   || NOTIFY_EMAIL="zumastor@debian.org"
+# Should the test install packages?
+test -n "$INSTALL_PKGS"   || INSTALL_PKGS="true"
+# set this to false if you want to check grub and reboot manually
+test -n "$AUTO_REBOOT"    || AUTO_REBOOT="false"
+# Version of zumastor to test
+test -n "$ZUMASTOR_VER"   || ZUMASTOR_VER="0.9.0"
+# HTTP Base for downloading packages
+test -n "$HTTP_BASE"      || HTTP_BASE="http://zumabuild"
+################################################################
 
-install_packages="true"
-reboot_after_install="false" # set this to false if you want to check grub and reboot manually
-version="0.9.0"
 SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q -l root"
 SCP_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -q"
 
+
 ssh_setup() {
-	local -r host=$1
-	if ! ssh $SSH_OPTS -o PasswordAuthentication=false $host "/bin/true"; then
+	local host=$1
+	if ! ssh $SSH_OPTS -o PasswordAuthentication=false $host "/bin/true"
+	then
 		echo "set up ssh access to host $host"
 		scp $SCP_OPTS ~/.ssh/id_rsa.pub root@$host:/tmp/
 		ssh $SSH_OPTS $host "cat /tmp/id_rsa.pub >> /root/.ssh/authorized_keys"
@@ -34,9 +48,10 @@ ssh_setup() {
 }
 
 remote_ssh_setup() {
-	local -r source=$1
-	local -r target=$2
-	if ! ssh $SSH_OPTS $source "ssh $SSH_OPTS -o PasswordAuthentication=false $target /bin/true"; then
+	local source=$1
+	local target=$2
+	if ! ssh $SSH_OPTS $source "ssh $SSH_OPTS -o PasswordAuthentication=false $target /bin/true"
+	then
 		ssh $SSH_OPTS $source "ls /root/.ssh/id_rsa.pub" || ssh $SSH_OPTS $source "ssh-keygen -t rsa -f /root/.ssh/id_rsa -P ''"
 		scp $SCP_OPTS root@$source:/root/.ssh/id_rsa.pub ~/.ssh/$source.pub
 		scp $SCP_OPTS ~/.ssh/$source.pub root@$target:/root/.ssh/
@@ -45,21 +60,21 @@ remote_ssh_setup() {
 }
 
 zuma_install() {
-	local -r version=$1
-	local -r source=$2
-	local -r target=$3
+	local version=$1
+	local source=$2
+	local target=$3
 	local revision
 
 	rm -rf zumabuild
 	mkdir zumabuild
 	cd zumabuild
-	wget http://zumabuild/trunk/testrev
+	wget $HTTP_BASE/trunk/testrev
 	read revision <testrev
 	echo version $version revision $revision
-	wget http://zumabuild/trunk/r$revision/ddsnap_${version}-r${revision}_i386.deb
-	wget http://zumabuild/trunk/r$revision/zumastor_${version}-r${revision}_all.deb
-	wget http://zumabuild/trunk/kernel-headers-build_i386.deb
-	wget http://zumabuild/trunk/kernel-image-build_i386.deb
+	wget $HTTP_BASE/trunk/r$revision/ddsnap_${version}-r${revision}_i386.deb
+	wget $HTTP_BASE/trunk/r$revision/zumastor_${version}-r${revision}_all.deb
+	wget $HTTP_BASE/trunk/kernel-headers-build_i386.deb
+	wget $HTTP_BASE/trunk/kernel-image-build_i386.deb
 	cd ..
 	ssh $SSH_OPTS $source "rm -rf /root/zumabuild"
 	scp $SCP_OPTS -r zumabuild root@$source:/root/
@@ -70,56 +85,58 @@ zuma_install() {
 }
 
 check_ready() {
-	local -r host=$1
+	local host=$1
 	local revision version
 	ssh_ready="false"
 	for i in `seq 10`; do
-		 if ssh $SSH_OPTS $host "/bin/true"; then
+		if ssh $SSH_OPTS $host "/bin/true"
+		then
 			ssh_ready="true"
 			break;
 		fi
 		sleep 20
 	done
-	[[ $ssh_ready == "false" ]] && return 1
+	[ $ssh_ready = "false" ] && return 1
 
 	read revision < zumabuild/buildrev
 	version=`ssh $SSH_OPTS $host "zumastor --version" | awk '{ print $4 }'`
-	[[ $version = $revision ]] || { echo "fail to install zumastor-$revision package"; exit 1; }
+	[ $version = $revision ] || { echo "fail to install zumastor-$revision package"; exit 1; }
 	version=`ssh $SSH_OPTS $host "ddsnap --version" |  head -n 1 | cut -d "\"" -f 2`
-	[[ $version = $revision ]] || { echo "fail to install ddsnap-$revision package"; exit 1; }
+	[ $version = $revision ] || { echo "fail to install ddsnap-$revision package"; exit 1; }
 	revision=`dpkg -I zumabuild/kernel-image-build_i386.deb | awk '/Description:/ { print $8 }'`
 	revision=${revision/%./}
 	version=`ssh $SSH_OPTS $host "uname -r"`
-	[[ $version = $revision ]] || { echo "fail to install kernel-image-$revision package"; exit 1; }
+	[ $version = $revision ] || { echo "fail to install kernel-image-$revision package"; exit 1; }
 
 	return 0
 }
 
 monitor_replication() {
-	local -r vol=$1
+	local vol=$1
 	local smodify tmodify scurrent tcurrent shangtime thangtime
 
-	if ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$vol/targets/$target/send >& /dev/null"; then
-		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target/send"`
-	elif ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$vol/targets/$target/hold >& /dev/null"; then
-		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target/hold"`
+	if ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$VOLUME_NAME/targets/$target/send >& /dev/null"; then
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/targets/$target/send"`
+	elif ssh $SSH_OPTS $source "ls /var/lib/zumastor/volumes/$VOLUME_NAME/targets/$target/hold >& /dev/null"; then
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/targets/$target/hold"`
 	else
-		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$vol/targets/$target"`
+		smodify=`ssh $SSH_OPTS $source "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/targets/$target"`
 	fi
 
-	if ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$vol/source/apply >& /dev/null"; then
-		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source/apply"`
-	elif ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$vol/source/hold >& /dev/null"; then
-		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source/hold"`
+	if ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$VOLUME_NAME/source/apply >& /dev/null"; then
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/source/apply"`
+	elif ssh $SSH_OPTS $target "ls /var/lib/zumastor/volumes/$VOLUME_NAME/source/hold >& /dev/null"; then
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/source/hold"`
 	else
-		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$vol/source"`
+		tmodify=`ssh $SSH_OPTS $target "stat -c %Y /var/lib/zumastor/volumes/$VOLUME_NAME/source"`
 	fi
 
 	scurrent=`ssh $SSH_OPTS $source "date +%s"`
 	tcurrent=`ssh $SSH_OPTS $target "date +%s"`
-	shangtime=$(( scurrent - smodify ))
-	thangtime=$(( tcurrent - tmodify ))
-	if [[ $shangtime -ge 14400 || $thangtime -ge 14400 ]]; then
+	shangtime=$(( $scurrent - $smodify ))
+	thangtime=$(( $tcurrent - $tmodify ))
+	if [ $shangtime -ge 14400 ] || [ $thangtime -ge 14400 ]
+	then
 		echo "replication has stopped for four hours"
 		echo | mail -s 'ZUMASTOR LARGE VOLUME COPY TEST HANGING' $notifyemail
 		exit 1
@@ -129,63 +146,65 @@ monitor_replication() {
 	pgrep rsync >& /dev/null || { echo | mail -s 'ZUMASTOR LARGE VOLUME COPY TEST FINISHED' $notifyemail ; exit 0; }
 }
 
-[[ $# -eq 1 ]] || { echo "usage: $0 install|start|monitor|stop"; exit 1; }
+[ $# -eq 1 ] || { echo "usage: $0 install|start|monitor|stop"; exit 1; }
 case $1 in
 install)
 # initial ssh setup, requires user interaction
-[[ -e ~/.ssh/id_rsa.pub ]] || ssh-keygen -t rsa -f ~/.ssh/id_rsa -P ''
-ssh_setup $source
-ssh_setup $target
-remote_ssh_setup $source $target
-remote_ssh_setup $target $source
+[ -e ~/.ssh/id_rsa.pub ] || ssh-keygen -t rsa -f ~/.ssh/id_rsa -P ''
+ssh_setup $SOURCE_MACHINE
+ssh_setup $TARGET_MACHINE
+remote_ssh_setup $SOURCE_MACHINE $TARGET_MACHINE
+remote_ssh_setup $TARGET_MACHINE $SOURCE_MACHINE
 
 # install/upgrade zumastor packages
-[[ $install_packages == "true" ]] && zuma_install $version $source $target
-if [[ $reboot_after_install == "true" ]]; then
-	ssh $SSH_OPTS $source "reboot"
-	ssh $SSH_OPTS $target "reboot"
+[ "x$INSTALL_PKGS" = "xtrue" ] && zuma_install $ZUMASTOR_VER $SOURCE_MACHINE $TARGET_MACHINE
+if [ "x$AUTO_REBOOT" = "xtrue" ]
+then
+	ssh $SSH_OPTS $SOURCE_MACHINE "reboot"
+	ssh $SSH_OPTS $TARGET_MACHINE "reboot"
 	sleep 30
-	check_ready $source || { echo "fail to reboot host $source"; exit 1; }
-	check_ready $target || { echo "fail to reboot host $target"; exit 1; }
+	check_ready $SOURCE_MACHINE || { echo "fail to reboot host $SOURCE_MACHINE"; exit 1; }
+	check_ready $TARGET_MACHINE || { echo "fail to reboot host $TARGET_MACHINE"; exit 1; }
 fi
 ;;
 
 start)
 # zumastor volume/replication setup and the initial replication cycle
-ssh $SSH_OPTS $source "zumastor define volume -i $vol $source_orgdev $source_snapdev"
-ssh $SSH_OPTS $source "mkfs.ext3 /dev/mapper/$vol"
-ssh $SSH_OPTS $source "zumastor define master $vol"
-ssh $SSH_OPTS $source "zumastor define schedule $vol -h 24 -d 7"
-ssh $SSH_OPTS $source "zumastor define target $vol $target"
-ssh $SSH_OPTS $target "zumastor define volume -i $vol $target_orgdev $target_snapdev"
-ssh $SSH_OPTS $target "zumastor define source $vol $source -p 3600 -m"
-ssh $SSH_OPTS $target "zumastor define schedule $vol -h 24 -d 7"
-ssh $SSH_OPTS $target "zumastor start source $vol"
+ssh $SSH_OPTS $SOURCE_MACHINE "zumastor define volume -i $VOLUME_NAME $SOURCE_ORGDEV $SOURCE_SNAPDEV"
+ssh $SSH_OPTS $SOURCE_MACHINE "mkfs.ext3 /dev/mapper/$VOLUME_NAME"
+ssh $SSH_OPTS $SOURCE_MACHINE "zumastor define master $VOLUME_NAME"
+ssh $SSH_OPTS $SOURCE_MACHINE "zumastor define schedule $VOLUME_NAME -h 24 -d 7"
+ssh $SSH_OPTS $SOURCE_MACHINE "zumastor define target $VOLUME_NAME $TARGET_MACHINE"
+ssh $SSH_OPTS $TARGET_MACHINE "zumastor define volume -i $VOLUME_NAME $TARGET_ORGDEV $TARGET_SNAPDEV"
+ssh $SSH_OPTS $TARGET_MACHINE "zumastor define source $VOLUME_NAME $SOURCE_MACHINE -p 3600 -m"
+ssh $SSH_OPTS $TARGET_MACHINE "zumastor define schedule $VOLUME_NAME -h 24 -d 7"
+ssh $SSH_OPTS $TARGET_MACHINE "zumastor start source $VOLUME_NAME"
 
 # set up nfs access
-ssh $SSH_OPTS $source "exportfs -o'rw,fsid=1000,crossmnt,nohide' *:/var/run/zumastor/mount/$vol"
-ssh $SSH_OPTS $source "chmod a+rw /var/run/zumastor/mount/$vol"
-[[ -e /zsoftware ]] || { sudo mkdir /zsoftware; sudo chmod a+rwx /zsoftware; }
-sudo mount -tnfs $source:/var/run/zumastor/mount/$vol /zsoftware
+ssh $SSH_OPTS $SOURCE_MACHINE "exportfs -o'rw,fsid=1000,crossmnt,nohide' *:/var/run/zumastor/mount/$VOLUME_NAME"
+ssh $SSH_OPTS $SOURCE_MACHINE "chmod a+rw /var/run/zumastor/mount/$VOLUME_NAME"
+[ -e /zsoftware ] || { sudo mkdir /zsoftware; sudo chmod a+rwx /zsoftware; }
+sudo mount -tnfs $SOURCE_MACHINE:/var/run/zumastor/mount/$VOLUME_NAME /zsoftware
 
 # start the large volume copy via nfs
-rsync -avz --exclude '.snapshot*' $copy_path /zsoftware/ &
+rsync -avz --exclude '.snapshot*' $COPY_SOURCE /zsoftware/ &
 ;;
 
 monitor)
 # monitoring the replication status
-while true; do
-	monitor_replication $vol $source $target
+while true
+do
+	monitor_replication $VOLUME_NAME $SOURCE_MACHINE $TARGET_MACHINE
 	sleep 30
 done
 ;;
 
 stop)
 mountpoint -q /zsoftware && sudo umount /zsoftware
-ssh $SSH_OPTS $source "/etc/init.d/nfs-kernel-server stop"
-ssh $SSH_OPTS $source "zumastor forget volume $vol"
-ssh $SSH_OPTS $source "/etc/init.d/nfs-kernel-server start"
-ssh $SSH_OPTS $target "zumastor forget volume $vol"
+ssh $SSH_OPTS $SOURCE_MACHINE "/etc/init.d/nfs-kernel-server stop"
+ssh $SSH_OPTS $SOURCE_MACHINE "zumastor forget volume $VOLUME_NAME"
+ssh $SSH_OPTS $SOURCE_MACHINE "/etc/init.d/nfs-kernel-server start"
+ssh $SSH_OPTS $TARGET_MACHINE "zumastor forget volume $VOLUME_NAME"
 ;;
 
 *)
