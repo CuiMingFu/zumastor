@@ -39,9 +39,25 @@ timeout_file_wait() {
   return $?
 }
 
+apt-get -q update || apt-get -q update || apt-get -q update
+
+mkfs='mkfs.ext3 -F'
+apt-get -q -y install e2fsprogs devscripts
+
+
+  echo "1..7"
+output=`checkbashisms /bin/zumastor /etc/cron.hourly/zumastor /etc/init.d/zumastor /etc/cron.weekly/zumastor /etc/cron.daily/zumastor`
+if [ "x" != "$output" ]
+then
+  echo "not ok 1 - Zumastor contains bashisms! FAIL!"
+  exit 1
+else
+  echo "ok 1 - checkbashisms returned clean"
+fi
+
+# If we get this far, be a little more destructive.
 # install dash and replace /bin/sh
-apt-get update
-aptitude install -y dash && update-alternatives --install /bin/sh sh /bin/dash 1
+apt-get install -y dash && update-alternatives --install /bin/sh sh /bin/dash 1
 
 # The installed zumastor scripts
 for f in /bin/zumastor /etc/cron.hourly/zumastor /etc/init.d/zumastor \
@@ -51,47 +67,28 @@ do
 done
 
 
-
-
-mkfs='mkfs.ext3 -F'
-aptitude install -y e2fsprogs
-
-
-  echo "1..6"
-
   zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 
   $mkfs /dev/mapper/testvol
   zumastor define master testvol -s; zumastor define schedule testvol -h 24 -d 7
 
-  echo ok 1 - testvol set up
+  echo ok 2 - testvol set up
 
   sync
   zumastor snapshot testvol hourly
 
 
   if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
-    echo "ok 2 - first snapshot mounted"
+    echo "ok 3 - first snapshot mounted"
   else
     ls -lR /var/run/zumastor/
-    echo "not ok 2 - first snapshot mounted"
-    exit 2
+    echo "not ok 3 - first snapshot mounted"
+    exit 3
   fi
         
   date >> /var/run/zumastor/mount/testvol/testfile
 
   if [ ! -f /var/run/zumastor/mount/testvol/hourly.0/testfile ] ; then
-    echo "ok 3 - testfile not present in first snapshot"
-  else
-    ls -laR /var/run/zumastor/mount
-    echo "not ok 3 - testfile not present in first snapshot"
-    exit 3
-  fi
-
-  sync
-  zumastor snapshot testvol hourly 
-
-  if [ ! -f /var/run/zumastor/mount/testvol/hourly.1/testfile ] ; then
     echo "ok 4 - testfile not present in first snapshot"
   else
     ls -laR /var/run/zumastor/mount
@@ -99,25 +96,36 @@ aptitude install -y e2fsprogs
     exit 4
   fi
 
+  sync
+  zumastor snapshot testvol hourly 
+
+  if [ ! -f /var/run/zumastor/mount/testvol/hourly.1/testfile ] ; then
+    echo "ok 5 - testfile not present in first snapshot"
+  else
+    ls -laR /var/run/zumastor/mount
+    echo "not ok 5 - testfile not present in first snapshot"
+    exit 5
+  fi
+
 
   if diff -q /var/run/zumastor/mount/testvol/testfile \
       /var/run/zumastor/mount/testvol/hourly.0/testfile 2>&1 >/dev/null ; then
-    echo "ok 5 - identical testfile immediately after second snapshot"
+    echo "ok 6 - identical testfile immediately after second snapshot"
   else
     ls -lR /var/run/zumastor/mount
-    echo "not ok 5 - identical testfile immediately after second snapshot"
-    exit 5
+    echo "not ok 6 - identical testfile immediately after second snapshot"
+    exit 6
   fi
 
   date >> /var/run/zumastor/mount/testvol/testfile
 
   if ! diff -q /var/run/zumastor/mount/testvol/testfile \
       /var/run/zumastor/mount/hourly.0/testfile 2>&1 >/dev/null ; then
-    echo "ok 6 - testfile changed between origin and second snapshot"
+    echo "ok 7 - testfile changed between origin and second snapshot"
   else
     ls -lR /var/run/zumastor/mount
-    echo "not ok 6 - testfile changed between origin and second snapshot"
-    exit 6
+    echo "not ok 7 - testfile changed between origin and second snapshot"
+    exit 7
   fi
 
   zumastor forget volume testvol
