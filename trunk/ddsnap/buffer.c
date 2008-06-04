@@ -41,7 +41,8 @@ unsigned dirty_buffer_count;
 LIST_HEAD(lru_buffers);
 unsigned buffer_count;
 LIST_HEAD(free_buffers);
-
+unsigned journaled_count;
+LIST_HEAD(journaled_buffers); /* bufferes that have been written to journal but not yet to snapstore */
 static unsigned max_buffers = 10000;
 static unsigned max_evict = 1000; /* free 10 percent of the buffers */
 
@@ -95,6 +96,17 @@ void show_dirty_buffers(void)
 	warn("");
 }
 
+void show_journaled_buffers(void)
+{
+	struct list_head *list;
+	warn("%i journaled buffers: ", journaled_count);
+	list_for_each(list, &journaled_buffers) {
+		struct buffer *buffer = list_entry(list, struct buffer, dirty_list);
+		show_buffer(buffer);
+	}
+	warn("");
+}
+
 #if 0
 void dump_buffer(struct buffer *buffer, unsigned offset, unsigned length)
 {
@@ -102,11 +114,30 @@ void dump_buffer(struct buffer *buffer, unsigned offset, unsigned length)
 }
 #endif
 
+void add_buffer_journaled(struct buffer *buffer)
+{
+	if (buffer_dirty(buffer)) {
+		list_del(&buffer->dirty_list);
+		dirty_buffer_count--;
+	}
+	buffer->state = BUFFER_STATE_JOURNALED;
+	list_add_tail(&buffer->dirty_list, &journaled_buffers);
+	journaled_count ++;
+}
+
+static void remove_buffer_journaled(struct buffer *buffer)
+{
+	list_del(&buffer->dirty_list);
+	journaled_count --;
+}
+
 void set_buffer_dirty(struct buffer *buffer)
 {
 	buftrace(warn("set_buffer_dirty %Lx state=%u", buffer->sector, buffer->state););
 	if (buffer_dirty(buffer))
 		return;
+	if (buffer_journaled(buffer))
+		remove_buffer_journaled(buffer);
 	assert(!buffer->dirty_list.next);
 	assert(!buffer->dirty_list.prev);
 	list_add_tail(&buffer->dirty_list, &dirty_buffers);
@@ -120,6 +151,8 @@ void set_buffer_uptodate(struct buffer *buffer)
 		list_del(&buffer->dirty_list);
 		dirty_buffer_count--;
 	}
+	if (buffer_journaled(buffer))
+		remove_buffer_journaled(buffer);
 	buffer->state = BUFFER_STATE_CLEAN;
 }
 
@@ -239,7 +272,7 @@ struct buffer *new_buffer(sector_t sector, unsigned size)
 
 	list_for_each_safe(list, safe, &lru_buffers) {
 		struct buffer *buffer_evict = list_entry(list, struct buffer, list);
-		if (buffer_evict->count == 0 && !buffer_dirty(buffer_evict)) {
+		if (buffer_evict->count == 0 && !buffer_dirty(buffer_evict) && !buffer_journaled(buffer_evict)) {
 			remove_buffer_lru(buffer_evict);
 			remove_buffer_hash(buffer_evict);
 			add_buffer_free(buffer_evict);
@@ -317,7 +350,7 @@ struct buffer *bread(unsigned fd, sector_t sector, unsigned size)
 
 	if (!(buffer = getblk(fd, sector, size)))
 		return NULL;
-	if (buffer_uptodate(buffer) || buffer_dirty(buffer))
+	if (buffer->state != BUFFER_STATE_INVAL)
 		return buffer;
 	if ((err = read_buffer(buffer))) {
 		warn("error: %s unable to read sector %Lx", strerror(-err), sector);
@@ -422,6 +455,8 @@ void init_buffers(unsigned bufsize, unsigned mem_pool_size)
 	INIT_LIST_HEAD(&lru_buffers);
 	buffer_count = 0;
 	INIT_LIST_HEAD(&free_buffers);
+	journaled_count = 0;
+	INIT_LIST_HEAD(&journaled_buffers);
 
 	/* calculate number of max buffers to a fixed size, independent of chunk size */
 	max_buffers = mem_pool_size / bufsize;

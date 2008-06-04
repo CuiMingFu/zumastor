@@ -7,6 +7,7 @@
 #define BUFFER_STATE_INVAL 1
 #define BUFFER_STATE_CLEAN 2
 #define BUFFER_STATE_DIRTY 3
+#define BUFFER_STATE_JOURNALED 4
 #define BUFFER_BUCKETS 9999
 
 #include "list.h"
@@ -29,6 +30,8 @@ struct buffer
 
 struct list_head dirty_buffers;
 extern unsigned dirty_buffer_count;
+struct list_head journaled_buffers;
+extern unsigned journaled_count;
 
 void show_dirty_buffers(void);
 void set_buffer_dirty(struct buffer *buffer);
@@ -50,6 +53,7 @@ void show_buffer(struct buffer *buffer);
 void show_active_buffers(void);
 void show_buffers(void);
 void init_buffers(unsigned bufsize, unsigned mem_pool_size);
+void add_buffer_journaled(struct buffer *buffer);
 
 static inline int buffer_dirty(struct buffer *buffer)
 {
@@ -59,6 +63,11 @@ static inline int buffer_dirty(struct buffer *buffer)
 static inline int buffer_uptodate(struct buffer *buffer)
 {
 	return buffer->state == BUFFER_STATE_CLEAN;
+}
+
+static inline int buffer_journaled(struct buffer *buffer)
+{
+	return buffer->state == BUFFER_STATE_JOURNALED;
 }
 
 static inline void *malloc_aligned(size_t size, unsigned binalign)
