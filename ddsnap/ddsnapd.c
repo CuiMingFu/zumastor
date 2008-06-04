@@ -552,6 +552,19 @@ static void selfcheck_freespace(struct superblock *sb)
 		check_freespace(sb);
 }
 
+static void flush_journaled_buffers(void)
+{
+	while (!list_empty(&journaled_buffers)) {
+		struct list_head *entry = journaled_buffers.next;
+		struct buffer *buffer = list_entry(entry, struct buffer, dirty_list);
+		jtrace(warn("write data sector = %Lx", buffer->sector););
+		if (write_buffer_to(buffer, buffer->sector))
+			warn("unable to write commit block to journal");
+		set_buffer_uptodate(buffer);
+	}
+	assert(journaled_count == 0);
+}
+
 static void flush_deferred_allocs(struct superblock *sb)
 {
 	for (int i = 0; i < sb->deferred_allocs; i++)
@@ -588,7 +601,8 @@ static void commit_transaction(struct superblock *sb, int barrier)
 	if (list_empty(&dirty_buffers) && !sb->defer.count)
 		return;
 
-	if (sb->deferred_allocs >= sb->image.journal_size / 2) {
+	if (sb->deferred_allocs >= sb->image.journal_size / 2 || journaled_count >= sb->image.journal_size / 2) {
+		flush_journaled_buffers();
 		flush_deferred_allocs(sb);
 		barrier = 1;
 	}
@@ -652,17 +666,29 @@ static void commit_transaction(struct superblock *sb, int barrier)
 		jtrace(warn("unable to write checksum from commit block");); // what does this mean?
 	brelse(commit_buffer);
 
-	/*
-	 * Now write each dirty buffer to its proper location.
-	 */
-	while (!list_empty(&dirty_buffers)) {
-		struct list_head *entry = dirty_buffers.next;
-		struct buffer *buffer = list_entry(entry, struct buffer, dirty_list);
-		jtrace(warn("write data sector = %Lx", buffer->sector););
-		assert(buffer_dirty(buffer));
-		if (write_buffer(buffer)) // deletes it from dirty (fixme: fragile)
-			jtrace(warn("unable to write commit block to journal"););
-		// we hope the order we just listed these is the same as committed above
+	/* Use deferred metadata writes if RUN_DEFER flag is set and this is not a barrier commit. */
+	if (deferring(sb) && !barrier) {
+		/* move dirty buffers to the journaled_buffer list after writing commit block to disk */
+		while (!list_empty(&dirty_buffers)) {
+			struct list_head *entry = dirty_buffers.next;
+			struct buffer *buffer = list_entry(entry, struct buffer, dirty_list);
+			assert(buffer_dirty(buffer));
+			jtrace(warn("move buffer to journaled_list, sector = %Lx", buffer->sector););
+			add_buffer_journaled(buffer);
+		}
+	} else {
+		/*
+	 	* Now write each dirty buffer to its proper location.
+	 	* TODO: this can be merged with the above flush_journaled_buffers() code.
+	 	*/
+		while (!list_empty(&dirty_buffers)) {
+			struct list_head *entry = dirty_buffers.next;
+			struct buffer *buffer = list_entry(entry, struct buffer, dirty_list);
+			jtrace(warn("write data sector = %Lx", buffer->sector););
+			assert(buffer_dirty(buffer));
+			if (write_buffer(buffer)) // deletes it from dirty (fixme: fragile)
+				jtrace(warn("unable to write commit block to journal"););
+		}
 	}
 	/* checking free chunks for debugging purpose only,, return before this to skip the checking */
 	selfcheck_freespace(sb);
@@ -672,6 +698,7 @@ static void commit_deferred_allocs(struct superblock *sb)
 {
 	commit_transaction(sb, 0);
 	flush_deferred_allocs(sb);
+	flush_journaled_buffers();
 	commit_transaction(sb, 1);
 }
 
@@ -768,15 +795,18 @@ static int replay_journal(struct superblock *sb)
 	jtrace(warn("found newest commit [%u]", pos[newest]););
 
 	/* Pick up any deferred allocs */
-	int i = newest + 1;
+	struct commit_block *commit;
+	int i = newest + 1, barrier = -1;
 	do {
 		if (i == commits)
 			i = 0;
 		buffer = jread(sb, pos[i]);
-		struct commit_block *commit = buf2commit(buffer);
+		commit = buf2commit(buffer);
 		struct alloc_range alloc = commit->alloc;
-		if (alloc.barrier)
+		if (alloc.barrier) {
 			sb->deferred_allocs = 0;
+			barrier = i;
+		}
 		if (alloc.count) {
 			jtrace(show_alloc_range(&alloc, " deferred\n");)
 			sb->deferred_alloc[sb->deferred_allocs++] = (struct alloc_range){
@@ -785,20 +815,30 @@ static int replay_journal(struct superblock *sb)
 		brelse(buffer);
 	} while (i++ != newest);
 
-	/* For now, only the newest commit needs to be replayed */
-	buffer = jread(sb, pos[newest]);
-	struct commit_block *commit = buf2commit(buffer);
-	unsigned entries = commit->entries;
-
-	for (int i = 0; i < entries; i++) {
-		unsigned replay = (pos[newest] - entries + i + jblocks) % jblocks;
-		struct buffer *databuf = jread(sb, replay);
-		if (is_commit_block(buf2commit(databuf)))
-			error("data block [%u] marked as commit block", replay);
-		jtrace(warn("write journal [%u] data to %Lx", replay, commit->sector[i]););
-		write_buffer_to(databuf, commit->sector[i]);
-		brelse(databuf);
-	}
+	/* write the journal blocks between the barrier and the newest commit to disk */
+	if (barrier == -1 || barrier == newest)
+		i = newest;
+	else
+		i = barrier + 1;
+	do {
+		if (i == commits)
+			i = 0;
+		buffer = jread(sb, pos[i]);
+		commit = buf2commit(buffer);
+		unsigned entries = commit->entries;
+		for (int j = 0; j < entries; j++) {
+			unsigned replay = (pos[i] - entries + j + jblocks) % jblocks;
+			struct buffer *databuf = jread(sb, replay);
+			if (is_commit_block(buf2commit(databuf)))
+				error("data block [%u] marked as commit block", replay);
+			jtrace(warn("write journal [%u] data to %Lx", replay, commit->sector[i]););
+			warn("write journal [%u] data to %Lx", replay, commit->sector[i]);
+			write_buffer_to(databuf, commit->sector[i]);
+			brelse(databuf);
+		}
+		if (i != newest)
+			brelse(buffer);
+	} while (i++ != newest);
 
 	/* Recover durable state from newest commit */
 	sb->image.journal_next = (pos[newest] + 1 + jblocks) % jblocks;
