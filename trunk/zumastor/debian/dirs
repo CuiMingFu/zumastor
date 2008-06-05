@@ -1,0 +1,3 @@
+var/log/zumastor
+var/lib/zumastor
+var/lib/zumastor/volumes

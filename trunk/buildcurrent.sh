@@ -90,25 +90,30 @@ HOSTARCH=$ARCH
 cp $kconfig $BUILD_DIR/$KERNEL_VERSION.config
 pushd $BUILD_DIR >> $LOG || exit 1
 
+# Build Constants
 VERSION_STRING="${VERSION}-r${REVISION}"
+EDITOR=/bin/true
+VISUAL=/bin/true
+DPKG_BUILDOPTS="-i.svn -I.svn -uc -us -rfakeroot"
 
 echo -n Building zumastor Debian package...
-pushd ${SRC}/zumastor >> $LOG || exit 1
 
+pushd ${SRC}/zumastor >> $LOG || exit 1
 echo ${VERSION_STRING} > VERSION_STRING
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true VISUAL=/bin/true dch --create --package zumastor -u low --no-query -v $VERSION_STRING "revision $REVISION" || exit 1
-dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
+dch --create --package zumastor -u low --no-query -v $VERSION_STRING "revision $REVISION" || exit 1
+dpkg-buildpackage $DPKG_BUILDOPTS >> $LOG || exit 1
 popd >> $LOG
 mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${REVISION}
 echo -e "done.\n"
 
 echo -n Building ddsnap Debian package...
+
 pushd ${SRC}/ddsnap >> $LOG || exit 1
 echo ${VERSION_STRING} > VERSION_STRING
 [ -f debian/changelog ] && rm debian/changelog
-EDITOR=/bin/true VISUAL=/bin/true dch --create --package ddsnap -u low --no-query -v $VERSION_STRING "revision $REVISION" || exit 1
-dpkg-buildpackage -I.svn -uc -us -rfakeroot >> $LOG || exit 1
+dch --create --package ddsnap -u low --no-query -v $VERSION_STRING "revision $REVISION" || exit 1
+dpkg-buildpackage $DPKG_BUILDOPTS >> $LOG || exit 1
 make genpatches
 popd >> $LOG
 mv ${SRC}/*.changes ${SRC}/*.deb ${SRC}/*.tar.gz ${SRC}/*.dsc ${BUILD_DIR}/r${REVISION}
