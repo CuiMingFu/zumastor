@@ -1448,7 +1448,7 @@ static int ddsnap_create(struct dm_target *target, unsigned argc, char **argv)
 	target->private = info;
 
 	if (!(info->control_socket_path = 
-			kmalloc(strlen(argv[2] + 1), GFP_NOIO|__GFP_NOFAIL)))
+			kmalloc(strlen(argv[2]) + 1, GFP_NOIO|__GFP_NOFAIL)))
 		goto eek;
 	strcpy(info->control_socket_path, argv[2]);
 
