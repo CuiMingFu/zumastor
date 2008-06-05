@@ -12,9 +12,6 @@
 
 set -e
 
-# Remove this when issue 126 is fixed
-EXPECT_FAIL=1
-
 # The required sizes of the sdb and sdc devices in M.
 # Read only by the test harness.
 NUMDEVS=2
@@ -48,7 +45,9 @@ echo "ok 3 - testvol2 setup"
 
 sync
 
-name_frequency=`ls /proc/driver/ddsnap|sort|uniq -c|awk '{ print $1 }'|grep -v 1`
+name_frequency=`ls /proc/driver/ddsnap|sort|uniq -c|awk '{ print $1 }'|grep -qv
+1` || name_frequency=""
+
 if [ "x$name_frequency" = "x" ]
 then
   echo "ok 4 - no device appears more than once"
