@@ -45,7 +45,7 @@ echo "ok 3 - testvol2 setup"
 
 sync
 
-name_frequency=`ls /proc/driver/ddsnap|sort|uniq -c|awk '{ print $1 }'|grep -qv
+name_frequency=`ls /proc/driver/ddsnap|sort|uniq -c|awk '{ print $1 }'|grep -v
 1` || name_frequency=""
 
 if [ "x$name_frequency" = "x" ]
