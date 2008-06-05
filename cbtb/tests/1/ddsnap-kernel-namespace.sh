@@ -63,9 +63,9 @@ lvremove -f /dev/testvg/vol1
 lvremove -f /dev/testvg/vol1_snap
 lvremove -f /dev/testvg/vol2
 lvremove -f /dev/testvg/vol2_snap
-vgremove -f /dev/testvg
-pvremove -ff $DEV1NAME
-pvremove -ff $DEV2NAME
+vgremove /dev/testvg
+pvremove -ffy $DEV1NAME || true
+pvremove -ffy $DEV2NAME || true
 echo "ok 5 - cleanup"
 
 exit 0
