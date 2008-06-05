@@ -1,6 +1,6 @@
-diff -purN linux-2.6.24.2.clean/block/ll_rw_blk.c linux-2.6.24.2/block/ll_rw_blk.c
---- linux-2.6.24.2.clean/block/ll_rw_blk.c	2008-04-01 14:32:39.000000000 -0700
-+++ linux-2.6.24.2/block/ll_rw_blk.c	2008-04-01 14:35:05.000000000 -0700
+diff -purN linux-2.6.24.2/block/ll_rw_blk.c linux-2.6.24.2-new/block/ll_rw_blk.c
+--- linux-2.6.24.2/block/ll_rw_blk.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/block/ll_rw_blk.c	2008-06-02 16:23:00.000000000 -0700
 @@ -3210,9 +3210,9 @@ static inline int bio_check_eod(struct b
   */
  static inline void __generic_make_request(struct bio *bio)
@@ -52,10 +52,78 @@ diff -purN linux-2.6.24.2.clean/block/ll_rw_blk.c linux-2.6.24.2/block/ll_rw_blk
  }
  
  /*
-diff -purN linux-2.6.24.2.clean/drivers/md/dm.c linux-2.6.24.2/drivers/md/dm.c
---- linux-2.6.24.2.clean/drivers/md/dm.c	2008-04-01 14:32:42.000000000 -0700
-+++ linux-2.6.24.2/drivers/md/dm.c	2008-04-01 14:35:05.000000000 -0700
-@@ -809,6 +809,11 @@ static int __split_bio(struct mapped_dev
+diff -purN linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-new/drivers/md/dm.c
+--- linux-2.6.24.2/drivers/md/dm.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/drivers/md/dm.c	2008-06-02 16:32:05.000000000 -0700
+@@ -22,6 +22,7 @@
+ #include <linux/hdreg.h>
+ #include <linux/blktrace_api.h>
+ #include <linux/smp_lock.h>
++#include <linux/sysctl.h>
+ 
+ #define DM_MSG_PREFIX "core"
+ 
+@@ -130,6 +131,43 @@ struct mapped_device {
+ #define MIN_IOS 256
+ static struct kmem_cache *_io_cache;
+ static struct kmem_cache *_tio_cache;
++static int sysctl_bio_throttle = 0;
++
++static ctl_table dm_table[] = {
++	{
++		.ctl_name	= DEV_DM_BIO_THROTTLE,
++		.procname	= "bio_throttle",
++		.data		= &sysctl_bio_throttle,
++		.maxlen		= sizeof(int),
++		.mode           = S_IRUGO|S_IWUSR,
++		.proc_handler   = &proc_dointvec,
++	},
++	{ .ctl_name = 0 }
++};
++
++static ctl_table dm_dir_table[] = {
++	{
++		.ctl_name	= DEV_DM,
++		.procname	= "dm",
++		.maxlen		= 0,
++		.mode		= S_IRUGO|S_IXUGO,
++		.child		= dm_table,
++	},
++	{ .ctl_name = 0 }
++};
++
++static struct ctl_table_header *dm_table_header;
++
++static ctl_table dm_root_table[] = {
++	{
++		.ctl_name	= CTL_DEV,
++		.procname	= "dev",
++		.maxlen		= 0,
++		.mode		= 0555,
++		.child		= dm_dir_table,
++	},
++	{ .ctl_name = 0 }
++};
+ 
+ static int __init local_init(void)
+ {
+@@ -209,6 +247,7 @@ static int __init dm_init(void)
+ 			goto bad;
+ 	}
+ 
++	dm_table_header = register_sysctl_table(dm_root_table);
+ 	return 0;
+ 
+       bad:
+@@ -224,6 +263,7 @@ static void __exit dm_exit(void)
+ 
+ 	while (i--)
+ 		_exits[i]();
++	unregister_sysctl_table(dm_table_header);
+ }
+ 
+ /*
+@@ -809,6 +849,11 @@ static int __split_bio(struct mapped_dev
   * CRUD END
   *---------------------------------------------------------------*/
  
@@ -67,7 +135,7 @@ diff -purN linux-2.6.24.2.clean/drivers/md/dm.c linux-2.6.24.2/drivers/md/dm.c
  /*
   * The request function that just remaps the bio built up by
   * dm_merge_bvec.
-@@ -967,6 +972,7 @@ out:
+@@ -967,6 +1012,7 @@ out:
  
  static struct block_device_operations dm_blk_dops;
  
@@ -75,19 +143,21 @@ diff -purN linux-2.6.24.2.clean/drivers/md/dm.c linux-2.6.24.2/drivers/md/dm.c
  /*
   * Allocate and initialise a blank device with a given minor.
   */
-@@ -1009,6 +1015,11 @@ static struct mapped_device *alloc_dev(i
+@@ -1009,6 +1055,13 @@ static struct mapped_device *alloc_dev(i
  		goto bad1_free_minor;
  
  	md->queue->queuedata = md;
-+	md->queue->metric = dm_metric;
-+	/* A dm device constructor may change the throttle capacity */
-+	atomic_set(&md->queue->available, md->queue->capacity = DEFAULT_THROTTLE_CAPACITY);
-+	init_waitqueue_head(&md->queue->throttle_wait);
++	if (sysctl_bio_throttle == 1) {
++		md->queue->metric = dm_metric;
++		/* A dm device constructor may change the throttle capacity */
++		atomic_set(&md->queue->available, md->queue->capacity = DEFAULT_THROTTLE_CAPACITY);
++		init_waitqueue_head(&md->queue->throttle_wait);
++	}
 +
  	md->queue->backing_dev_info.congested_fn = dm_any_congested;
  	md->queue->backing_dev_info.congested_data = md;
  	blk_queue_make_request(md->queue, dm_request);
-@@ -1571,6 +1582,7 @@ int dm_suspended(struct mapped_device *m
+@@ -1571,6 +1624,7 @@ int dm_suspended(struct mapped_device *m
  {
  	return test_bit(DMF_SUSPENDED, &md->flags);
  }
@@ -95,9 +165,9 @@ diff -purN linux-2.6.24.2.clean/drivers/md/dm.c linux-2.6.24.2/drivers/md/dm.c
  
  int dm_noflush_suspending(struct dm_target *ti)
  {
-diff -purN linux-2.6.24.2.clean/fs/bio.c linux-2.6.24.2/fs/bio.c
---- linux-2.6.24.2.clean/fs/bio.c	2008-04-01 14:32:48.000000000 -0700
-+++ linux-2.6.24.2/fs/bio.c	2008-04-01 14:35:42.000000000 -0700
+diff -purN linux-2.6.24.2/fs/bio.c linux-2.6.24.2-new/fs/bio.c
+--- linux-2.6.24.2/fs/bio.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/fs/bio.c	2008-06-02 16:23:00.000000000 -0700
 @@ -1007,6 +1007,13 @@ void bio_endio(struct bio *bio, int erro
  	else if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
  		error = -EIO;
@@ -112,9 +182,9 @@ diff -purN linux-2.6.24.2.clean/fs/bio.c linux-2.6.24.2/fs/bio.c
  	if (bio->bi_end_io)
  		bio->bi_end_io(bio, error);
  }
-diff -purN linux-2.6.24.2.clean/include/linux/bio.h linux-2.6.24.2/include/linux/bio.h
---- linux-2.6.24.2.clean/include/linux/bio.h	2008-04-01 14:32:50.000000000 -0700
-+++ linux-2.6.24.2/include/linux/bio.h	2008-04-01 14:35:05.000000000 -0700
+diff -purN linux-2.6.24.2/include/linux/bio.h linux-2.6.24.2-new/include/linux/bio.h
+--- linux-2.6.24.2/include/linux/bio.h	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/include/linux/bio.h	2008-06-02 16:23:00.000000000 -0700
 @@ -111,6 +111,7 @@ struct bio {
  	bio_end_io_t		*bi_end_io;
  	atomic_t		bi_cnt;		/* pin count */
@@ -123,9 +193,9 @@ diff -purN linux-2.6.24.2.clean/include/linux/bio.h linux-2.6.24.2/include/linux
  	void			*bi_private;
  
  	bio_destructor_t	*bi_destructor;	/* destructor */
-diff -purN linux-2.6.24.2.clean/include/linux/blkdev.h linux-2.6.24.2/include/linux/blkdev.h
---- linux-2.6.24.2.clean/include/linux/blkdev.h	2008-04-01 14:32:50.000000000 -0700
-+++ linux-2.6.24.2/include/linux/blkdev.h	2008-04-01 14:35:05.000000000 -0700
+diff -purN linux-2.6.24.2/include/linux/blkdev.h linux-2.6.24.2-new/include/linux/blkdev.h
+--- linux-2.6.24.2/include/linux/blkdev.h	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/include/linux/blkdev.h	2008-06-02 16:23:00.000000000 -0700
 @@ -384,6 +384,10 @@ struct request_queue
  	struct work_struct	unplug_work;
  
@@ -137,3 +207,49 @@ diff -purN linux-2.6.24.2.clean/include/linux/blkdev.h linux-2.6.24.2/include/li
  
  	/*
  	 * The queue owner gets to use this for whatever they like.
+diff -purN linux-2.6.24.2/include/linux/sysctl.h linux-2.6.24.2-new/include/linux/sysctl.h
+--- linux-2.6.24.2/include/linux/sysctl.h	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/include/linux/sysctl.h	2008-06-02 16:24:11.000000000 -0700
+@@ -859,6 +859,7 @@ enum {
+ 	DEV_MAC_HID=5,
+ 	DEV_SCSI=6,
+ 	DEV_IPMI=7,
++	DEV_DM=8
+ };
+ 
+ /* /proc/sys/dev/cdrom */
+@@ -882,6 +883,11 @@ enum {
+ 	DEV_RAID_SPEED_LIMIT_MAX=2
+ };
+ 
++/* /proc/sys/dev/dm */
++enum {
++	DEV_DM_BIO_THROTTLE = 1
++};
++
+ /* /proc/sys/dev/parport/default */
+ enum {
+ 	DEV_PARPORT_DEFAULT_TIMESLICE=1,
+diff -purN linux-2.6.24.2/kernel/sysctl_check.c linux-2.6.24.2-new/kernel/sysctl_check.c
+--- linux-2.6.24.2/kernel/sysctl_check.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-new/kernel/sysctl_check.c	2008-06-02 16:24:11.000000000 -0700
+@@ -875,6 +875,11 @@ static struct trans_ctl_table trans_parp
+ 	{}
+ };
+ 
++static struct trans_ctl_table trans_dm_table[] = {
++	{ DEV_DM_BIO_THROTTLE,	"bio_throttle" },
++	{}
++};
++
+ static struct trans_ctl_table trans_dev_table[] = {
+ 	{ DEV_CDROM,	"cdrom",	trans_cdrom_table },
+ 	/* DEV_HWMON unused */
+@@ -883,6 +888,7 @@ static struct trans_ctl_table trans_dev_
+ 	{ DEV_MAC_HID,	"mac_hid",	trans_mac_hid_files },
+ 	{ DEV_SCSI,	"scsi",		trans_scsi_table },
+ 	{ DEV_IPMI,	"ipmi",		trans_ipmi_table },
++	{ DEV_DM,	"dm",		trans_dm_table },
+ 	{}
+ };
+ 
