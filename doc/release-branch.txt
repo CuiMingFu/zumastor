@@ -40,4 +40,31 @@ svn checkout http://zumastor.googlecode.com/svn/branches/0.9/cbtb/tests zumastor
 cd ~zuabuild
 mv zumastor/build 0.9/zumastor
 
+7) check out my own local 0.9 branch
+cd
+cd code/
+svn co https://zumastor.googlecode.com/svn/branches/0.9 0.9
+cd 0.9
+ls
+cat Version
+
+8) Update and copy the new cbtb launch scripts to zumabuild
+cd ~/code/zumastor
+svn update
+cd cbtb/zumabuild
+edit zuabuild.start
+scp zuabuild.start root@zumabuild:~zuabuild/
+
+cd ~/code/0.9
+svn update
+/cbtb/host-scripts
+scp * root@zumabuild:~zuabuild/0.9/
+
+9) Rebuild trunk base images
+cd zumastor/cbtb/host-setup
+tunbr ./dapper-i386.sh
+
+10) Launch continuous build
+slogin root@zumabuild
+/etc/init.d/zuabuild start
 
