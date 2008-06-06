@@ -61,7 +61,7 @@ timeout_remote_file_wait() {
 }
 
 
-echo "1..10"
+echo "1..13"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -81,7 +81,7 @@ ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} zumastor define volume testvol ${DEV1NAME} ${DEV2NAME} --initialize
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
- 
+
 zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
@@ -231,5 +231,9 @@ rhash0=`${SSH} root@${slave} md5sum /var/run/zumastor/snapshot/testvol/hourly.0/
     tail -200 /var/log/syslog
 EOF
 
+# cleanup
+zumastor forget volume testvol
+${SSH} root@${slave} zumastor forget volume testvol
+echo "ok 13 - cleanup"
 
 exit 0

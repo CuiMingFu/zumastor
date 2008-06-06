@@ -72,7 +72,7 @@ timeout_remote_file_wait() {
 apt-get update
 aptitude install -y e2fsprogs
 
-echo "1..7"
+echo "1..8"
 
 pvcreate -ff ${DEV1NAME}
 vgcreate testvg ${DEV1NAME}
@@ -191,5 +191,10 @@ echo y | lvresize /dev/testvg/test_snap -L 12M
 zumastor replicate testvol slave --wait
 zumastor status --usage
 file_check 7 "origin and slave testfiles are in sync after snapshot shrinking"
+
+# cleanup
+zumastor forget volume testvol
+${SSH} root@${slave} zumastor forget volume testvol
+echo "ok 8 - cleanup"
 
 exit 0

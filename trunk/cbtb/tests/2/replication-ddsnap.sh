@@ -79,7 +79,7 @@ ${SSH} root@${slave} \
 echo ok 10 - slave ddsnap server
 sleep $SLEEP
 
-size=`ddsnap status $serversocket --size` 
+size=`ddsnap status $serversocket --size`
 echo 0 $size ddsnap ${DEV2NAME} ${DEV1NAME} $controlsocket -1 | dmsetup create $volname
 echo ok 11 - master create $volname
 sleep $SLEEP
@@ -136,7 +136,7 @@ fi
 echo ok 20 - master $volname\($tosnap\) == slave $volname\($tosnap\)
 
 
-dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/$volname  
+dd if=/dev/urandom bs=32k count=128 of=/dev/mapper/$volname
 echo 21 - copy random data onto master $volname
 
 fromsnap=0
