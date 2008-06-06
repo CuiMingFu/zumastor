@@ -28,7 +28,7 @@ test -n "$INSTALL_PKGS"   || INSTALL_PKGS="true"
 # set this to false if you want to check grub and reboot manually
 test -n "$AUTO_REBOOT"    || AUTO_REBOOT="false"
 # Version of zumastor to test
-test -n "$ZUMASTOR_VER"   || ZUMASTOR_VER="0.9.0"
+test -n "$ZUMASTOR_VER"   || ZUMASTOR_VER="0.10.0"
 # HTTP Base for downloading packages
 test -n "$HTTP_BASE"      || HTTP_BASE="http://zumabuild"
 ################################################################

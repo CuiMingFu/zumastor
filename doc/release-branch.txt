@@ -1,0 +1,43 @@
+HOWTO branch for a new zumastor release
+
+Notes so I remember how to do all of this next time.  -dld
+
+
+1) take down the autobuild automation on zumabuild
+ ps aux | grep continuous
+zuabuild  3542  0.0  0.0   7496  1680 ?        S    Jun02   0:00 /bin/sh -x
+/home/zuabuild/continuous-build.sh
+zuabuild  3608  0.0  0.0   7460  1620 ?        S    Jun02   0:00 /bin/sh -x
+/home/zuabuild/continuous-install.sh
+zuabuild  3616  0.0  0.0   7460  1620 ?        S    Jun02   0:00 /bin/sh -x
+/home/zuabuild/continuous-test.sh
+kill 3542
+kill 3608
+kill 3616
+
+
+2) create the new www symlink
+cd ~zbuild/www
+ln -s /home/zuabuild/0.9/zumastor/build 0.9
+
+3) Make the svn branch (inside normal client on desktop)
+svn info https://zumastor.googlecode.com/svn/trunk
+svn cp https://zumastor.googlecode.com/svn/trunk https://zumastor.googlecode.com/svn/branches/0.9
+
+4) Update the revision numbers on trunk
+Version
+zumastor/debian/control
+test/large_volume_copy_test.sh
+svn commit
+
+5) check out the source and tests for 0.9
+su - zuabuild
+cd 0.9
+svn checkout http://zumastor.googlecode.com/svn/branches/0.9/ zumastor
+svn checkout http://zumastor.googlecode.com/svn/branches/0.9/cbtb/tests zumastor-tests
+
+6) move the current trunk builds into 0.9 subdirectory
+cd ~zuabuild
+mv zumastor/build 0.9/zumastor
+
+
