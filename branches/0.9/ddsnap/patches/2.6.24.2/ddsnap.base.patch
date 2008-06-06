@@ -1,0 +1,99 @@
+diff -purN linux-2.6.24.2/drivers/md/dm.c linux-2.6.24.2-ddsnap.base/drivers/md/dm.c
+--- linux-2.6.24.2/drivers/md/dm.c	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/drivers/md/dm.c	2008-06-02 17:40:43.000000000 -0700
+@@ -889,6 +889,15 @@ static int dm_any_congested(void *conges
+ 	return r;
+ }
+ 
++unsigned dm_inflight_total(struct dm_target *target)
++{
++	struct mapped_device *md = dm_table_get_md(target->table);
++	int inflight = dm_disk(md)->in_flight;
++	dm_put(md);
++	return inflight;
++}
++EXPORT_SYMBOL_GPL(dm_inflight_total);
++
+ /*-----------------------------------------------------------------
+  * An IDR is used to keep track of allocated minor numbers.
+  *---------------------------------------------------------------*/
+diff -purN linux-2.6.24.2/drivers/md/dm-ioctl.c linux-2.6.24.2-ddsnap.base/drivers/md/dm-ioctl.c
+--- linux-2.6.24.2/drivers/md/dm-ioctl.c	2008-06-02 17:41:33.000000000 -0700
++++ linux-2.6.24.2-ddsnap.base/drivers/md/dm-ioctl.c	2008-06-02 16:53:58.000000000 -0700
+@@ -1545,3 +1545,4 @@ out:
+ 
+ 	return r;
+ }
++EXPORT_SYMBOL_GPL(dm_copy_name_and_uuid);
+diff -purN linux-2.6.24.2/drivers/md/Kconfig linux-2.6.24.2-ddsnap.base/drivers/md/Kconfig
+--- linux-2.6.24.2/drivers/md/Kconfig	2008-06-02 17:41:33.000000000 -0700
++++ linux-2.6.24.2-ddsnap.base/drivers/md/Kconfig	2008-06-02 16:53:41.000000000 -0700
+@@ -288,4 +288,13 @@ config DM_UEVENT
+ 	---help---
+ 	Generate udev events for DM events.
+ 
++config DM_DDSNAP
++	tristate "Distributed Data Snapshot target (EXPERIMENTAL)"
++	depends on BLK_DEV_DM && EXPERIMENTAL
++	---help---
++	  This device-mapper target allows you to take multiple simultaneous
++	  read/write snapshots of a clustered or non-clustered block devices.
++	  If unsure, say N.
++
++
+ endif # MD
+diff -purN linux-2.6.24.2/drivers/md/Makefile linux-2.6.24.2-ddsnap.base/drivers/md/Makefile
+--- linux-2.6.24.2/drivers/md/Makefile	2008-06-02 17:41:33.000000000 -0700
++++ linux-2.6.24.2-ddsnap.base/drivers/md/Makefile	2008-06-02 16:53:41.000000000 -0700
+@@ -41,6 +41,7 @@ obj-$(CONFIG_DM_MULTIPATH_RDAC)	+= dm-rd
+ obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
+ obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o
+ obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
++obj-$(CONFIG_DM_DDSNAP)		+= dm-ddsnap.o
+ 
+ quiet_cmd_unroll = UNROLL  $@
+       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
+diff -purN linux-2.6.24.2/include/linux/device-mapper.h linux-2.6.24.2-ddsnap.base/include/linux/device-mapper.h
+--- linux-2.6.24.2/include/linux/device-mapper.h	2008-02-10 21:51:11.000000000 -0800
++++ linux-2.6.24.2-ddsnap.base/include/linux/device-mapper.h	2008-06-02 17:38:52.000000000 -0700
+@@ -196,6 +196,7 @@ int dm_copy_name_and_uuid(struct mapped_
+ struct gendisk *dm_disk(struct mapped_device *md);
+ int dm_suspended(struct mapped_device *md);
+ int dm_noflush_suspending(struct dm_target *ti);
++unsigned dm_inflight_total(struct dm_target *target);
+ 
+ /*
+  * Geometry functions.
+diff -purN linux-2.6.24.2/include/linux/prctl.h linux-2.6.24.2-ddsnap.base/include/linux/prctl.h
+--- linux-2.6.24.2/include/linux/prctl.h	2008-06-02 17:41:33.000000000 -0700
++++ linux-2.6.24.2-ddsnap.base/include/linux/prctl.h	2008-06-02 16:53:41.000000000 -0700
+@@ -63,4 +63,8 @@
+ #define PR_GET_SECCOMP	21
+ #define PR_SET_SECCOMP	22
+ 
++/* set process less throttleL: see PF_LESS_THROTTLE */
++#define PR_SET_LESS_THROTTLE           23
++#define PR_SET_MEMALLOC			24
++
+ #endif /* _LINUX_PRCTL_H */
+diff -purN linux-2.6.24.2/kernel/sys.c linux-2.6.24.2-ddsnap.base/kernel/sys.c
+--- linux-2.6.24.2/kernel/sys.c	2008-06-02 17:41:33.000000000 -0700
++++ linux-2.6.24.2-ddsnap.base/kernel/sys.c	2008-06-02 16:53:41.000000000 -0700
+@@ -1741,7 +1741,16 @@ asmlinkage long sys_prctl(int option, un
+ 		case PR_SET_SECCOMP:
+ 			error = prctl_set_seccomp(arg2);
+ 			break;
+-
++		case PR_SET_LESS_THROTTLE: {
++			current->flags |= PF_LESS_THROTTLE;
++			return 0;
++		}
++			
++		case PR_SET_MEMALLOC: {
++			current->flags |= PF_MEMALLOC;
++			printk("set PF_MEMALLOC for process %s[%i]\n", current->comm, current->pid);
++			return 0;
++		}
+ 		default:
+ 			error = -EINVAL;
+ 			break;

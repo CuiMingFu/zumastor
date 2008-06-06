@@ -1,0 +1,262 @@
+.TH ddsnap 8 "Nov 30, 2007" "Linux"
+.SH NAME
+ddsnap \- block device snapshot and replication
+
+\fB
+.SH SYNOPSIS
+.B ddsnap
+[\-V|--version] [-?|--help] [--usage] \fIsubcommand\fP [option\.\.\.] [operand...]
+.br
+.B ddsnap initialize
+[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fImeta_device\fP]
+.br
+.B ddsnap agent 
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIagent_socket\fP
+.br
+.B ddsnap server 
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] [-k|--cachesize \fIcachesize\fP] \fIsnapshot_device\fP \fIorigin_device\fP [\fIdev/meta\fP] \fIagent_socket\fP \fIserver_socket\fP
+.br
+.B ddsnap create
+.I server_socket snapshot
+.br
+.B ddsnap delete
+.I server_socket snapshot
+.br
+.B ddsnap list
+.I server_socket
+.br
+.B ddsnap priority
+.I server_socket snap_tag new_priority_value
+.br
+.B ddsnap usecount
+.I server_socket snap_tag \fP[\fIdiff_amount\fP]
+.br
+.B ddsnap resize
+.I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.br
+.B ddsnap revert
+.I server_socket snapshot
+.br
+.B ddsnap status
+[\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
+.br
+
+.B ddsnap delta changelist
+.I server_socket changelist_name snapshot1 snapshot2
+.br
+.B ddsnap delta create
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] 
+.I changelist deltafile_name snapshot_device_stem
+.br
+.B ddsnap delta apply 
+.I deltafile_name snapshot_device_stem
+.br
+.B ddsnap delta listen
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
+.br
+.B ddsnap transmit
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP] [-l|--ratelimit \fItransrate\fP]
+\fIserver_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
+
+.SH DESCRIPTION
+\fBddsnap\fP provides block device replication given a block level snapshot facility capable of holding multiple simultaneous snapshots efficiently. \fBddsnap\fP can generate a list of snapshot chunks that differ between two snapshots, then send that difference over the wire. On a downstream server, write the updated data to a snapshotted block device.
+
+\fBddsnap\fP snapshots a block device and replicates the data on another block device. It is assumed that the user has access to hardware capable of holding multiple simultaneous snapshots efficiently.
+\fBddsnap\fP can also general a list of snapshot chunks containing the differences between two snapshots and can send those chunks across a network. On the target server, ddsnap writes the updated data to a block device.
+
+\fBddsnap\fP provides some useful low\-level flexibility. The user can set it to run daemonized or in the foreground; can set the desired journal size to use when creating the snapshot, and can set the desired block size on the target block device.
+
+.SH OPTIONS
+.IP \fB\-y|--yes
+.br
+Answers yes to all prompts.
+.IP \fB\-j\ \fIjournalsize\fB|--journalsize=\fIjournalsize
+.br
+Specifies the journal size, i.e. 200k. Defaults to 400k.
+.IP \fB\-b\ \fIblocksize\fB|--blocksize=\fIblocksize
+.br
+Specifies the block size. Input has to be a power of two, i.e. 8k, and must be larger than 512 bytes. Defaults to chunksize.
+.IP \fB\-c\ \fIchunksize\fB|--chunksize=\fIchunksize
+.br
+Specifies the snapshot chunk size. Input has to be a power of two and must be larger than 512 bytes.
+.IP \fB\-k\ \fIcachesize\fB|--cachesize=\fIcachesize
+.br
+Specifies the amount of RAM to dedicate to the snapshot btree cache.  If not specified or
+if specified as 0 (zero), defaults to max(128MB, system ram size/4).
+.IP \fB-f|--foreground
+.br
+Sets the server to run in the foreground. The default is to run daemonized.
+.IP \fB\-l\ \fIfile_name\fB|--logfile=\fIfile_name
+.br
+Specifies the log file.
+.IP \fB\-p\ \fIfile_name\fB|--pidfile=\fIfile_name
+.br
+Specifies the preferred process id file.
+.IP \fB\-v|--verbose
+.br
+Gives lots of information about what's happening.
+.IP \fB\-x|--xdelta
+.br
+Use xdelta as the snapshot delta format.
+.IP \fB\-r|--raw
+.br
+Use raw data as the snapshot delta format.
+.IP \fB\-b|--best
+.br
+Automatically select the delta format (xdelta or raw) that has the best compression rate.
+.IP \fB\-z\ \fIcompression_level\fB|--zip=\fIcompression_level
+.br
+Specifies a zlib or xdelta compression level from 0 to 9, where level 0 is no compression and level 9 is maximum compression. If unspecified, compression level defaults to 6.
+.IP \fB\-V|--version
+.br
+Shows version.
+.IP \fB\-?|--help
+.br
+Prints a short help message and exits.
+.IP \fB\--usage
+.br
+prints a short usage message and exits.
+
+.SH COMMANDS
+.IP \fBinitialize\fP 
+[\-y|--yes] [-j|--journalsize \fIjournalsize\fP] [-b|--blocksize \fIblocksize\fP] [-c|--chunksize \fIchunksize\fP] 
+.I snapshot_device origin_device 
+[\fImeta_device\fP]
+.br
+Initializes snapshot storage device.
+.IP \fBagent
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] 
+.I agent_socket
+.br
+Starts the snapshot agent.
+.IP \fBserver
+[\-f|--foreground] [-l|--logfile \fIfile_name\fP] [-p|--pidfile \fIfile_name\fP] [-k|--cachesize \fIcachesize\fP]
+.I snapshot_device origin_device 
+[\fIdev/meta\fP] 
+.I agent_socket server_socket
+.br
+Starts the snapshot server.
+.IP \fBcreate
+.I server_socket snapshot
+.br
+Creates a snapshot with the given sockname and snapshot.
+.IP \fBdelete
+.I server_socket snapshot
+.br
+Deletes a snapshot with the given sockname and snapshot.
+.IP \fBlist
+.I server_socket
+.br
+Returns a list of snapshots currently held.
+.IP \fBpriority
+.I server_socket snap_tag new_priority_value
+.br
+Sets the priority of the snapshot with the given sockname and snap_tag to the given priority_value.
+.IP \fBusecount
+.I server_socket snap_tag [diff_amount]
+.br
+Changes the use count of the snapshot with the given sockname and snap_tag by adding diff_amount to current snapshot usecount.  If diff_amount is omitted, 0 is assumed.
+.IP \fBresize
+.I server_socket [-o|--origin \fInewsize\fP] [-s|--snapshot \fInewsize\fP] [-m|--metadata \fInewsize\fP]
+.br
+Resize the origin/snapshot/metadata device of an existing ddsnap volume.
+.IP \fBrevert
+.I server_socket snapshot
+.br
+Revert the origin volume to a previous snapshot.
+.IP \fBstatus
+[\-v|--verbose] \fIserver_socket\fP [\fIsnapshot\fP]
+.br
+Reports snapshot usage statistics.
+.IP \fBdelta\ \fBchangelist\fP
+.I server_socket changelist_name snapshot1 snapshot2
+.br
+Creates a changelist from snapshot1 and snapshot2 with the given changelist_name.
+.IP \fBdelta\ \fBcreate\fP 
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP]
+.I changelist_name deltafile_name snapshot_device_stem
+.br
+Creates a deltafile from the given \fIchangelist\fP and snapshot device stem with the given deltafile_name. Defaults to optimal mode if no option was selected.
+.IP \fBdelta\ \fBapply\fP
+.I deltafile_name snapshot_device_stem
+.br
+Applies the deltafile to the given device.
+.IP \fBdelta\ \fBlisten\fP 
+[\-f|--foreground] [-l|--logfile \fIstring\fP] [-p|--pidfile \fIstring\fP] \fIsnapshot_device_stem\fP [\fIhost\fP[\fI:port\fP]]
+.br
+Listens for a deltafile arriving from upstream.
+.IP \fBtransmit\fP 
+[-x|--xdelta] [-r|--raw] [-b|--best] [-g|--gzip \fIcompression_level\fP] [-p|--progress \fIprogress_file\fP] [-s|--resume \fIaddr\fP] [-l|--ratelimit \fItransrate\fP]
+.I server_socket host\fP[\fI:port\fP] [\fIfromsnap\fP] \fItosnap
+.br
+Streams a delta from snapshot \fIfromsnap\fP to snapshot \fItosnap\fP to downstream server \fIhost\fP.  If \fIfromsnap\fP is omitted, the full volume, as it existed at \fItosnap\fP is sent. If \fIprogress_file\fP is specified, it is updated once a second with replication progress data. If resume \fIaddr\fP is specified, replication will resume from the given address of the replicated snapshot. If \fItransrate\fP is specified, replication data will be sent at in that bytes/sec.
+
+.SH EXAMPLES
+# Initializing snapshot storage device
+.TP
+.B
+sudo ./\fBddsnap initialize\fP \fI/dev/test\-snapstore\fP \fI/dev/test-origin\fP
+.PP
+# Start up the agent server
+.TP
+.B
+sudo ./\fBddsnap agent\fP \fI/tmp/control\fP
+.PP
+# Start up the snapshot server
+.TP
+.B
+sudo ./\fBddsnap server\fP \fI/dev/test\-snapstore\fP \fI/dev/test-origin\fP \fI/tmp/control\fP \fI/tmp/server\fP
+.PP
+# Creating a snapshot
+.TP
+.B
+sudo ./\fBddsnap create\fP \fI/tmp/server\fP \fI0\fP
+.PP
+# Creating a changelist named \fIchangelist0\-1\fP given \fI/tmp/server\fP and two snapshots (\fI0\fP and \fI1\fP)
+.TP
+.B
+sudo ./\fBddsnap delta changelist\fP \fI/tmp/server\fP \fIchangelist0\-1\fP \fI0\fP \fI1\fP
+.PP
+# Creating a deltafile named \fIdeltafile0\-1\fP based on \fIchangelist0-1\fP, \fI/dev/mapper/snapshot(0)\fP and \fI/dev/mapper/snapshot(1)\fP in \fIraw\fP mode
+.TP
+.B
+sudo ./\fBddsnap delta create\fP \fIchangelist0-1\fP \fIdeltafile0-1\fP \fI/dev/mapper/snapshot\fP
+.PP
+# Applying a deltafile name \fIdeltafile0\-1\fP to a device named \fI/dev/mapper/vol\fP
+.TP
+.B
+sudo ./\fBddsnap delta apply\fP \fI/path/to/deltafile0\-1\fP \fI/dev/mapper/vol\fP
+.SH TERMINOLOGY
+.TP
+\fBsnapshot\fP \- a virtually instant copy of a defined collection of data created at a particular instant in time.
+.TP
+\fBorigin volume\fP \- One of two block devices underlying a virtual snapshot device.  This volume is mapped one-to-one to a snapshot origin virtual device.  The virtual device could be removed and the underlying origin volume accessed directly, at the risk of losing the integrity of any snapshots sharing data with the origin.
+.TP
+\fBsnapshot store\fP \- The other block device underlying a virtual snapshot device.  This volume contains data chunks that were copied from the origin in order to preserve the integrity of snapshot data, or were written directly to the snapshot store via a snapshot virtual device.  It also contains all metadata required to keep track of which snapshot store chunks belong to which snapshots.
+.TP
+\fBchunk\fP \- a user-definable binary multiple of 4K block size.
+.TP
+\fBexception\fP \- a chunk of data in the snapshot store, belonging to one or more snapshots.
+.SH SEE ALSO
+\fBzumastor\fP(8), \fBddraid\fP(8), \fBdmsetup\fP(8)
+
+zumastor project page: http://zumastor.org
+.SH FUTURE ADDITIONS
+In the future, we will go further in the direction of hiding the device names, by coming up with a proper library API for creating the virtual devices so we don't need the clumsy dmsetup command any more or the even more clumsy libdevmapper interface, or worse yet, the devmapper ioctl interface.  Our library interface might even offer the option of creating a virtual device with no name, it just gives the program a FD for a device that we set (somehow) to be a virtual origin or snapshot.  No device name ever appears on the filesystem.  I have some misgivings about this idea because we then invite the situation where we can have multiple virtual devices on the same host, referring to the same snapshot.  This ought to work for fine for our \fBddsnap\fP and ddraid devices because they are designed as cluster devices, but I dunno.  I'm still mulliing over the right thing to do there.  This is just to let everybody know that the deficiencies of the current scheme are known, they are being thought about, and for now the result is some visible warts.
+.SH BUGS
+Please report bugs at \fBhttp://code.google.com/p/zumastor\fP or mail them to \fBzumastor@googlegroups.com\fP.
+.SH VERSION
+This man page is current for version 0.6 of \fBddsnap\fP.
+.SH AUTHORS
+.TP
+Man page written by Jane Chiu.  Original ddsnap snapshots coded by Daniel Phillips.  Remote replication originally coded by Jane Chiu and Robert Nelson.  Additional coding by Ross Combs.
+.SH CREDITS
+.TP
+\fBddsnap\fP is distributed under the GNU public license, version 2.  See the file COPYING for details.
+.TP
+This program uses zlib compression library and popt library.  Many people sent patches, lent machines, gave advice and were generally helpful.
+.SH THANKS
+.TP
+Thanks to Google, Red Hat and Sistina Software for supporting this work.  Special thanks to: Mike Todd, Joseph Dries and Matthew O'Keefe.
+.TP
+The home page of \fBddsnap\fP is \fBhttp://zumastor.org\fP.  This site may cover questions unanswered by this manual page.  Mailing lists for support and development are available at zumastor@googlegroups.com

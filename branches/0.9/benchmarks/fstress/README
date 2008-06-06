@@ -1,0 +1,51 @@
+Fstress is a benchmark that is used to test NFS server performance (average 
+latency for a mixed number of client operations at different load levels). 
+The source code here were obtainded from Duke, with several small changes.
+Many thanks to its authors, Darrell Anderson and Jeff Chase, for their permissions
+for us to provide the benchmark here. For more detailed documents, please
+go to the fstress webpage at Duke: http://www.cs.duke.edu/ari/fstress/.
+
+1. BUILD
+	export FSTRESS_HOME=/fstress   // assume the path of fstress code is /fstress
+	cd $FSTRESS_HOME; make
+
+2. CONFIGURE
+	Edit ~/.bashrc file, adding the following line:
+		export FSTRESS_HOME=/fstress
+	Edir ~/.ssh/environment, adding the following line:
+		FSTRESS_HOME=/fstress
+	Fstress allows using multiple clients during a test. A master machine starts executions 
+	on the specified client machines. To do this, the master needs to be able to execute 
+	command remotely. The default remote shell fstress uses is rsh. To use ssh instead, 
+	use option -ssh when starting fstress. Also, use ssh-keygen to setup login without passwd:
+		ssh-keygen -t dsa   // Just enter for any questions ssh-keygen asks, execute this on each client
+		scp ~/.ssh/id_dsa.pub master-host:/home-dir/.ssh/client-host.pub   // scp the generated id_dsa.pub to the master
+		cat /home-dir/.ssh/client-host.pub >> /home-dir/.ssh/authorized_keys2   // add to authorized_keys2
+	Make sure the used client machines have access (can mount and write) on NFS servers
+
+3. RUN
+	Below are some examples of using fstress to measure NFS server response time. 
+	For a complete list of options, please refer to the manual.pdf included in this directory.
+	/* run fstress on a single NFS client (localhost) with NFS server server-name */
+		/fstress/bin/fstress.csh -ssh -clients localhost -server server-name:/nfs-test
+	/* run fstress with starting load 100 (200 ops/s), ending load 1000, increasing 100 per run */
+		/fstress/bin/fstress.csh -low 1000 -high 1000 -incr 100 -ssh -clients localhost -server server-name:/datasrc
+	/* run fstress with warmup time as 500s (default 300s), run time 500s (default 300s) */
+		/fstress/bin/fstress.csh -warmup 500 -run 500 -ssh -clients localhost -server server-name:/datasrc
+	/* specify maximum latency */
+		/fstress/bin/fstress.csh -maxlat 1000 -ssh -clients localhost -server server-name:/datasrc
+	/* have fstress report stats every minute and run it 4 hours at load 1000, loop is the number of repeats. i.e., total-time/run-time */
+		/fstress/bin/fstress.csh -low 1000 -high 1000 -maxlat 1000 -run 60 -loop 240 -ssh -clients localhost -server server-name:/nfs-test
+
+4. VIEW RESULTS 
+	Run fstress_multistich.csh to view the results. output is the directory that contains the running results
+	/fstress/bin/fstress_multistich.csh output
+
+5. Evaluate ZUMASTOR PERFORMANCE
+	This directory includes an example script, run.sh, for comparing fstress performance with and without zumastor.
+	Have a look at the script and change the settings in it according to your nfs server setup. Then execute the
+	script to run the test:
+		./run.sh
+	After the tests finish, use another included script to view the results:
+		./generate_all_gnuplot.sh fstress-output | gnuplot
+	where fstress-output is the directory that contains the generated benchmark results.

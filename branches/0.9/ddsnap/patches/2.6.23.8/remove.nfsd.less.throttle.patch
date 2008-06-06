@@ -1,0 +1,13 @@
+diff -urpN linux-2.6.23.8-clean/fs/nfsd/nfssvc.c linux-2.6.23.8-patched/fs/nfsd/nfssvc.c
+--- linux-2.6.23.8-clean/fs/nfsd/nfssvc.c	2007-10-12 11:43:44.000000000 -0500
++++ linux-2.6.23.8-patched/fs/nfsd/nfssvc.c	2007-11-21 11:43:56.000000000 -0600
+@@ -432,7 +432,7 @@ nfsd(struct svc_rqst *rqstp)
+ 	 * localhost doesn't cause nfsd to lock up due to all the client's
+ 	 * dirty pages.
+ 	 */
+-	current->flags |= PF_LESS_THROTTLE;
++	//current->flags |= PF_LESS_THROTTLE;
+ 	set_freezable();
+ 
+ 	/*
+

@@ -1,0 +1,86 @@
+# Zumastor Linux Storage Server
+# Copyright (c) 2006 Google Inc.
+# Author: Daniel Phillips <phillips@google.com>
+# Licensed under the GNU GPL version 2
+
+# if this environment variable is set,
+# define functions to override the actual commands
+[[ $DDFAKE ]] || return
+
+echo DDFAKE ENABLED
+
+function dmsetup {
+	case $1 in
+	create)
+		local args
+		read args
+		echo dmsetup create $2 $args
+		;;
+	remove)
+		echo dmsetup remove $2
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+function ddsnap {
+	case $1 in
+	initialize|create|delete|server|agent)
+		echo ddsnap "$@"
+		;;
+	status)
+		case $3 in
+		--size)
+			echo 12345
+			;;
+		--list)
+			echo 0 1
+			;;
+		--last)
+			echo 1
+			;;
+		*)
+			return 1
+			;;
+		esac
+		;;
+	usecount)
+		echo test
+		echo New usecount: 0
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
+function mount {
+	case $1 in
+	*)
+		echo mount $@
+		return 0
+		;;
+	esac
+}
+
+function umount {
+	case $1 in
+	*)
+		echo umount $@
+		return 0
+		;;
+	esac
+}
+
+
+function dd {
+	case $1 in
+	*)
+		echo umount $@
+		return 0
+		;;
+	esac
+}
+

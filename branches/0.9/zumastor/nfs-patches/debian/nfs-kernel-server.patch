@@ -1,0 +1,26 @@
+--- nfs-kernel-server.orig	2007-11-30 11:14:03.000000000 -0800
++++ nfs-kernel-server	2007-11-30 13:31:51.000000000 -0800
+@@ -71,7 +71,7 @@ case "$1" in
+ 		
+ 		do_mount nfsd $PROCNFSD_MOUNTPOINT || NEED_SVCGSSD=no
+ 		log_begin_msg "Exporting directories for $DESC..."
+-		$PREFIX/sbin/exportfs -r
++		$PREFIX/sbin/exportfs -a
+ 		if [ $? != 0 ]; then
+ 			log_end_msg $?
+ 			exit $?
+@@ -160,11 +159,9 @@ case "$1" in
+ 	log_end_msg 0
+ 
+ 	log_begin_msg "Unexporting directories for $DESC..."
+-	$PREFIX/sbin/exportfs -au
+-	if [ $? != 0 ]; then
+-		log_end_msg $?
+-		exit $?
+-	fi
++	while read volume options; do
++		[[ $volume == "#"* ]] || $PREFIX/sbin/exportfs -u ${options%(*}:$volume || { log_end_msg $?; exit $?; }
++	done </etc/exports
+ 	log_end_msg 0
+ 
+ 	if mountpoint -q /proc/nfs/nfsd

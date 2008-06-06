@@ -1,0 +1,14 @@
+#!/bin/sh
+
+rm /bin/zumastor
+rm -r /lib/zumastor
+rm -r /var/lib/zumastor
+rm -r /var/run/zumastor
+rm -r /var/log/zumastor
+
+rm /etc/cron.hourly/zumastor
+rm /etc/cron.daily/zumastor
+rm /etc/cron.weekly/zumastor
+rm /etc/cron.monthly/zumastor
+rm /etc/init.d/zumastor
+rm -r /etc/zumastor

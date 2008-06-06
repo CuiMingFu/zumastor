@@ -1,0 +1,2304 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.2.5" />
+<style type="text/css">
+/* Debug borders */
+p, li, dt, dd, div, pre, h1, h2, h3, h4, h5, h6 {
+/*
+  border: 1px solid red;
+*/
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+}
+
+strong {
+  font-weight: bold;
+}
+
+tt {
+  color: navy;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  font-family: sans-serif;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+
+div.sectionbody {
+  font-family: serif;
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+pre {
+  padding: 0;
+  margin: 0;
+}
+
+span#author {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+span#email {
+}
+span#revision {
+  font-family: sans-serif;
+}
+
+div#footer {
+  font-family: sans-serif;
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+div#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+div#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+div#preamble,
+div.tableblock, div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-right: 10%;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  font-family: sans-serif;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+
+div.listingblock {
+  margin-right: 0%;
+}
+div.listingblock > div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock > div.content {
+  padding-left: 2.0em;
+}
+
+div.attribution {
+  text-align: right;
+}
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 2px solid silver;
+}
+
+div.exampleblock > div.content {
+  border-left: 2px solid silver;
+  padding: 0.5em;
+}
+
+div.verseblock div.content {
+  white-space: pre;
+}
+
+div.imageblock div.content { padding-left: 0; }
+div.imageblock img { border: 1px solid silver; }
+span.image img { border-style: none; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: italic;
+}
+dd > *:first-child {
+  margin-top: 0;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+div.olist2 ol {
+  list-style-type: lower-alpha;
+}
+
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead {
+  font-family: sans-serif;
+  font-weight: bold;
+}
+tfoot {
+  font-weight: bold;
+}
+
+div.hlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hlist td {
+  padding-bottom: 5px;
+}
+td.hlist1 {
+  vertical-align: top;
+  font-style: italic;
+  padding-right: 0.8em;
+}
+td.hlist2 {
+  vertical-align: top;
+}
+
+@media print {
+  div#footer-badges { display: none; }
+}
+
+div#toctitle {
+  color: #527bbd;
+  font-family: sans-serif;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+/* Workarounds for IE6's broken and incomplete CSS2. */
+
+div.sidebar-content {
+  background: #ffffee;
+  border: 1px solid silver;
+  padding: 0.5em;
+}
+div.sidebar-title, div.image-title {
+  font-family: sans-serif;
+  font-weight: bold;
+  margin-top: 0.0em;
+  margin-bottom: 0.5em;
+}
+
+div.listingblock div.content {
+  border: 1px solid silver;
+  background: #f4f4f4;
+  padding: 0.5em;
+}
+
+div.quoteblock-content {
+  padding-left: 2.0em;
+}
+
+div.exampleblock-content {
+  border-left: 2px solid silver;
+  padding-left: 0.5em;
+}
+
+/* IE6 sets dynamically generated links as visited. */
+div#toc a:visited { color: blue; }
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+window.onload = function(){generateToc(2)}
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, October 2006. License: GPL */
+
+function getText(el) {
+  var text = "";
+  for (var i = el.firstChild; i != null; i = i.nextSibling) {
+    if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+      text += i.data;
+    else if (i.firstChild != null)
+      text += getText(i);
+  }
+  return text;
+}
+
+function TocEntry(el, text, toclevel) {
+  this.element = el;
+  this.text = text;
+  this.toclevel = toclevel;
+}
+
+function tocEntries(el, toclevels) {
+  var result = new Array;
+  var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+  // Function that scans the DOM tree for header elements (the DOM2
+  // nodeIterator API would be a better technique but not supported by all
+  // browsers).
+  var iterate = function (el) {
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+        var mo = re.exec(i.tagName)
+        if (mo)
+          result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+        iterate(i);
+      }
+    }
+  }
+  iterate(el);
+  return result;
+}
+
+// This function does the work. toclevels = 1..4.
+function generateToc(toclevels) {
+  var toc = document.getElementById("toc");
+  var entries = tocEntries(document.getElementsByTagName("body")[0], toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "toc" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+}
+/*]]>*/
+</script>
+<title>Zumastor HOWTO</title>
+</head>
+<body>
+<div id="header">
+<h1>Zumastor HOWTO</h1>
+<span id="author">Dan Kegel</span><br />
+<span id="email"><tt>&lt;<a href="mailto:dank@kegel.com">dank@kegel.com</a>&gt;</tt></span><br />
+<span id="revision">version 0.8,</span>
+Mar 2008
+<div id="toc">
+  <div id="toctitle">Table of Contents</div>
+  <noscript><p><b>JavaScript must be enabled in your browser to display the table of contents.</b></p></noscript>
+</div>
+</div>
+<h2 id="_introduction">1. Introduction</h2>
+<div class="sectionbody">
+<div class="para"><p>This document will explain what Zumastor is, how it differs from
+other snapshot and replication tools, how to install it,
+and how to use it.</p></div>
+</div>
+<h2 id="_what_is_zumastor">2. What is Zumastor?</h2>
+<div class="sectionbody">
+<div class="para"><p>It has been difficult to convince users of commercial NAS applicances
+to switch to Linux.  In particular, some commercial NAS boxes have
+had better support for snapshots and remote replication than Linux does.
+Zumastor is an effort to fix that.</p></div>
+<h3 id="_snapshots">2.1. Snapshots</h3><div style="clear:left"></div>
+<div class="para"><p>Snapshots can be useful as part of an hourly backup system.  Instead of
+shutting down all applications for the entire duration of the backup, you
+can shut them down for just the second or two needed to take a snapshot.</p></div>
+<div class="para"><p>If your goal is to protect users from accidental deletion of files,
+you may want to take snapshots every hour, and leave the last few
+snapshots around; users who accidentally delete a file can just look in
+the snapshot.</p></div>
+<div class="para"><p>LVM already lets administrators create snapshots, but its design has the
+surprising property that every block you change on the original volume
+consumes one block for each snapshot.  The resulting speed and space
+penalty usually makes the use of more than one or two snapshots at a
+time impractical.</p></div>
+<div class="para"><p>Zumastor keeps all snapshots for a particular volume in a common snapshot
+store, and shares blocks the way one would expect.  Thus making a
+change to one block of a file in the original volume only uses one block
+in the snapshot store no matter how many snapshots you have.</p></div>
+<h3 id="_remote_replication">2.2. Remote Replication</h3><div style="clear:left"></div>
+<div class="para"><p>Andrew Tridgell's rsync is a wonderful tool for replicating files remotely.
+However, when doing periodic replication of large numbers of
+infrequently changing files, the overhead for figuring out what files
+need to be sent can be extreme.</p></div>
+<div class="para"><p>Zumastor keeps track of which block change between one snapshot
+and the next, and can easily send just the changed blocks.
+Thus Zumastor can do frequent replication of large filesystems much more
+efficiently than rsync can.</p></div>
+<div class="para"><p>See <a href="#_replication_latency_benchmark">Replication Latency Benchmark</a> below.</p></div>
+</div>
+<h2 id="_license">3. License</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor is licensed under GPLv2.</p></div>
+</div>
+<h2 id="_development">4. Development</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor development happens on an svn repository, mailing list, irc
+channel, and issue tracker linked to from our home page at
+<a href="http://zumastor.org">http://zumastor.org</a>.</p></div>
+<div class="para"><p>Most development is done by a small group of contributors
+(mainly Daniel Phillips, Jiaying Zhang, Shapor Naghibzadeh, and Drake Diedrich),
+but we welcome patches from the community.
+(Jonathan Van Eenwyk contributed a cool offline backup feature,
+but <a href="http://www.nomorevoid.com/downloads/dm-ddloop.tar.gz">his patch</a> has not yet been merged.  Let us know if you need this.)</p></div>
+</div>
+<h2 id="_release_history">5. Release History</h2>
+<div class="sectionbody">
+<div class="para"><p>Version 0.8, released on 9 May 2008, adds
+several bugfixes (in particular, replication between x86 and x86_64 hosts now works)
+as well as experimental native Hardy packages.  See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3Arelease8&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<div class="para"><p>Version 0.7, released on 27 Mar 2008, adds experimental
+"revert to snapshot" and "multilayer replication" features,
+lets downstream replicas retain snapshots on their own schedule,
+and fixes several bugs.  See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease7%20status%3AFixed&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<div class="para"><p>Version 0.6, released on 4 Feb 2008, added support for offline resizing,
+and fixed a bug that could cause data loss.  (For developers, it also
+added a way to run our autobuilder tests before committing changes.)
+See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease6%20status%3AFixed&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<div class="para"><p>Version 0.5, released on 10 Jan 2008,
+added support for volumes larger than 2TB
+and for exporting snapshots via NFS and CIFS.  See
+<a href="http://code.google.com/p/zumastor/issues/list?q=label%3ARelease5%20status%3AFixed&amp;can=1">our issue tracker for the full list of fixed issues</a>.</p></div>
+<div class="para"><p>Version 0.4, released on 1 Dec 2007, was the first public release.</p></div>
+<div class="para"><p>We have a number of kernel patches, and will push them upstream as
+soon as possible.  See <a href="http://zumastor.org">http://zumastor.org</a> for a list.</p></div>
+</div>
+<h2 id="_limitations">6. Limitations</h2>
+<div class="sectionbody">
+<h3 id="_snapshot_count">6.1. Snapshot Count</h3><div style="clear:left"></div>
+<div class="para"><p>Each volume can have at most 64 snapshots.  This limit may
+be raised or removed in future releases; see
+<a href="http://code.google.com/p/zumastor/issues/detail?id=6">bug 6</a>.</p></div>
+<h3 id="_write_performance">6.2. Write Performance</h3><div style="clear:left"></div>
+<div class="para"><p>Although writes to a Zumastor volume are scalable in that
+their cost doesn't depend on the number of snapshots,
+there is still significant constant overhead; see
+<a href="http://code.google.com/p/zumastor/issues/detail?id=52">bug 52</a>.
+Multiple spindles and RAID controller caches can reduce this problem.
+Reducing the write overhead is an important goal for future releases.
+Until that happens, Zumastor is best suited for read-mostly applications.</p></div>
+<h3 id="_ram">6.3. RAM</h3><div style="clear:left"></div>
+<div class="para"><p>Zumastor's snapshot exception index uses about 1MB of RAM per gigabyte of snapshot change blocks,
+but the index's size is fixed at ddsnapd startup time.  You can tune it with the &#8212;cachesize
+option to <em>zumastor define volume</em>; the default size of the cache is 128MB (or one
+quarter of physical RAM, whichever is smaller).
+You may need to tune it to get good performance with very large volumes.</p></div>
+<div class="para"><p>A future release may use a more compact index; see <a href="http://code.google.com/p/zumastor/issues/detail?id=5">bug 5</a>.</p></div>
+</div>
+<h2 id="_zumastor_user_interface">7. Zumastor User Interface</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor exposes itself to users in several ways:</p></div>
+<div class="ilist"><ul>
+<li>
+<p>
+An admin script, /etc/init.d/zumastor
+</p>
+</li>
+<li>
+<p>
+A commandline tool, /bin/zumastor
+</p>
+</li>
+<li>
+<p>
+Origin mount points, e.g. /var/run/zumastor/mount/myvolumename
+</p>
+</li>
+<li>
+<p>
+Snapshot mount points, e.g. /var/run/zumastor/snapshot/myvolumename/yyyy.mm.dd-hh.mm.ss
+</p>
+</li>
+</ul></div>
+<h3 id="_zumastor_admin_script">7.1. Zumastor admin script</h3><div style="clear:left"></div>
+<div class="para"><p>The admin script, /etc/init.d/zumastor, simply starts or stops the
+Zumastor daemon responsible for mounting Zumastor volumes.  Normally this
+is run once at system startup time by init, but you may need to run it
+manually in unusual circumstances.</p></div>
+<div class="para"><p>For instance, if you tell Zumastor to use origin volumes or snapshot
+stores on loopback devices that are not set up at boot time, and then
+reboot, Zumastor can't mount them automatically; you have to set them up
+and then restart Zumastor with the command <tt>/etc/init.d/zumastor restart</tt>.</p></div>
+<h3 id="_zumastor_commandline_tool">7.2. Zumastor commandline tool</h3><div style="clear:left"></div>
+<div class="para"><p>The sysadmin uses /bin/zumastor to configure snapshot stores,
+take or delete snapshots, and set up remote replication.
+See <a href="http://zumastor.org/man/zumastor.8.html">the zumastor man page</a> for more information.</p></div>
+<div class="para"><p>The zumastor command is really just a very fancy wrapper around
+the underlying command, ddsnap.  You probably won't ever need to
+use ddsnap directly, but if you're curious, see <a href="http://zumastor.org/man/ddsnap.8.html">the ddsnap man page</a>.</p></div>
+<h3 id="_origin_and_snapshot_mount_points">7.3. Origin and Snapshot mount points</h3><div style="clear:left"></div>
+<div class="para"><p>Zumastor deals with two kinds of volumes: <em>origin</em> volumes
+and <em>snapshot</em> volumes.  Simply put, origin volumes are what you
+take snapshots of.
+Zumastor mounts these volumes for you in appropriately named
+subdirectories of /var/run/zumastor/mount.
+In other words, you do not need to add any of these to /etc/fstab.
+The zumastor init script will mount the volume and all its snapshots
+automatically at boot time.</p></div>
+<div class="para"><p>Zumastor mounts snapshot volumes in appropriately named
+subdirectories of /var/run/zumastor/snapshot.
+Each snapshot mount point is named for the creation time of that snapshot,
+in the form of YYYY.MM.DD-HH:MM.SS. Zumastor also maintains a series of symbolic links
+for each specified snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).</p></div>
+<div class="para"><p>Zumastor skips one number each snapshot for housekeeping reasons, so
+home(1000) would be roughly the 500th snapshot of home.
+The snapshot number never decreases (though perhaps it would
+wrap if you did billions of snapshots&#8230;)</p></div>
+<div class="para"><p>By default, Zumastor mounts all its volumes under /var/run/zumastor/mount,
+and mounts all its volume snapshots under /var/run/zumastor/snapshot.
+You can change the mount point of a volume with the <tt>&#8212;mountpoint</tt> option
+of the command <tt>zumastor define volume</tt> or with the <tt>zumastor remount</tt>
+command, as described in Zumastor man page.
+Similarly, you can change the mount points of a volume snapshot with the
+<tt>&#8212;snappath</tt> option of the command <tt>zumastor define volume</tt>.</p></div>
+</div>
+<h2 id="_installing_zumastor">8. Installing Zumastor</h2>
+<div class="sectionbody">
+<div class="para"><p>Zumastor requires changes to the Linux kernel that are not yet
+in the vanilla kernel, so a patched kernel is required.
+You can install Zumastor on any recent distribution as long as you're
+willing to do it by hand.  Automated installation is available
+for Debian / Ubuntu and Gentoo.  (RHEL, Fedora, and Suse
+are probably next on our list of distros to support, please
+let us know if you're willing to contribute RPM .spec files.)
+For developers, we also support automated installation with UML.</p></div>
+<h3 id="_source">8.1. Source</h3><div style="clear:left"></div>
+<div class="para"><p>If you use a distro not covered below, you can install if you're
+willing to patch your kernel and compile everything manually.  See
+the writeup at <a href="http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL">http://zumastor.googlecode.com/svn/trunk/ddsnap/INSTALL</a>.</p></div>
+<h3 id="_prebuilt_debian_ubuntu_packages_from_zumastor_org">8.2. Prebuilt Debian / Ubuntu Packages from zumastor.org</h3><div style="clear:left"></div>
+<div class="para"><p>Prebuilt kernel packages for recent Debian / Ubuntu systems
+are available from zumastor.org.
+You should probably play with Zumastor in a virtual environment
+before installing on your real systems.  (You can even do this on Windows!)</p></div>
+<div class="para"><p>These packages should work with any version of Ubuntu from Dapper to Gutsy,
+but they aren't built quite like standard Ubuntu kernel packages,
+so they might not fit all needs.
+If you need more native Ubuntu packages, see the next section.</p></div>
+<div class="para"><p>Stable releases are at <a href="http://zumastor.org/downloads/releases">http://zumastor.org/downloads/releases</a>,
+and trunk snapshots are at <a href="http://zumastor.org/downloads/snapshots">http://zumastor.org/downloads/snapshots</a>.
+Directories are named by branch and svn revision.
+e.g. 0.7-r1491 is the 0.7 branch as of svn revision 1491.
+Once you've picked a version, download and install its four .deb
+packages.  (Install dmsetup first.)</p></div>
+<div class="para"><p>Installing in Feisty or later requires some work to avoid
+<a href="https://bugs.launchpad.net/baltix/+source/ubiquity/+bug/78552">ubuntu bug 78552</a>.
+In particular,
+you have to run update-grub by hand after installing.
+Alternately, you could instead edit /etc/kernel-img.conf first
+to have an absolute path for update-grub.</p></div>
+<div class="para"><p>For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt> sudo apt-get install dmsetup
+ wget -m -np zumastor.org/downloads/releases/0.7-r1491/
+ mv zumastor.org/downloads/releases/0.7-r1491 .
+ rm -rf zumastor.org
+ sudo dpkg -i 0.7-r1491/*.deb
+ sudo update-grub</tt></pre>
+</div></div>
+<div class="para"><p>Don't forget the trailing slash on wget, else it will download
+all directories, not just the one you want!</p></div>
+<div class="para"><p>The install takes several minutes.
+Ignore the warnings about deleting symbolic links <tt>&#8230;/build</tt> and <tt>&#8230;/source</tt>.</p></div>
+<div class="para"><p>Try rebooting into your newly installed kernel.
+If booting hangs, the most likely cause is an hda1 / sda1 confusion.
+Try editing the new kernel's entries in /boot/grub/menu.lst to say root=/dev/hda1 instead of root=/dev/sda1.
+If that helps, note that you might need to mentally replace /dev/sda3 with /dev/hda3 when running
+through the examples later in this document.  (Alternately, you could create a symlink so /dev/sda3 points to /dev/hda3.)</p></div>
+<h3 id="_experimental_prebuilt_ubuntu_packages_from_ppa_launchpad_net_zumastor_team">8.3. Experimental Prebuilt Ubuntu Packages from ppa.launchpad.net/zumastor-team</h3><div style="clear:left"></div>
+<div class="para"><p>Our team page at launchpad.net (https://launchpad.net/~zumastor-team)
+has a continually-updated repository of standard Ubuntu packages for Zumastor.
+It's hooked up to our trunk right now, so it's only for those interested in
+the very latest untested packages.  But they should be real Hardy packages,
+up to Ubuntu's packaging standards.</p></div>
+<div class="para"><p>Here's how to use that repository, if you dare:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Add these lines to /etc/apt/sources.list
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>deb http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse
+deb-src http://ppa.launchpad.net/zumastor-team/ubuntu gutsy main restricted universe multiverse</tt></pre>
+</div></div>
+<div class="para"><p>Then run <tt>sudo apt-get update</tt>.</p></div>
+</li>
+<li>
+<p>
+Install zumastor, ddsnap, dmsetup, and a zumastor-enabled kernel.
+For instance:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo aptitude install linux-image-2.6.22-14-zumastor zumastor ddsnap</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<div class="para"><p>Finally, reboot and choose the Zumastor-enabled kernel, and
+make sure the system comes up ok.</p></div>
+<h3 id="_example_installing_zumastor_on_ubuntu_inside_a_vmware_player">8.4. Example: installing Zumastor on Ubuntu inside a VMWare player</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Install the free VMWare Player from <a href="http://vmware.com/download/player">http://vmware.com/download/player</a>.
+</p>
+<div class="ilist"><ul>
+<li>
+<p>
+If you're on Feisty, it's easier, just do <tt>apt-get install vmware-player</tt>.
+</p>
+</li>
+<li>
+<p>
+For all other versions of Ubuntu, you have to use the vendor's
+install script.  You may need to do <tt>sudo apt-get install build-essential</tt> first.
+There's a nice tutorial for the timid at
+<a href="http://www.smokinglinux.com/tutorials/install-vmware-player-on-ubuntu-gutsy-710">smokinglinux.com</a>.
+Take the easy way out and choose all defaults when installing.
+</p>
+</li>
+<li>
+<p>
+If you're running a very new kernel, you may get
+compile errors when installing vmware player.
+See <a href="https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391">https://bugs.launchpad.net/ubuntu/+source/linux-meta/+bug/188391</a>
+I was able to work around this by using the "any-any" script,
+first described at <a href="http://communities.vmware.com/thread/26693">http://communities.vmware.com/thread/26693</a>, and
+downloadable by clicking on
+<a href="http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz">http://vmkernelnewbies.googlegroups.com/web/vmware-any-any-update-116.tgz</a>
+in a browser (no wget).
+</p>
+</li>
+</ul></div>
+</li>
+<li>
+<p>
+Download a vmware image with Ubuntu preinstalled.
+Dan Kegel, one of the Zumastor developers,
+prepared a standard Ubuntu Gutsy Jeos 7.10 vmware image
+that's a svelte 78MB download; you can grab it at
+<a href="http://kegel.com/linux/jeos-vmware-player/">http://kegel.com/linux/jeos-vmware-player/</a>.
+The image is several files 7zipped together, so unpack it before trying to
+use it.  Sadly, there are several versions of 7zip with different
+interfaces.
+On both dapper and gutsy, <tt>sudo apt-get install p7zip</tt> installs it.
+The command to decompress is
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>7z e ~/ubuntu-7.10-jeos-vmware.7z</tt></pre>
+</div></div>
+<div class="para"><p>on Dapper, and</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>7zr e ~/ubuntu-7.10-jeos-vmware.7z</tt></pre>
+</div></div>
+<div class="para"><p>on Gutsy.  Go figure.</p></div>
+</li>
+<li>
+<p>
+Boot the virtual machine with the command <tt>vmplayer gutsy.vmx</tt>.
+Inside vmware, log in to the virtual ubuntu box
+(using the username and password from the site where you downloaded the image,
+e.g. "notroot", "notpass" if you're using Dan Kegel's image).
+</p>
+</li>
+<li>
+<p>
+Verify that you can ping the outside world.  If you can't, you may
+need to make minor adjustments to the gutsy.vmx file's networking.
+On one system, I had to change the line
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.connectionType = "nat"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.connectionType = "bridged"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Inside vmware, download and install dmsetup and the Zumastor packages
+as described above.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
+<h3 id="_example_setting_up_multiple_instances_of_zumastor_on_vmware">8.5. Example: Setting up multiple instances of Zumastor on vmware</h3><div style="clear:left"></div>
+<div class="para"><p>If you want to test replication virtually, you'll need to create at
+least one more virtual machine.   The only trick here is getting
+the network addressing straight.  Here's what to do (assuming you're
+using the gutsy jeos image from the previous example).</p></div>
+<div class="para"><p>Set up one virtual machine first as follows:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Create a new directory vm1 and unzip ubuntu-7.10-jeos-vmware.7z into it, e.g.
+ $ mkdir vm1
+ $ cd vm1
+ $ 7zr e ../ubuntu-7.10-jeos-vmware.7z
+</p>
+</li>
+<li>
+<p>
+Set up the uuid and ethernet address in gutsy.vmx to end in 01 (since this is the first vm),
+i.e. change the lines
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:00"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b ac"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Boot the virtual machine by running <tt>vmplayer gutsy.vmx</tt>.
+Networking won't work yet because the system is only
+set up to use the first ethernet device, and the new ethernet
+address is assigned to the second ethernet device.
+Once logged in to the new virtual machine, fix the ethernet
+address of eth0 and remove any extra ethernet devices by editing
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt>.
+Then restart each new virtual machine's network by running
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo /etc/init.d/udev restart</tt></pre>
+</div></div>
+<div class="para"><p>or rebooting it, and verify that networking works.</p></div>
+</li>
+<li>
+<p>
+Configure the hostname to be <tt>vm1</tt> by editing <tt>/etc/hostname</tt>.
+</p>
+</li>
+<li>
+<p>
+Edit /etc/hosts to use <tt>vm1</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
+</p>
+</li>
+<li>
+<p>
+Install an ssh server, e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo apt-get install openssh-server</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Set up ssh authorization as described in the section
+<a href="#_try_remote_replication">Try Remote Replication</a> below.
+Add both your own public key from your real workstation,
+as well as the public key of the vm's root account, to
+the virtual machine's root account's authorized_keys file.
+e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>(copy ~/.ssh/id_rsa.pub onto the vm using scp, call it mykey)
+sudo cat mykey /root/.ssh/id_rsa.pub &gt;&gt; /root/.ssh/authorized_keys</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Download and install dmsetup and the Zumastor packages as described above.
+</p>
+</li>
+<li>
+<p>
+Shut down the virtual machine with <tt>halt</tt>.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Cloning the virtual machines is slightly easier than setting them up from scratch:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+For each desired new virtual machine, copy the vm1 directory, e.g.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>cp -a vm1 vm2
+cd vm2</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+As above, edit the new machine's gutsy.vmx file to use
+different uuid and ethernet addresses.  e.g. change
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:01"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 01"</tt></pre>
+</div></div>
+<div class="para"><p>to</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ethernet0.address = "00:50:56:3F:12:02"
+uuid.location = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"
+uuid.bios = "56 4d 12 67 af 79 52 33-3f 54 3a 1b 7a 4c 4b 02"</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Boot the new machine, log in to it as root, and edit
+<tt>/etc/udev/rules.d/70-persistent-net.rules</tt> as above to use the new address for eth0,
+and remove eth1.  Then restart the network by running
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>sudo /etc/init.d/udev restart</tt></pre>
+</div></div>
+<div class="para"><p>and verify that networking works.</p></div>
+</li>
+<li>
+<p>
+Configure the hostname to be <tt>vm2</tt>, by editing <tt>/etc/hostname</tt>.
+</p>
+</li>
+<li>
+<p>
+Edit /etc/hosts to use <tt>vm2</tt> rather than <tt>ubuntu</tt>,
+and add a line for the virtual machine's IP address, with its real hostname
+(you can get the IP address from <tt>ip addr</tt>).
+</p>
+</li>
+<li>
+<p>
+Reboot the virtual machine so the hostname change takes effect.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Then merge the /etc/hosts entries for all virtual machines
+together, and add them to both your host's /etc/hosts file
+and the /etc/hosts files on all the virtual machines.</p></div>
+<div class="para"><p>Finally, from your real host machine, make sure you can do</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>ssh root@vm1
+ssh root@vm2
+...</tt></pre>
+</div></div>
+<div class="para"><p>to make sure you can log in to each vm as root without being prompted for a password.</p></div>
+<div class="para"><p>Tip: create a script to start up all your virtual machines, e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>for vm in vm1 vm2 vm3
+do
+   cd $vm
+   vmplayer gutsy.vmx &amp;
+   sleep 2
+   cd ..
+done</tt></pre>
+</div></div>
+<div class="para"><p>Tip: after starting virtual machines, just minimize them,
+and log in via ssh.  That way you won't have to jump through hoops to
+switch windows, and copy-and-paste will work as expected.</p></div>
+<h3 id="_example_installing_zumastor_on_ubuntu_inside_a_qemu_virtual_machine">8.6. Example: installing Zumastor on Ubuntu inside a QEMU virtual machine</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Install qemu on your machine.  (If you're using Ubuntu,
+it might be as simple as <tt>apt-get install qemu</tt>.)
+</p>
+</li>
+<li>
+<p>
+Download an Ubuntu or Debian installation CD image.  Use one
+of the more complete images if you don't want to configure network
+access for the test image.  Here are links to download Ubuntu Dapper
+via
+<a href="http://mirrors.kernel.org/ubuntu-releases/dapper/ubuntu-6.06.1-server-i386.iso">http</a>
+or
+<a href="http://torrent.ubuntu.com:6969/file?info_hash=%0F%EF%D4K%9DW%B9%99w%0A%00%DB%60%21%CF%EBV%87%7Bq">torrent</a>.
+</p>
+</li>
+<li>
+<p>
+Create an empty file to become the image's block device using either dd or qemu-img:
+<tt>dd if=/dev/zero bs=1M seek=10k count=0 of=zqemu.raw</tt>
+</p>
+</li>
+<li>
+<p>
+Start qemu, booting from CD the first time to install a base system:
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot d</tt>
+</p>
+</li>
+<li>
+<p>
+Chose manual partitioning, create a 2G partition for / on /dev/sda and
+leave the rest unallocated.  You may or may not want a 1G swap.
+Create any user you wish and remember the password.
+</p>
+</li>
+<li>
+<p>
+Boot again off the newly install disk image, this time with userspace
+networking enabled:
+<tt>qemu -cdrom ubuntu-6.06.1-server-i386.iso -hda zqemu.raw -boot c -net user -net nic</tt>
+</p>
+</li>
+<li>
+<p>
+Log in to the virtual machine, and inside it, download and install dmsetup and the Zumastor packages
+as described above.
+</p>
+</li>
+<li>
+<p>
+Boot the virtual machine again.
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Congratulations, you now have a virtual system with Zumastor installed!</p></div>
+<h3 id="_debian_ubuntu_packages_from_source">8.7. Debian/Ubuntu packages from source</h3><div style="clear:left"></div>
+<div class="para"><p>Most people won't need to do this, but just in case, here's how to build
+our .deb packages.  Zumastor is currently built as three packages:
+a patched kernel package, a ddsnap (snapshot device userspace) package,
+and a zumastor (management cli) package.</p></div>
+<div class="para"><p>1.
+Make sure you have the necessary build tools installed, e.g.:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo aptitude install debhelper devscripts fakeroot kernel-package libc6-dev \
+libevent-dev libkrb5-dev libkrb53 libldap2-dev libpopt-dev ncurses-dev \
+slang1-dev subversion zlib1g-dev</tt></pre>
+</div></div>
+<div class="para"><p>2.
+Get the latest code:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ svn checkout http://zumastor.googlecode.com/svn/trunk/ zumastor</tt></pre>
+</div></div>
+<div class="para"><p>3.
+Run the build script.  This will build all three packages.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ cd zumastor
+$ ./buildcurrent.sh kernel/config/full</tt></pre>
+</div></div>
+<div class="para"><p>This will download kernel source from kernel.org.
+The version downloaded is controlled by the file
+<a href="http://zumastor.googlecode.com/svn/trunk/KernelVersion">KernelVersion</a>
+at the top of the Zumastor source tree.
+The script takes a parameter which is a .config file for the kernel.
+There is distribution-like config in the repository in
+<a href="http://zumastor.googlecode.com/svn/trunk/kernel/config/2.6.22.10-i386-full">kernel/config/full</a>.
+If you need to use a different config, make sure you enable <tt>CONFIG_DM_DDSNAP</tt>.</p></div>
+<h3 id="_gentoo">8.8. Gentoo</h3><div style="clear:left"></div>
+<div class="para"><p>The Zumastor project has a Gentoo overlay to simplify deployment of
+Zumastor using Gentoo's Portage package system. To use the overlay in
+an automated fashion you'll want to make sure you have the Gentoo
+overlay manager, layman, installed.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># emerge layman
+# echo "source /usr/portage/local/layman/make.conf" &gt;&gt; /etc/make.conf</tt></pre>
+</div></div>
+<div class="para"><p>Next you'll want to add the Zumastor overlay diretory to layman's
+/etc/layman/layman.cfg. You want to update the "overlays"
+variable. Note that layman's config format want's each new entry in
+the overlays list to be on a new line. After you have updated it, the
+section of the file where overlays is set will look something like:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>overlays        : http://www.gentoo.org/proj/en/overlays/layman-global.txt
+                  http://zumastor.googlecode.com/svn/trunk/gentoo/overlay/overlays.xml</tt></pre>
+</div></div>
+<div class="para"><p>You will then want to add the Zumastor overlay to layman:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># layman -f -a zumastor</tt></pre>
+</div></div>
+<div class="para"><p>The zumastor ebuilds are currently masked, so the next think you'll
+need to do is to unmask them:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># echo "sys-kernel/zumastor-sources ~x86" &gt;&gt; /etc/portage/package.keywords
+# echo "sys-block/zumastor ~x86" &gt;&gt; /etc/portage/package.keywords</tt></pre>
+</div></div>
+<div class="para"><p>After all that preamble, we are now ready to install Zumastor and the
+Zumastor kernel sources:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># emerge zumastor-sources zumastor</tt></pre>
+</div></div>
+<div class="para"><p>Congratulations, you have now installed the zumastor software and
+kernel sources. You'll need to build a kernel as per usual, with one
+exception: you need to ensure that you enable the CONFIG_DM_DDSNAP
+kernel option when you configure your kernel. It can be found in
+"Device Drivers" -&gt; "Multi-device support" -&gt; "Distributed Data
+Snapshot target".</p></div>
+<div class="para"><p>The Zumastor project also recommends a few options be enabled to
+assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
+CONFIG_DEBUG_INFO.</p></div>
+<h4 id="_example_installing_zumastor_on_gentoo_inside_a_vmware_player">8.8.1. Example: installing Zumastor on Gentoo inside a VMWare player</h4>
+<div class="para"><p>We have a prebuilt Gentoo vmware image at
+<a href="http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z">http://zumastor.org/downloads/misc/Gentoo_VMImage.tar.7z</a>.  You'll
+need to unpack that image with 7zip (believe it or not, compressing
+with 7zip saved a lot more space than with rzip, and lrzip crashed on
+it.  Go figure.)</p></div>
+<div class="para"><p>Be sure to check the settings to make sure that the RAM allocation is
+reasonable for your system. When you look at the settings you'll
+notice there are two SCSI drives installed on the image. The first one
+contains the Gentoo image, and the second is a blank, set aside for
+your Zumastor datastore. You may wish to resize the second one to
+better suit your needs.</p></div>
+<div class="para"><p>Power on the virtual image and select the Zumastor kernel. The root
+password on the image is set to "zumastor", so you should login as
+root and immediately change the password. You should also look at the
+contents of /etc/conf.d/clock to make sure that the timezone and clock
+settings are correct for your system. I'd also recommend syncing and
+updating through portage/layman, just to be sure you have the latest
+software.</p></div>
+<div class="para"><p>Once you've got the image the way you want it, it is time to set up
+the Zumastor storage space. You'll need to use lvm to create a
+physical volume and volume group:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># pvcreate /dev/sdb
+# vgcreate sysvg /dev/sdb
+# lvcreate --size 500MB -n test sysvg
+# lvcreate --size 1500MB -n test sysvg</tt></pre>
+</div></div>
+<div class="para"><p>Your Gentoo image is now ready for Zumastor.</p></div>
+<h3 id="_uml">8.9. UML</h3><div style="clear:left"></div>
+<div class="para"><p>UML is potentially the fastest and easiest way to try out Zumastor,
+at least if you're a developer who likes working with the commandline.</p></div>
+<div class="para"><p>There is a simple shell script,
+<strong><a href="http://zumastor.googlecode.com/svn/trunk/test/uml/demo.sh">test/uml/demo.sh</a></strong>,
+which starts UML, runs a few simple tests to make sure Zumastor is
+basically working, and shuts UML back down.
+It's somewhat Ubuntu/Debian specific, but could probably be made compatible
+with rpm-based distos (patches gratefully accepted).</p></div>
+<div class="para"><p>Developers who wish to contribute changes to Zumastor should
+make sure that demo.sh passes before and after their changes.</p></div>
+<div class="para"><p>Before you run demo.sh, you should look through it.
+It starts off by doing six configuration steps, three of
+which use sudo to gain root privs:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+As root, it installs any missing packages with apt-get.
+</p>
+</li>
+<li>
+<p>
+It downloads some large files (Linux sources, UML system images)
+which can take quite a while on a slow connection.
+These files are cached in the <em>build</em> subdirectory at the
+top of the zumastor tree so they don't need to be downloaded again.
+</p>
+</li>
+<li>
+<p>
+It builds UML in the directory <em>working/linux-2.6.xxx</em> if it's
+not present.
+</p>
+</li>
+<li>
+<p>
+It creates a root filesystem for UML.
+</p>
+</li>
+<li>
+<p>
+As root, it configures the UML root filesystem.
+</p>
+</li>
+<li>
+<p>
+As root, it runs <em>setup_network_root.sh</em> to configure your system
+to allow ssh to the UML instances.  For instance, it modifies /etc/hosts
+to include the lines
+</p>
+</li>
+</ol></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>192.168.100.1 uml_1
+192.168.100.2 uml_2</tt></pre>
+</div></div>
+<div class="para"><p>Finally, after all that setup, it starts running the UML tests (whew!).</p></div>
+<div class="para"><p>If you want to do a squeaky-clean run, do "rm -rf working".
+Otherwise demo.sh will reuse the UML and images in that directory
+to save time.</p></div>
+<div class="para"><p>You may want to do <em>sudo true</em> before running demo.sh just
+to make sure sudo has your password, so the sudo in the
+middle of the script doesn't prompt you and hang forever.</p></div>
+<div class="para"><p>Also, you may want to add ", timestamp_timeout=100" to the
+end of the Defaults line in your /etc/sudoers file so
+sudo doesn't time out so quickly.</p></div>
+<div class="para"><p>Now that you've read all of the above :-), go ahead and run "bash demo.sh" now.
+On my oldish Athlon 64 3000, it takes 23 minutes (plus download time)
+on the first run, and 10 minutes on the second run.</p></div>
+<div class="para"><p>Once demo.sh passes, or even if it doesn't quite, you might
+want to start and log in to a UML instance manually.
+The four simple shell scripts, xssh.sh, xget.sh, xput.sh, and
+xstop.sh, let you log in to, get a file from, put a file on, and stop
+the uml instance set up by demo.sh.
+These are handy for poking at things manually.</p></div>
+<div class="para"><p>Note that these tests are not the ones run by our continuous
+build and test system; see below for those.</p></div>
+<h3 id="_cbtb_uml">8.10. CBTB UML</h3><div style="clear:left"></div>
+<div class="para"><p>There is experimental support for using UML on Debian / Ubuntu systems
+to run the same tests that our continuous build and test system runs; see
+<a href="http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README">http://zumastor.googlecode.com/svn/trunk/cbtb/uml/README</a>.
+This modifies your system, for instance, by installing Apache to act as a local
+debian package repository for use by the UML instances, so it
+may not be everybody's cup of tea.  But it does get the time
+to test small changes to the cbtb test scripts down below ten minutes,
+which should help people developing new automated tests &#8212;
+at least if they're willing to run a particular version of Ubuntu.</p></div>
+<div class="para"><p>These tests are very touchy.
+It may take you hours to get them working, or they may run on the first try.
+They use sudo and ssh a lot, so make sure sudo and ssh are working well.
+Ask on IRC for help if you run into trouble.</p></div>
+<div class="para"><p>Steps to follow:</p></div>
+<div class="para"><p>0) Set up ccache if you want fast kernel compiles after the first run
+(assumes /usr/local/bin is early on your PATH):</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt> $ sudo apt-get install ccache
+ $ sudo ln -sf /usr/bin/ccache /usr/local/bin/gcc</tt></pre>
+</div></div>
+<div class="para"><p>And if your home directory is on NFS, you have to point to a local
+drive (else the cache will be too slow), e.g.:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt> $ mkdir /data/$LOGNAME/ccache.dir
+ $ ln -s /data/$LOGNAME/ccache.dir ~/.ccache</tt></pre>
+</div></div>
+<div class="para"><p>1) Run the smoke tests</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt> $ cd cbtb/uml
+ $ bash smoke-test.sh</tt></pre>
+</div></div>
+<div class="para"><p>Sounds simple, doesn't it?  Yet there are dozens of problems you might
+hit.  Here are the ones I hit when I tried it, in order:</p></div>
+<div class="ilist"><ul>
+<li>
+<p>
+doesn't support Ubuntu Gutsy (I switched to Dapper; Hardy may also work)
+</p>
+</li>
+<li>
+<p>
+ssh prompted for password, but I didn't notice
+</p>
+</li>
+<li>
+<p>
+I ran the tests with sh instead of bash (we check for that now)
+</p>
+</li>
+<li>
+<p>
+I mistakenly ran the tests as root (don't do that)
+</p>
+</li>
+<li>
+<p>
+/dev/net/tun had the wrong permissions, so the script couldn't contact
+the UML instances (the script is now much aggressive about relaxing
+permissions on that file)
+</p>
+</li>
+<li>
+<p>
+The script to set up the UML environment behaves very badly if
+there are any network errors while accessing the Ubuntu repository
+(we now set up a proxy server, and download an initial tarball, to
+deal with that &#8212; but those add failure modes of their own)
+</p>
+</li>
+<li>
+<p>
+The script to set up the proxy (../host-setup/proxy.sh) had a bad URL for
+the ubuntu server, so I had to delete /etc/apache2/sites-enabled/proxy
+and run again.
+</p>
+</li>
+<li>
+<p>
+I accidentally ran <em>svn update</em> in a subdirectory rather than
+the top of the tree, and ended up with a mismatched tree.  The
+script warns you about a split repository, but didn't say quite what
+to do about it.  (The script is clearer now.)
+</p>
+</li>
+</ul></div>
+<div class="para"><p>Other notes:</p></div>
+<div class="ilist"><ul>
+<li>
+<p>
+You may append &#8212;all to smoke-test.sh's command line if you wish to run all
+  cbtb tests instead of just the smoke tests.
+</p>
+</li>
+</ul></div>
+</div>
+<h2 id="_troubleshooting">9. Troubleshooting</h2>
+<div class="sectionbody">
+<div class="para"><p>When creating a new snapshot store on an existing device from a
+previous test runs, be sure to zero the snapshot store
+by e.g. giving the -i option to "zumastor define volume".
+Otherwise creating the first snapshot may fail with "snapshot already exists".</p></div>
+<div class="para"><p>Many zumastor commands are not synchronous.  For instance,
+"zumastor snapshot" doesn't take effect right away; it can take
+several seconds for the snapshot to be taken and mounted.
+These nonsynchronous commands can't show any error messages directly,
+so you have to look in the log files /var/log/zumastor/VOLNAME/{master,server}
+for errors.</p></div>
+</div>
+<h2 id="_examples">10. Examples</h2>
+<div class="sectionbody">
+<h3 id="_verify_that_lvm2_is_installed">10.1. Verify that LVM2 is installed</h3><div style="clear:left"></div>
+<div class="para"><p>Although Zumastor doesn't require lvm2, many of these examples use it, so
+install it now if it's not already installed, and give the <em>pvcreate</em>
+comand with no arguments just to check whether it's installed and ready.
+(This example is for Debian / Ubuntu, but it's similar for Fedora et al.
+If you don't have /etc/init.d/lvm, don't worry, just skip that command.)</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo apt-get install lvm2
+$ sudo /etc/init.d/lvm start
+$ pvcreate</tt></pre>
+</div></div>
+<div class="para"><p>If pvcreate complains <tt>No program "pvcreate" found for your current version of LVM</tt>, you probably forgot to start the lvm service.</p></div>
+<h3 id="_verify_that_zumastor_is_installed_and_started">10.2. Verify that Zumastor is installed and started</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ zumastor
+Usage: /bin/zumastor {define|forget|start|stop|snapshot|replicate|status} [&lt;subarguments&gt;...]
+$ /etc/init.d/zumastor status
+zumastor is running
+use 'zumastor status' for more info...
+$ /bin/zumastor status
+RUN STATUS:
+agents
+cron
+mount
+running
+servers
+snapshot
+</tt></pre>
+</div></div>
+<div class="para"><p>Note: this doesn't yet complain properly if you forgot to reboot
+into a kernel that supports zumastor.  (It will later, when you try to
+define a volume.)</p></div>
+<div class="para"><p>The output of <tt>/etc/init.d/zumastor status</tt> is easy to understand,
+but the more verbose output of <tt>/bin/zumastor status</tt> needs some
+explanation.</p></div>
+<div class="para"><p>First, if you stop zumastor with <tt>/etc/init.d/zumastor stop</tt>,
+the line <em>running</em> won't show up in the ouptut of <tt>/bin/zumastor status</tt>.</p></div>
+<div class="para"><p>Second, some of the other output lines you see there is a category.
+Once volumes are mounted, there will be more lines underneath some of
+the categories; see below.</p></div>
+<h3 id="_create_a_simple_snapshotted_volume_on_a_loopback_file">10.3. Create a simple snapshotted volume on a loopback file</h3><div style="clear:left"></div>
+<div class="para"><p>Before you go messing with real devices, it's useful
+to experiment with plain old files dressed up to look
+like devices via the loopback device.</p></div>
+<div class="para"><p>Annoyingly, the loopback device naming scheme changed at some point;
+on some systems it's /dev/loop/0, on others it's /dev/loop0.
+You may need to adjust the path to suit your version of Linux.</p></div>
+<div class="para"><p>Run the following commands as root (e.g. with sudo sh):</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>dd if=/dev/zero of=/media/vg.img bs=1024 count=220000
+losetup -d /dev/loop0 &gt; /dev/null 2&gt;&amp;1 || true
+losetup /dev/loop0 /media/vg.img
+pvcreate /dev/loop0
+vgcreate sysvg /dev/loop0
+lvcreate --name test --size 100MB sysvg
+mkfs.ext3 /dev/sysvg/test
+lvcreate --name test_snap --size 100MB sysvg
+zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+zumastor define master zumatest</tt></pre>
+</div></div>
+<div class="para"><p>If this complains</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/bin/zumastor[889]: error: dmsetup returned 1
+create failed
+/bin/zumastor: define volume 'zumatest' failed</tt></pre>
+</div></div>
+<div class="para"><p>you may have forgotten to reboot into the Zumastor-enabled kernel
+you installed earlier.</p></div>
+<div class="para"><p>If lvcreate complains</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/proc/misc: No entry for device-mapper found
+Is device-mapper driver missing from kernel?</tt></pre>
+</div></div>
+<div class="para"><p>you may be hitting
+<a href="https://bugs.launchpad.net/ubuntu/+source/devmapper/+bug/178889">Ubuntu bug 178889</a>;
+try adding <tt>dm_mod</tt> to <tt>/etc/modules</tt> or do <tt>sudo modprobe dm_mod</tt> manually.</p></div>
+<div class="para"><p>Verify that zumastor has mounted the volume by doing</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ df | grep zumatest</tt></pre>
+</div></div>
+<h3 id="_what_if_zumastor_can_t_mount_the_devices_at_boot_time">10.4. What if Zumastor can't mount the devices at boot time?</h3><div style="clear:left"></div>
+<div class="para"><p>Starting with the previous example,
+reboot the virtual machine and log back in.
+Notice that <tt>df</tt> doesn't show any Zumastor volumes mounted.
+That's because when Zumastor started at boot time, it
+couldn't see the loopback device, because we didn't arrange
+for it to be set up automatically at boot time.
+(This won't happen with real devices!)
+So do it manually now, then tell LVM about it, then tell Zumastor about it:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo sh
+# losetup /dev/loop0 /media/vg.img
+# vgchange -ay
+# /etc/init.d/zumastor restart
+# df | grep zumatest</tt></pre>
+</div></div>
+<div class="para"><p>You should now see the expected set of volumes and snapshots mounted.</p></div>
+<div class="para"><p>If vgchange -ay doesn't detect your volume group, do <tt>rm /etc/lvm/.cache</tt>
+and try again.</p></div>
+<h3 id="_remove_the_volume_and_loopback_file_created_above">10.5. Remove the volume and loopback file created above</h3><div style="clear:left"></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo sh
+# zumastor forget volume zumatest
+# lvremove sysvg
+# losetup -d /dev/loop0
+# rm /media/vg.img</tt></pre>
+</div></div>
+<h3 id="_create_a_single_snapshotted_volume_on_a_real_device">10.6. Create a single snapshotted volume on a real device</h3><div style="clear:left"></div>
+<div class="para"><p>First, find or create an big empty partition.
+(If you're using Dan Kegel's gutsy vmware image, the virtual hard drive
+has lots of unpartitioned space; use <tt>fdisk /dev/sda</tt> to create new
+partition 3 with type 8e (LVM), then reboot and make sure /dev/sda3 now exists.)</p></div>
+<div class="para"><p>Here's how to use LVM to put a volume and its snapshot store onto it,
+assuming the empty partition is named /dev/sda3 and has size 10GB:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo sh
+# pvcreate /dev/sda3
+  Physical volume "/dev/sda3" successfully created
+# vgcreate sysvg /dev/sda3
+  Volume group "sysvg" successfully created
+# lvcreate --name test --size 5G sysvg
+  Logical volume "test" created
+# lvcreate --name test_snap --size 4G sysvg
+  Logical volume "test_snap" created
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+Wed Nov 21 19:32:58 2007: [3622] snap_server_setup: ddsnapd bound to socket /var/run/zumastor/servers/zumatest
+pid = 3623
+Successfully created and initialized volume 'zumatest'.
+# mkfs.ext3 /dev/mapper/zumatest
+# zumastor define master zumatest</tt></pre>
+</div></div>
+<div class="para"><p>The <tt>zumastor define master</tt> command causes it be to mounted on
+/var/run/zumastor/mount/zumatest.</p></div>
+<div class="para"><p>You now have a mounted zumastorized filesystem.</p></div>
+<div class="para"><p>Note that you can run mkfs either before or after <tt>zumastor define volume</tt>,
+i.e. you can zumastor-ize an existing volume if you like,
+or you can mkfs a zumastor-ized volume.    (You can even do silly things
+like taking snapshots during the middle of mkfs.)</p></div>
+<div class="para"><p>Note: If you are using XFS, you will need to add <tt>&#8212;mountopts nouuid</tt> to your <tt>zumastor define volume</tt> line.</p></div>
+<h3 id="_set_up_periodic_snapshots">10.7. Set up periodic snapshots</h3><div style="clear:left"></div>
+<div class="para"><p>To set up hourly snapshots on the volume from the previous example, do:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor define schedule zumatest --hourly 24</tt></pre>
+</div></div>
+<div class="para"><p>The <tt>&#8212;hourly 24</tt> specifies that we want to keep the 24 most recent hourly snapshots (a days worth).
+A snapshot will be created once an hour via the zumastor hourly cron
+script.  We can accelerate this by manually telling zumastor to take an
+"hourly" snapshot right now, with the <tt>zumastor snapshot</tt> command:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest    5160576    141440   4756992   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0) 5160576    141440   4756992   3% /var/run/zumastor/snapshot/zumatest/2008.02.18-19.10.14</tt></pre>
+</div></div>
+<div class="para"><p>Notice that the snapshot is mounted for you in a subdirectory of
+<tt>/var/run/zumastor/snapshot/zumatest/</tt> named after the date and time of
+when you took the snapshot.</p></div>
+<div class="para"><p>Now look at the directory where all the snapshots are mounted:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># ls -l /var/run/zumastor/snapshot/zumatest/
+drwxr-xr-x 3 root root 4096 2008-02-18 18:51 2008.02.18-19.10.14
+lrwxrwxrwx 1 root root   19 2008-02-18 19:20 hourly.0 -&gt; 2008.02.18-19.10.14</tt></pre>
+</div></div>
+<div class="para"><p>The <tt>hourly.0</tt> symlink will "always" point to the most recent hourly snapshot.
+This is handy when writing scripts, and mimics common practice on other
+systems.</p></div>
+<div class="para"><p>If you do some IO on the filesystem, the number of blocks used by the
+origin volume (<tt>/var/run/zumastor/mount/zumatest</tt>) should increase,
+but the number of blocks used by any existing snapshot should not:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># echo 'This is the first file!' &gt; /var/run/zumastor/mount/zumatest/foo.txt
+# df | grep zumatest
+/dev/mapper/zumatest    5160576    141444   4756988   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0) 5160576    141440   4756992   3% /var/run/zumastor/snapshot/zumatest/2008.02.18-19.10.14</tt></pre>
+</div></div>
+<div class="para"><p>As expected, the origin's block counts change a bit (by four in this example),
+but the snapshot's doesn't change.</p></div>
+<div class="para"><p>Now take another snapshot, and look at df again:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor snapshot zumatest hourly
+# df | grep zumatest
+/dev/mapper/zumatest    5160576    141444   4756988   3% /var/run/zumastor/mount/zumatest
+/dev/mapper/zumatest(0) 5160576    141440   4756992   3% /var/run/zumastor/snapshot/zumatest/2008.02.18-19.10.14
+/dev/mapper/zumatest(2) 5160576    141444   4756988   3% /var/run/zumastor/snapshot/zumatest/2008.02.18-19.15.01</tt></pre>
+</div></div>
+<div class="para"><p>Notice that the first snapshot's volume was named
+<tt>zumatest(0)</tt>, but the new one's is named <tt>zumatest(2)</tt>.
+(Why the gap?  Zumastor uses another snapshot internally during
+replication.  Yes, this is a bit of a rough edge.)</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">If you want to export Zumastor snapshots via NFS or Samba, you need to use the <tt>export</tt> or <tt>samba</tt>
+options with the <tt>zumastor define master</tt> command. See sections "Exporting a Zumastor volume via NFS"
+and "Exporting a Zumastor volume via Samba" for such examples.</td>
+</tr></table>
+</div>
+<h3 id="_comparison_with_lvm_snapshots">10.8. Comparison with LVM Snapshots</h3><div style="clear:left"></div>
+<div class="para"><p>LVM can of course also do snapshots.  For instance, to back up a filesystem
+at an instant using an LVM snapshot and tar, you might do:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># lvcreate --name backup --size 100M --snapshot sysvg/test
+# mkdir /mnt/backup
+# mount /dev/sysvg/backup /mnt/backup
+# tar -czf /tmp/backup.tgz -C /mnt/backup .
+# umount /dev/backup
+# lvremove --force sysvg/backup</tt></pre>
+</div></div>
+<div class="para"><p>Zumastor simplifies this a bit in that it doesn't require creating
+a new LVM logical volume for each snapshot, and it handles the
+mounting for you.  For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor snapshot zumatest hourly
+# tar -czf /tmp/backup.tgz -C /var/run/zumastor/snapshot/zumatest/hourly.0 .</tt></pre>
+</div></div>
+<div class="para"><p>The snapshot will be garbage-collected later, no need to remove it,
+no need for manual mounting or unmounting.</p></div>
+<div class="para"><p>See <a href="#_replication_latency_benchmark">Replication Latency Benchmark</a> below
+for a script that compares performance of zumastor replication
+with rsync.</p></div>
+<h3 id="_where_do_old_snapshots_go">10.9. Where do old snapshots go?</h3><div style="clear:left"></div>
+<div class="para"><p>Assuming you've set up a volume to keep 24 hourly snapshots
+around with the command <tt>zumastor define schedule zumatest &#8212;hourly 24</tt>
+as in the last example, what happens when the 25th snapshot is taken?</p></div>
+<div class="para"><p>To find out, you can run a loop that takes lots of snapshots.
+Run it, then use df to see how many snapshots are around afterwards:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># num=0
+# while test $num -lt 50
+  do
+    zumastor snapshot zumatest hourly
+    num=`expr $num + 1`
+    echo $num
+  done
+# df -P | grep zumatest</tt></pre>
+</div></div>
+<div class="para"><p>You should see 24 snapshots (the limit set when we did the <tt>zumastor define schedule</tt>)
+plus the origin volume.  Each time you run <tt>zumastor snapshot &#8230;</tt>
+it creates a new snapshot, and deletes any that are <em>too old</em>.</p></div>
+<h3 id="_try_remote_replication">10.10. Try Remote Replication</h3><div style="clear:left"></div>
+<div class="para"><p>In this section, we will be working with two machines, <em>original</em>
+(the main machine) and <em>replica</em> (where data is replicated to).</p></div>
+<div class="para"><p>Note: zumastor requires you to refer to each machine
+by the string returned by <tt>uname -n</tt>.  You can't use numerical
+IP addresses!  This is <a href="http://code.google.com/p/zumastor/issues/detail?id=54">bug 54</a>.</p></div>
+<div class="para"><p>For example, if in DNS your machines are original.example.com and
+replica.example.com but <tt>uname -n</tt> returns only <tt>original</tt> and <tt>replica</tt>,
+you must tell Zumastor the hosts are <em>original</em> and <em>replica</em>, not the
+FQDNs of the machines.</p></div>
+<div class="para"><p>If your organization uses the .local
+TLD, you might run into some issues with mDNS. See
+<a href="http://avahi.org/wiki/AvahiAndUnicastDotLocal">Avahi and Unicast Domains .local</a>
+for more information.</p></div>
+<h4 id="_enable_root_login">10.10.1. Enable root login</h4>
+<div class="para"><p>As of Zumastor 0.7, remote replication still requires that both
+the original and replica machines trust each other, and
+allow root to remotely log in to each other.  This is
+<a href="http://code.google.com/p/zumastor/issues/detail?id=40">bug 40 in the zumastor issue tracker</a>.
+Eventually Zumastor's networking will be redone
+to allow replication without requiring both machines to
+trust each other so strongly.</p></div>
+<div class="para"><p>If you use Ubuntu or any other distribution which disables root login
+by default, set a password for the root user to enable this account:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>$ sudo passwd root</tt></pre>
+</div></div>
+<div class="para"><p>Make sure the SSH daemon is installed and PermitRootLogin is set to
+<em>yes</em> in your sshd_config.</p></div>
+<h4 id="_ssh_authorization">10.10.2. SSH authorization</h4>
+<div class="para"><p>Please note if you get a root shell by using <em>sudo -s</em>, this step will
+fail because by default preserves your environment (including your home
+directory). Either use <em>su</em> (if you have already set a password for root)
+or <em>sudo -s -H</em>.</p></div>
+<div class="para"><p>On each machine, run ssh-keygen as root and hit enter to all three
+questions, creating phraseless keys:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+7a:81:de:d4:71:18:32:f0:4e:2c:ee:7d:e4:33:c1:5d root@original</tt></pre>
+</div></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa):
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+4a:fe:e7:39:ec:eb:ab:39:e8:b3:29:09:b7:77:02:02 root@replica</tt></pre>
+</div></div>
+<div class="para"><p>Append root's .ssh/id_rsa.pub file from each machine to .ssh/authorized_keys
+on the other.  This authorizes root on each machine to connect without
+a password to the other. For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# cat /root/.ssh/id_rsa.pub | ssh root@replica "cat &gt;&gt; /root/.ssh/authorized_keys"
+root@replica:~# cat /root/.ssh/id_rsa.pub | ssh root@original "cat &gt;&gt; /root/.ssh/authorized_keys"</tt></pre>
+</div></div>
+<div class="para"><p>Using ssh to do this copy also happens to put each machine in the other's
+/root/.ssh/known_hosts file.  This is important for later; without it, replication will fail.</p></div>
+<div class="para"><p>Finally, verify that root can ssh from replica to original, and vice versa,
+without any prompting.</p></div>
+<div class="para"><p>(Bidirectional root trust between machines is scary, isn't it?  As mentioned above,
+<a href="http://code.google.com/p/zumastor/issues/detail?id=40">we'll get rid of this eventually</a>).</p></div>
+<h4 id="_create_volume_on_master">10.10.3. Create volume on master</h4>
+<div class="para"><p>This example uses volume <em>zumatest</em> just like the previous examples,
+with one minor difference: to make the first replication efficient,
+one should zero the partition before creating the filesystem.
+You can do this with /bin/dd; zumastor 0.7 also has a handy &#8212;zero option that does this.
+(Yes, this can be slow on a large volume, but it can save
+time when you don't have an infinitely fast network.)</p></div>
+<div class="para"><p>When following this example on vmware, you probably want to use
+small volumes, e.g. 500M rather than 5G, unless you have lots of time to kill.</p></div>
+<div class="para"><p>For instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># pvcreate /dev/sda3
+# vgcreate sysvg /dev/sda3
+# lvcreate --name test --size 5G sysvg
+# lvcreate --name test_snap --size 4G sysvg
+# dd if=/dev/zero of=/dev/sysvg/test bs=1024k count=5120
+# mkfs.ext3 /dev/sysvg/test
+# zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize</tt></pre>
+</div></div>
+<h4 id="_define_target_on_master">10.10.4. Define target on master</h4>
+<div class="para"><p>Tell <em>original</em> to be ready to replicate to <em>replica</em>:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor define target zumatest replica.example.com</tt></pre>
+</div></div>
+<div class="para"><p>Replications have to be triggered somehow.  There are three ways to do this:</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+automatically, with a &#8212;period NUMSECONDS option on `zumastor define target' on <em>original</em>
+</p>
+</li>
+<li>
+<p>
+automatically, with a &#8212;period NUMSECONDS option on `zumastor define source' on <em>replica</em>
+</p>
+</li>
+<li>
+<p>
+manually, with `zumastor replicate'
+</p>
+</li>
+</ol></div>
+<div class="para"><p>Now make sure the new relationship is reflected in <tt>zumastor status</tt>:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor status --usage
+...
+`-- targets/
+    `-- replica.example.com/
+        |-- period
+        `-- trigger|
+...</tt></pre>
+</div></div>
+<h4 id="_create_volume_on_target">10.10.5. Create volume on target</h4>
+<div class="para"><p>Zumastor doesn't create volumes for you, so you have to do it.
+The volumes should be exactly the same size on the target as on the master.
+e.g.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># pvcreate /dev/sda3
+# vgcreate sysvg /dev/sda3
+# lvcreate --name test --size 5G sysvg
+# lvcreate --name test_snap --size 4G sysvg</tt></pre>
+</div></div>
+<h4 id="_define_volume_and_configure_source_on_target">10.10.6. Define volume and configure source on target</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600</tt></pre>
+</div></div>
+<div class="para"><p>Please note you do not need to create a filesystem (i.e. run mkfs) on the target machine.</p></div>
+<div class="para"><p>Running <tt>zumastor status &#8212;usage</tt> on the target should show a hostname, replication port number, and period entry
+under source for volume zumatest.</p></div>
+<div class="para"><p>You can use <tt>zumastor define schedule</tt> command to keep periodic snapshots on target.
+By default, periodic snapshots are not mounted on target. You can use the <tt>&#8212;mount-snap</tt> option
+of the command <tt>zumastor define source</tt> to have snapshots mounted and symlinked, in the same way
+as those mounted on master.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~#  zumastor define source zumatest original.example.com:11235 --period 600 --mount-snap
+root@replica:~#  zumastor define schedule zumatest --hourly 24</tt></pre>
+</div></div>
+<h4 id="_start_replication">10.10.7. Start replication</h4>
+<div class="para"><p>This is important; without it, no automatic replication happens:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# zumastor start source zumatest</tt></pre>
+</div></div>
+<div class="para"><p>Alternatively, you may kick off replication manually each time from the master.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor replicate zumatest replica.example.com</tt></pre>
+</div></div>
+<div class="para"><p>Once initial replication is started, ddsnap processes should begin
+consuming CPU cycles and moving tens of megabits per second between
+the nodes. Initially, the entire origin device will need to be moved,
+which can take several minutes.  (5 minutes for a 500MB volume on vmware,
+less on real hardware.)</p></div>
+<div class="para"><p>When replication is complete, df on the slave should show the same /var/run/zumastor/mount/zumatest volume locally mounted.</p></div>
+<h4 id="_verify_replication">10.10.8. Verify replication</h4>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  date &gt;&gt; /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>Wait 30-60 seconds for next replication cycle to complete.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~#  cat /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>If your current directory is inside the volume in question,
+you won't see any new snapshots; you should watch from outside
+the volume if you want to see incoming snapshots.</p></div>
+<div class="para"><p>If the same file is there on the target (replica), replication is working.</p></div>
+<h4 id="_automated_demo_script">10.10.9. Automated demo script</h4>
+<div class="para"><p>Here's a handy script that illustrates all the commands needed to set up
+small test volumes and kick off rapid replication between two machines
+named vm1 and vm2.
+(It also rather rudely resets zumastor and clears its logs,
+but that's handy when you're trying to learn how things work.)
+It assumes you've already set up a volume group named sysvg.
+On my 1GHz system, it takes about five minutes to do the initial
+replication, but seems to replicate quickly after that.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>#!/bin/sh
+cat &gt; restart-test.sh &lt;&lt;_EOF_
+set -x
+# Clean up after last run, if any.
+zumastor forget volume zumatest &gt; /dev/null 2&gt;&amp;1
+lvremove -f sysvg/test &gt; /dev/null 2&gt;&amp;1
+lvremove -f sysvg/test_snap &gt; /dev/null 2&gt;&amp;1
+# Clear logs.  Wouldn't do this in production!  Just for testing.
+/etc/init.d/zumastor stop
+rm -rf /var/log/zumastor /var/run/zumastor
+/etc/init.d/zumastor start
+lvcreate --name test --size 500M sysvg
+lvcreate --name test_snap --size 400M sysvg
+dd if=/dev/zero of=/dev/sysvg/test bs=500k count=1024
+_EOF_
+set -x
+for host in vm1 vm2
+do
+    scp restart-test.sh root@${host}:
+    ssh root@${host} sh restart-test.sh
+done
+ssh root@vm1 "mkfs.ext3 /dev/sysvg/test ;
+ zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
+ zumastor define master zumatest ;
+ zumastor define target zumatest vm2"
+ssh root@vm2 "
+zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize ;
+zumastor define source zumatest vm1:11235 --period 5;
+zumastor start source zumatest"</tt></pre>
+</div></div>
+<h3 id="_multilayer_replication">10.11. Multilayer replication</h3><div style="clear:left"></div>
+<div class="para"><p>This section illustrates how to set up chained replication on multiple machines, e.g.,
+<em>original</em> replicates to <em>replica1</em> that replicates to <em>replica2</em>.</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Set up root login on all of the three machines, see section "Enable root login" above.
+</p>
+</li>
+<li>
+<p>
+Set up SSH authorizations between <em>original</em> and <em>replica1</em>, and <em>replica1</em> and <em>replica2</em>,
+as described in section "SSH authorization" above.
+</p>
+</li>
+<li>
+<p>
+Create volume on master, as described in section "Create volume on master".
+</p>
+</li>
+<li>
+<p>
+Define target on master, as described in section "Define target on master".
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~# zumastor define target zumatest replica1.example.com</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Create volume on <em>replica1</em>, as described in section "Create volume on target".
+</p>
+</li>
+<li>
+<p>
+Define volume and configure source on <em>replica1</em>, as described in section "Define volume and configure source on target".
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica1:~#  zumastor define source zumatest original.example.com --period 600</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Define target on <em>replica1</em>.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor define target zumatest replica2.example.com</tt></pre>
+</div></div>
+<div class="para"><p>Running <tt>zumastor status</tt> on <em>replica1</em> shows that the machine is both the target and the source
+of the volume replication.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~# zumastor status
+...
+source
+   hostname: original.example.com
+   name: zumatest
+   period: 600
+targets
+   replica2.example.com
+      name: zumatest
+...</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Create volume on <em>replica2</em>, as described in section "Create volume on target".
+</p>
+</li>
+<li>
+<p>
+Define volume and configure source on <em>replica2</em> as <em>replica1</em>.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica2:~#  zumastor define volume zumatest /dev/sysvg/test /dev/sysvg/test_snap --initialize
+root@replica2:~#  zumastor define source zumatest replica1.example.com --period 600</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Start replication.
+You can set up automatic chained replication
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica1:~#  zumastor start source zumatest
+root@replica2:~#  zumastor start source zumatest</tt></pre>
+</div></div>
+<div class="para"><p>or start replication manually</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  zumastor replicate zumatest replica1.example.com
+root@replica1:~#  zumastor replicate zumatest replica2.example.com</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Verify replication.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@original:~#  date &gt;&gt; /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+<div class="para"><p>Wait for the next replication cycle to complete on both replicas.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica2:~#  cat /var/run/zumastor/mount/zumatest/testfile</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<h3 id="_export_a_zumastor_volume_via_nfs">10.12. Export a Zumastor volume via NFS</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Install the NFS server packages:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># aptitude install nfs-common nfs-kernel-server</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Add the following lines to the NFS exports file <tt>/etc/exports</tt>
+(where <em>zumatest</em> is the Zumastor volume to be exported):
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>/var/run/zumastor/mount/zumatest *(rw,fsid=0,nohide,no_subtree_check,crossmnt)
+/var/run/zumastor/snapshot/zumatest *(ro,fsid=1,nohide,no_subtree_check,crossmnt)</tt></pre>
+</div></div>
+<div class="para"><p>The &#8220;fsid=xxx&#8221; option is required to ensure that the NFS server uses the same
+file handle after a restart or remount of an exported volume.  If it is not
+specified, when the snapshot is remounted the file handle will change and the
+client will receive a stale file handle error. Any 32 bit number can be used for
+fsid value but it must be unique across all exported filesystems.</p></div>
+<div class="para"><p>The &#8220;crossmnt&#8221; option is required to allow client access to exported snapshot
+directories mounted under the Zumastor volume, see below.</p></div>
+</li>
+<li>
+<p>
+If you want to also export zumastor <strong>snapshots</strong>, you'll need to use
+the <tt>&#8212;export</tt> option with the command <tt>zumastor define master</tt> described in section
+"Mount a new volume and set up periodic snapshots" above.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor define master zumatest --export</tt></pre>
+</div></div>
+<div class="para"><p>You'll also need to modify your system's NFS startup script to
+reread /etc/exports on restart.  For Ubuntu, we provide a patch that
+does this for you:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># cd /etc/init.d/
+# wget http://zumastor.googlecode.com/svn/trunk/zumastor/nfs-patches/debian/nfs-kernel-server.patch
+# patch -p0 &lt; nfs-kernel-server.patch
+# rm -f nfs-kernel-server.patch</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<div class="para"><p>To export zumastor volumes from a different path, you can either symlink the zumastor volumes
+to that path or use the <tt>&#8212;mountpoint</tt> and <tt>&#8212;snappath</tt> options
+with the command <tt>zumastor define volume</tt> described in section "Origin and Snapshot mount points" above.</p></div>
+<h3 id="_recover_files_through_nfs_using_a_zumastor_snapshot">10.13. Recover files through NFS using a Zumastor snapshot</h3><div style="clear:left"></div>
+<div class="para"><p>First, make sure you have used the <tt>&#8212;export</tt> option with the <tt>zumastor define master</tt>
+command and modified your NFS server's startup script
+as described in the section "Exporting a Zumastor volume via NFS" above.</p></div>
+<div class="para"><p>Then mount the Zumastor volume as normal on an NFS client, for instance:</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># mount -tnfs nfs-server:/var/run/zumastor/snapshot/zumatest /mnt
+# ls /mnt</tt></pre>
+</div></div>
+<div class="para"><p>There will be a number of snapshot directories under /mnt.
+Each of these directories is named for the time at which that snapshot was
+taken and symlinked to the corresponding snapshot rotation (e.g., hourly.0, hourly.1, daily.0, etc).
+To recover a file, find it in the appropriate snapshot directory and
+copy it to the desired location.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">A future revision of Zumastor may add options to make the snapshots
+visible inside each directory, which would let you access them from any
+place under the volume mount point.</td>
+</tr></table>
+</div>
+<h3 id="_export_a_zumastor_volume_via_samba">10.14. Export a Zumastor volume via Samba</h3><div style="clear:left"></div>
+<div class="para"><p>Here is an example of setting up Samba on Zumastor using the USER authentication flavor.</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Install the Samba server packages:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># aptitude install samba</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Edit file <tt>/etc/samba/smb.conf</tt>, configuring the &#8220;workgroup&#8221; option according to your domain setup,
+commenting out the &#8220;obey pam restrictions = yes&#8221; option, and adding the following lines
+(where <em>zumatest</em> is the Zumastor volume to be exported and <em>homevol</em> is the name of
+the exported Samba volume):
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>[homevol]
+
+path = /var/run/zumastor/mount/zumatest
+comment = test volume
+browseable = yes
+case sensitive = no
+read only = no
+vfs objects = shadow_copy</tt></pre>
+</div></div>
+<div class="para"><p>The &#8220;vfs objects = shadow_copy&#8221; option is required for accessing snapshot directories via
+CIFS's <strong>previous version</strong> interface, see below.</p></div>
+</li>
+<li>
+<p>
+Setup smbpasswd for the volume <em>homevol</em>. Please replace <em>testuser</em> with the user name you want to
+use for accessing the exported Samba volume from a client. You don't need the <tt>useradd</tt> command if
+<em>testuser</em> has already existed on the Samba server.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># useradd testuser
+# smbpasswd -a testuser
+New SMB password: your-secure-passwd
+Retype new SMB password: your-secure-passwd</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+If you want to also export zumastor <strong>snapshots</strong> via CIFS's <strong>previous version</strong> interface, you'll need to use
+the <tt>&#8212;samba</tt> option with the command <tt>zumastor define master</tt> described in section
+"Mount a new volume and set up periodic snapshots" above.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor define master zumatest --samba</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<h3 id="_recover_files_through_samba_using_a_zumastor_snapshot">10.15. Recover files through Samba using a Zumastor snapshot</h3><div style="clear:left"></div>
+<div class="para"><p>First, make sure you have used the <tt>samba</tt> option with the <tt>zumastor define master</tt>
+command as described in the section "Exporting a Zumastor volume via Samba" above.
+Then you can recover files from a Windows Samba client as follows.</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Open Windows Explorer and enter the Samba server name followed by the exported volume name in the explorer bar, e.g.,
+<tt>\\samba-server\homevol\</tt>. Enter <em>testuser</em> and <em>your-secure-passwd</em> in the poped up authtication window, where <em>testuser</em>
+and <em>your-secure-passwd</em> are the username and password your have set up on the Samba server, as described in section
+"Exporting a Zumastor volume via Samba" above.
+</p>
+</li>
+<li>
+<p>
+Go to the file or directory you want to recover. Right click it and select <tt>Properties</tt>. You will see the
+<tt>Previous versions</tt> tab appear on the top. Select it and you will see a list of snapshots in the window.
+Select a snapshot. Then you can view, copy, or restore any file from that snapshot.
+</p>
+</li>
+</ol></div>
+<h3 id="_resize_a_zumastor_volume">10.16. Resize a Zumastor volume</h3><div style="clear:left"></div>
+<div class="para"><p>Suppose you have a Zumastor volume <em>zumatest</em> that uses the <em>/dev/sysvg/test</em> LVM device as the origin and
+<em>/dev/sysvg/test_snap</em> LVM device as the snapshot store.
+Here are the examples to resize the origin/snapshot device of the Zumastor volume that has an EXT3 file system
+running on top of it.</p></div>
+<h4 id="_enlarge_the_origin_device_of_a_zumastor_volume">10.16.1. Enlarge the origin device of a Zumastor volume</h4>
+<div class="olist"><ol>
+<li>
+<p>
+First, make sure you have shut down all of the services running on top of the Zumastor volume,
+such as NFS or Samba. You can use <em>lsof</em> to check if any file in /var/run/zumastor/mount/zumatest is still open:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># sync
+# lsof | grep /var/run/zumastor/mount/zumatest</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Resize the LVMm device of the origin volume with the <em>newsize</em>. Here <em>newsize</em> may be suffixed
+by unit designator such as K, M, or G.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># lvresize /dev/sysvg/test -L newsize</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Resize zumastor origin volume with the <tt>zumastor resize &#8212;origin</tt> command.
+Then resize the EXT3 file system with the <tt>e2fsck/resize2fs</tt> utilities from the
+<tt>e2fsprogs</tt> debian package (you need to install the package first if it is not already installed).
+Here, we need to first stop <tt>zumastor master</tt>, which will umount the
+origin volume as well as all of the existing snapshots. If the volume is being replicated to another server, you need to stop replication (both in the origin and in the replica host). After the EXT3 resizing, we restart
+<tt>zumastor master</tt>, which will mount the origin volume with the new size.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt>root@replica:~# zumastor stop source zumatest
+root@original:~# zumastor stop target zumatest replica
+root@original:~# zumastor stop master zumatest
+root@original:~# zumastor resize zumatest --origin newsize
+root@original:~# e2fsck -f /dev/mapper/zumatest
+root@original:~# resize2fs /dev/mapper/zumatest newsize
+root@original:~# zumastor start master zumatest
+root@original:~# zumastor start target zumatest replica
+root@replica:~# zumastor start source zumatest</tt></pre>
+</div></div>
+<div class="para"><p>Now check the size of the Zumastor volume with <tt>df | grep zumatest</tt>.
+You will see that the size of the origin volume has changed but the size of
+all the existing snapshots is unchanged.</p></div>
+</li>
+</ol></div>
+<h4 id="_shrink_the_origin_device_of_a_zumastor_volume">10.16.2. Shrink the origin device of a Zumastor volume</h4>
+<div class="para"><p>The steps to shrink the origin device of a Zumastor volume are
+similar to those for enlarging the origin device, but need to be
+ran in a different order.</p></div>
+<div class="olist"><ol>
+<li>
+<p>
+Shut down all of the services running on top of the Zumastor volume.
+</p>
+</li>
+<li>
+<p>
+Stop <tt>zumastor master</tt>. Then shrink the EXT3 file system.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor stop master zumatest
+# e2fsck -f /dev/mapper/zumatest
+# resize2fs /dev/mapper/zumatest newsize</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Shrink the zumastor origin device. Before running the <tt>zumastor resize &#8212;origin</tt>
+command, we need to first have all of the data on the shrinked space to be copied out to the
+snapshot store. Otherwise, you may get access error when reading/writing an existing snapshot.
+The copyout can be executed by overwriting the shrinked space with the <tt>dd</tt> command.
+E.g., when shrinking the origin device from 4G to 1G, you can use
+<tt>dd if=/dev/zero of=/dev/mapper/zumatest bs=64k seek=16k count=48k</tt>.
+Depends on the old size of your origin device, this step may take a long time.
+After that, restart <tt>zumastor master</tt>.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># dd if=/dev/zero of=/dev/mapper/zumatest bs=unit seek=newsize/unit count=(oldsize-newsize)/unit
+# sync
+# zumastor resize zumatest --origin newsize
+# zumastor start master zumatest</tt></pre>
+</div></div>
+<div class="para"><p>Now check the size of the Zumastor volume with <tt>df | grep zumatest</tt>.
+You should see that the size of the origin volume has changed but the size of
+all the existing snapshots is unchanged.</p></div>
+</li>
+<li>
+<p>
+Now it is safe to shrink the origin LVM device.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># lvresize /dev/sysvg/test -L newsize</tt></pre>
+</div></div>
+</li>
+</ol></div>
+<h4 id="_enlarge_the_snapshot_store_of_a_zumastor_volume">10.16.3. Enlarge the snapshot store of a Zumastor volume</h4>
+<div class="para"><p>To enlarge the snapshot store of a Zumastor volume,
+run the <tt>zumastor resize &#8212;snapshot</tt> command after enlarging the snapshot lvm device.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># lvresize /dev/sysvg/test_snap -L newsize
+# zumastor resize zumatest --snapshot newsize</tt></pre>
+</div></div>
+<div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
+<h4 id="_shrink_the_snapshot_store_of_a_zumastor_volume">10.16.4. Shrink the snapshot store of a Zumastor volume</h4>
+<div class="para"><p>Shrinking the snapshot store of a Zumastor volume is not difficult,
+but must be done with care.
+First, run the <tt>zumastor resize &#8212;snapshot</tt> command to shrink
+the Zumastor snapshot store.
+(The command may fail if the existing snapshot store does
+not have enough continuous free space. In this case, try a larger value.)
+If the  <tt>zumastor resize &#8212;snapshot</tt> command succeeds,
+you can then run the <tt>lvresize</tt> command to shrink the snapshot lvm device.</p></div>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor resize zumatest --snapshot newsize
+# lvresize /dev/sysvg/test_snap -L newsize</tt></pre>
+</div></div>
+<div class="para"><p>After this, check the new size of the Zumastor snapshot store with the <tt>zumastor status &#8212;usage</tt> command.</p></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">You can follow the similar procedures when resizing a Zumastor volume
+with a different file system running on top of it. For example, you can
+replace the
+<tt>e2fsck/resize2fs</tt> commands with <tt>resize_reiserfs -f /dev/mapper/zumatest</tt> to resize a reiserfs file system.
+If you want to resize a Zumastor volume that uses raw partitions instead of
+lvm devices, you can use <tt>fdisk</tt> instead of <tt>lvresize</tt> to resize those partitions.</td>
+</tr></table>
+</div>
+<h3 id="_how_to_revert_a_zumastor_volume_to_a_previous_snapshot">10.17. How to revert a Zumastor volume to a previous snapshot</h3><div style="clear:left"></div>
+<div class="olist"><ol>
+<li>
+<p>
+Take a look at <tt>/var/run/zumastor/snapshot/zumatest/</tt> and decide
+which snapshot you want to revert to.  Suppose you want to revert to a
+snapshot that is created two days ago. You can find out its corresponding
+snapshot number as follows:
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor status
+...
+snapshot
+...
+  daily.2 -&gt; 2008.03.10-09.09.40
+...
+
+# mount | grep mapper | grep 2008.03.10-09.09.40
+/dev/mapper/zumatest(xxx) on /var/run/zumastor/snapshot/zumatest/2008.03.10-09.09.40 type ext3 (ro)</tt></pre>
+</div></div>
+<div class="para"><p>Here, xxx is the snapshot number you want to revert to.</p></div>
+</li>
+<li>
+<p>
+Stop all of the services running on top of the zumastor volume and then stop zumastor master.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor stop master zumatest</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Revert the zumastor volume to snapshot xxx.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt># zumastor revert zumatest xxx</tt></pre>
+</div></div>
+</li>
+<li>
+<p>
+Restart zumastor master.
+</p>
+<div class="literalblock">
+<div class="content">
+<pre><tt> # zumastor start master zumatest
+ # ls /var/run/zumastor/mount/zumatest</tt></pre>
+</div></div>
+<div class="para"><p>You will see that the zumastor volume has changed back to the old version.</p></div>
+</li>
+</ol></div>
+<h3 id="_how_can_i_run_the_above_examples_using_uml">10.18. How can I run the above examples using UML?</h3><div style="clear:left"></div>
+<div class="para"><p>First off, cd into test/uml.</p></div>
+<div class="para"><p>Second, if you haven't already, run demo.sh to make sure UML is set up
+and working.</p></div>
+<div class="para"><p>Then you can easily start and log in to a UML instance by running ./xssh.sh.</p></div>
+<div class="para"><p>Rather than using LVM, use the devices created by demo.sh,
+/dev/ubdb and /dev/ubdc.  For instance, "zumastor define volume -i zumatest /dev/ubdb /dev/ubdc".</p></div>
+</div>
+<h2 id="_test_and_benchmark_tools">11. Test and Benchmark Tools</h2>
+<div class="sectionbody">
+<div class="para"><p>We provide several test and benchmark tools that you may want to run first before using Zumastor
+to host your critical data. The benchmark results depend a lot on the underlying hardware.
+E.g., with a single-spindle disk, you would expect about five times slowdown on write throughput.
+But with a ramdisk, you may observe no performance overhead introduced by Zumastor, even when
+a number of snapshots have been taken.</p></div>
+<h3 id="_large_volume_copy_test">11.1. Large volume copy test</h3><div style="clear:left"></div>
+<div class="para"><p>We recommend users to first try a large volume copy test to make sure that
+Zumastor works properly for the volume size you intend to use.
+A simple test script is provided
+that copies a large volume to an exported zumastor volume via nfs and at
+the same time take hourly replication between the zumastor nfs server and a backup server.
+The srcipt is located at <a href="http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh">http://zumastor.googlecode.com/svn/trunk/test/large_volume_copy_test.sh</a>.
+Please take a look at the script and specify the configuration parameters according
+to your setup.</p></div>
+<h3 id="_nsnaps_benchmark">11.2. Nsnaps benchmark</h3><div style="clear:left"></div>
+<div class="para"><p>Nsnaps benchmark provides performance data that relates the number of snapshots taken versus
+the time needed to untar a Linux kernel source tree and sync. The test script is located at
+<a href="http://zumastor.googlecode.com/svn/trunk/benchmarks/nsnaps/">http://zumastor.googlecode.com/svn/trunk/benchmarks/nsnaps/</a>. Please take a look at the
+README file included in that directory before running the test.</p></div>
+<h3 id="_bonnie_benchmark">11.3. Bonnie benchmark</h3><div style="clear:left"></div>
+<div class="para"><p>Bonnie is a program to test hard drives and file systems performance.
+You can obtain the Bonnie Debian package with the <tt>apt-get install bonnie</tt> command.
+After that, you can run the Bonnie benchmark with the wrapper we provide at
+<a href="http://zumastor.googlecode.com/svn/trunk/benchmarks/bonnie">http://zumastor.googlecode.com/svn/trunk/benchmarks/bonnie</a>.</p></div>
+<h3 id="_fstress_benchmark">11.4. Fstress benchmark</h3><div style="clear:left"></div>
+<div class="para"><p>Fstress is a benchmark that is used to test NFS server performance, i.e., average
+latency for a mixed number of client operations at different load levels.
+The source code provided from our repository,
+<a href="http://zumastor.googlecode.com/svn/trunk/benchmarks/fstress">http://zumastor.googlecode.com/svn/trunk/benchmarks/fstress</a>,
+was originally obtainded from Duke and includes several small changes to port
+the code to the latest Linux systems.
+Please take a look at the README file included in that directory for the
+instructions and examples on running the benchmark.</p></div>
+<h3 id="_replication_latency_benchmark">11.5. Replication latency benchmark</h3><div style="clear:left"></div>
+<div class="para"><p>benchmarks/replatbench.sh is a trivial synthetic replication benchmark.
+It measures how long it takes to replicate filesystems containing
+1 to 100 directories, each containing 1MB of small or large files,
+with zumastor, rsync, and rsync plus lvm snapshots.
+It seems to show that Zumastor as of 0.7 is faster than rsync
+at replicating many, many small unchanged files, but slower
+in all other cases.  (In Zumastor's defense, we have not yet spent any
+time optimizing Zumastor's write performance.)</p></div>
+</div>
+<div id="footer">
+<div id="footer-text">
+Version 0.8<br />
+Last updated 2008-05-09 16:19:47 PDT
+</div>
+</div>
+</body>
+</html>

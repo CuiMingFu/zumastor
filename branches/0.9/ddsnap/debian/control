@@ -1,0 +1,14 @@
+Source: ddsnap
+Section: utils
+Priority: optional
+Maintainer: Will Nowak <compbrain@gmail.com>
+Build-Depends: debhelper (>= 4.0.0), libpopt-dev, zlib1g-dev, build-essential
+Standards-Version: 0.1.0
+
+Package: ddsnap
+Architecture: amd64 i386
+Depends: dmsetup, ${shlibs:Depends}, ${misc:Depends}
+Provides: nblock-write
+Description: userspace daemons for block level snapshot and replication
+ Userspace interfaces to the ddsnap kernel modules that provide snapshotting
+ and replication.
