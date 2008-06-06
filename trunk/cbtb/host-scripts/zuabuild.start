@@ -9,7 +9,7 @@
 
 set -e
 
-for branch in /home/zbuild /home/zbuild/0.6 /home/zbuild/0.7
+for branch in /home/zuabuild /home/zuabuild/0.9
 do
   cd ${branch}
   rm -f zumastor/lock
