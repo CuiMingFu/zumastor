@@ -92,8 +92,8 @@ pushd $BUILD_DIR >> $LOG || exit 1
 
 # Build Constants
 VERSION_STRING="${VERSION}-r${REVISION}"
-EDITOR=/bin/true
-VISUAL=/bin/true
+export EDITOR=/bin/true
+export VISUAL=/bin/true
 DPKG_BUILDOPTS="-i.svn -I.svn -uc -us -rfakeroot"
 
 echo -n Building zumastor Debian package...
