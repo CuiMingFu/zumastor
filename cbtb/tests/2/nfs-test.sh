@@ -40,9 +40,7 @@ timeout_file_wait() {
   return $?
 }
 
-
-
-echo "1..8"
+echo "1..9"
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
 hostname master
@@ -61,7 +59,7 @@ else
 fi
 
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if timeout_file_wait 30 /var/run/zumastor/snapshot/testvol/hourly.0 ; then
   echo "ok 3 - first snapshot mounted"
@@ -72,7 +70,6 @@ else
 fi
 
 
-    
 apt-get update
 aptitude install -y nfs-kernel-server
 
@@ -118,7 +115,7 @@ else
   echo not ok 6 - file written on NFS client visible on master
 fi
 
-  
+
 rm /var/run/zumastor/mount/testvol/masterfile
 if $SSH root@${slave} test -f /mnt/masterfile ; then
   rc=7
@@ -135,5 +132,7 @@ else
   echo ok 8 - rm on NFS client did show up on master
 fi
 
+zumastor forget volume testvol
+echo "ok 9 - cleanup"
 
 exit $rc

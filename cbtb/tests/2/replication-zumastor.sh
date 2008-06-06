@@ -62,7 +62,7 @@ timeout_remote_file_wait() {
 
 env
 
-echo "1..10"
+echo "1..11"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -82,7 +82,7 @@ ${SSH} root@${slave} hostname slave
 ${SSH} root@${slave} zumastor define volume testvol $DEV1NAME $DEV2NAME --initialize
 ${SSH} root@${slave} zumastor status --usage
 echo ok 2 - slave testvol set up
- 
+
 zumastor define target testvol slave -p 30
 zumastor status --usage
 echo ok 3 - defined target on master
@@ -105,7 +105,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 6 - replication manually from master
   exit 6
 else
@@ -116,7 +116,7 @@ fi
 
 date >>/var/run/zumastor/mount/testvol/testfile
 sync
-zumastor snapshot testvol hourly 
+zumastor snapshot testvol hourly
 
 if ! timeout_file_wait 30 /var/run/zumastor/mount/testvol
 then
@@ -144,7 +144,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 8 - testvol has migrated to slave
   exit 8
 else
@@ -157,7 +157,7 @@ then
   $SSH root@${slave} ls -alR /var/run/zumastor
   $SSH root@${slave} zumastor status --usage
   $SSH root@${slave} tail -200 /var/log/syslog
-  
+
   echo not ok 9 - testfile has migrated to slave
   exit 9
 else
@@ -190,5 +190,10 @@ else
 EOF
   exit 10
 fi
+
+# cleanup
+zumastor forget volume testvol
+$SSH root@${slave} zumastor forget volume testvol
+echo "ok 11 - cleanup"
 
 exit 0

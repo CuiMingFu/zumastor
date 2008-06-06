@@ -61,7 +61,7 @@ timeout_remote_file_wait() {
 }
 
 
-echo "1..10"
+echo "1..11"
 
 echo ${IPADDR} master >>/etc/hosts
 echo ${IPADDR2} slave >>/etc/hosts
@@ -189,5 +189,10 @@ else
 EOF
   exit 10
 fi
+
+# cleanup
+zumastor forget volume testvol
+${SSH} root@${slave} zumastor forget volume testvol
+echo "ok 11 - cleanup"
 
 exit 0
