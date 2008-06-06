@@ -14,8 +14,12 @@ set -e
 mkdir /target/root/.ssh
 cp /authorized_keys /target/root/.ssh
 
-apt-install openssh-server cron postfix dmsetup build-essential lvm2
-
+apt-install openssh-server cron postfix dmsetup build-essential lvm2 \
+  debconf-utils debhelper devscripts fakeroot file gettext html2text \
+  intltool-debian kernel-package libapr0 libexpat1 libmagic1 libneon25 \
+  libpopt-dev libsvn0 libxml2 po-debconf rsync subversion zlib1g-dev \
+  dash
+  
 in-target apt-get dist-upgrade -y
 
 in-target apt-get clean
