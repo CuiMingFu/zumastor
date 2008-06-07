@@ -63,6 +63,10 @@ scp * root@zumabuild:~zuabuild/0.9/
 9) Rebuild trunk base images
 cd zumastor/cbtb/host-setup
 tunbr ./dapper-i386.sh
+mkdir ../../build
+mv dapper-i386-r1697.img ~/zumastor/build
+cd ~/zumastor/build
+ln -s dapper-i386-r1697.img dapper-i386.img
 
 10) Launch continuous build
 slogin root@zumabuild
