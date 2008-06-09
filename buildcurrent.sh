@@ -63,11 +63,12 @@ then
 fi
 if [ "x$REVISION" = "x" ]
 then
-  REVISION=unknown0
+  REVISION=exported
 elif [ "x$REVISION" = "xexported" ]
 then
-  REVISION=exported0
+  REVISION=exported
 fi
+
 SRC=${PWD}
 BUILD_DIR=${SRC}/build
 LOG=/dev/null

@@ -16,7 +16,7 @@ OLDPWD=$PWD
 cd ../..
   SRC=$PWD
   BUILD_DIR="$SRC/build"
-  SVNREV=`awk '/^[0-9]+$/ { print $1; }' SVNREV || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
+  SVNREV=`awk '/^[0-9]+$/ { print $1; }' REVISION || svnversion | tr [A-Z] [a-z] || svn info zumastor | grep ^Revision:  | cut -d\  -f2`
 cd $OLDPWD
 
 if [ "x$ARCH" = "x" ]
