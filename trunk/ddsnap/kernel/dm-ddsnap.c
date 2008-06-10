@@ -52,96 +52,85 @@
  * - detect message timeout
  */
 
-/* Useful gizmos */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-static int rwpipe(struct file *file, const void *buffer, unsigned int count,
-        ssize_t (*op)(struct kiocb *, const struct iovec *, unsigned long, loff_t), int mode)
-#else
-static int rwpipe(struct file *file, const void *buffer, unsigned int count,
-                        ssize_t (*op)(struct kiocb *, const char *, size_t, loff_t), int mode)
-#endif
+static int rwsocket(struct socket *sock, void *buffer, unsigned int count,
+		int mode)
 {
-        struct kiocb iocb;
-        mm_segment_t oldseg;
-        int err = 0;
-        trace_off(warn("%s %i bytes", mode == FMODE_READ? "read": "write", count);)
-        if (!(file->f_mode & mode))
-                return -EBADF;
-        if (!op)
-                return -EINVAL;
-        init_sync_kiocb(&iocb, file); // new in 2.5 (hmm)
-        iocb.ki_pos = file->f_pos;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-        iocb.ki_left = count;
-#endif
+	int err = 0;
+	struct kvec data = { .iov_base = buffer, .iov_len = count};
+	struct msghdr msg = {
+		.msg_name = NULL,
+		.msg_namelen = 0,
+		.msg_control = NULL,
+		.msg_controllen = 0,
+		.msg_flags = 0,
+	};
+	/* We don't currently support SEQPACKET */
+	if (mode == FMODE_WRITE && sock->type == SOCK_SEQPACKET) 
+		return -EINVAL;
 
-        oldseg = get_fs();
-        set_fs(get_ds());
-        while (count) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-                int chunk = (*op)(&iocb, &(struct iovec){ .iov_base = (void *)buffer, .iov_len = count }, 1, iocb.ki_pos);
-#else
-                int chunk = (*op)(&iocb, buffer, count, iocb.ki_pos);
-#endif
-                if (chunk <= 0) {
-                        err = chunk? chunk: -EPIPE;
-                        break;
-                }
-                BUG_ON(chunk > count);
-                count -= chunk;
-                buffer += chunk;
-        }
-        set_fs(oldseg);
-        file->f_pos = iocb.ki_pos;
-        return err;
+	while (count) {
+		int chunk;
+
+		if (mode == FMODE_WRITE)
+			chunk = kernel_sendmsg(sock, &msg, &data, 1, count);	
+		else
+			chunk = kernel_recvmsg(sock, &msg, &data, 1, count, msg.msg_flags);
+
+		if (chunk <= 0) {
+			err = chunk? chunk: -EPIPE;
+			break;
+		}
+		BUG_ON(chunk > count);
+		data.iov_len -= chunk;
+		data.iov_base += chunk;
+		count -= chunk;
+	}
+
+	return err;
 }
 
-static inline int readpipe(struct file *file, void *buffer, unsigned int count)
+static inline int readsocket(struct socket *sock, void *buffer, 
+		unsigned int count)
 {
-	return rwpipe(file, buffer, count, file->f_op->aio_read, FMODE_READ);
+	return rwsocket(sock, buffer, count, FMODE_READ);
 }
 
-static inline int writepipe(struct file *file, void *buffer, unsigned int count)
+static inline int writesocket(struct socket *sock, void *buffer, 
+		unsigned int count)
 {
-	return rwpipe(file, buffer, count, file->f_op->aio_write, FMODE_WRITE);
+	return rwsocket(sock, buffer, count, FMODE_WRITE);
 }
 
 #define outbead(SOCK, CODE, STRUCT, VALUES...) ({ \
 	struct { struct head head; STRUCT body; } PACKED message = \
 		{ { CODE, sizeof(STRUCT) }, { VALUES } }; \
-	writepipe(SOCK, &message, sizeof(message)); })
+	writesocket(SOCK, &message, sizeof(message)); })
 
 /*
- * This gets the job done but it sucks as an internal interface: there
- * is no reason to deal with fds at all, we just want to receive the
- * (struct file *), we do not want to have to wrap the socket in a
- * fd just to call recv_fd, and user space pointer for the (bogus) data
- * payload is just silly.  Never mind the danger of triggering some
- * wierdo signal handling cruft deep in the socket layer.  This kind of
- * posturing - lathering layers of cruft upon cruft - is the stuff
- * Windows is made of, Linux is not supposed to be like that.  Fixing
- * this requires delving into the SCM_RIGHTS path deep inside sys_recvmsg
- * and breaking out the part that actually does the work, to be a usable
- * internal interface.  Put it on the list of things to do.
+ * This gets the job done but it sucks as an internal interface: There 
+ * may be a the danger of triggering some wierdo signal handling cruft 
+ * deep in the socket layer.  This kind of posturing - lathering layers 
+ * of cruft upon cruft - is the stuff Windows is made of, Linux is not 
+ * supposed to be like that.  Fixing this requires delving into the 
+ * SCM_RIGHTS path deep inside sys_recvmsg and breaking out the part that 
+ * actually does the work, to be a usable internal interface.  Put it on 
+ * the list of things to do.
  */
-static int recv_fd(struct file *file, char *bogus, unsigned *len)
+static int recv_socket(struct socket *sock, struct socket **new_sock)
 {
+	int len = 4;
+	char bogus_buf[len];
+	struct kvec bogus_vec = { .iov_base = bogus_buf, .iov_len = len };
 	char payload[CMSG_SPACE(sizeof(int))];
-	struct socket *sock = file->private_data;
 	struct msghdr msg = {
 		.msg_control = payload,
 		.msg_controllen = sizeof(payload),
-		.msg_iov = &(struct iovec){ .iov_base = bogus, .iov_len = *len },
-		.msg_iovlen = 1,
 	};
-	mm_segment_t oldseg = get_fs();
 	struct cmsghdr *cmsg;
 	int result;
+	int fd;
 
-	set_fs(get_ds());
-	result = sock_recvmsg(sock, &msg, *len, 0);
-	set_fs(oldseg);
+	result = kernel_recvmsg(sock, &msg, &bogus_vec, 1, len, 0);
 
 	if (result <= 0)
 		return result;
@@ -156,8 +145,12 @@ static int recv_fd(struct file *file, char *bogus, unsigned *len)
 		cmsg->cmsg_type != SCM_RIGHTS)
 		return -EBADMSG;
 
-	*len = result;
-	return *((int *)CMSG_DATA(cmsg));
+	fd = *((int *)CMSG_DATA(cmsg));
+	*new_sock = sockfd_lookup(fd, &result);
+	/* sockfd_lookup does fget, but we already have a ref from sock_recvmsg */
+	sys_close(fd); /* drop one count here */
+
+	return result;
 }
 
 static void kick(struct block_device *dev)
@@ -189,8 +182,8 @@ struct devinfo {
 	struct inode  *inode; /* the cache */
 	struct dm_dev *orgdev;
 	struct dm_dev *snapdev;
-	struct file *sock;
-	struct file *control_socket;
+	struct socket *sock;
+	struct socket *control_socket;
 	char *control_socket_path;
 	char *devname;
 	struct semaphore server_in_sem;
@@ -549,14 +542,11 @@ static int incoming(struct dm_target *target)
 {
 	struct devinfo *info = target->private;
 	struct messagebuf message; // !!! have a buffer in the target->info
-	struct file *sock;
+	struct socket *sock;
 	struct task_struct *task = current;
 	int err, length;
 	char *err_msg;
 	u32 chunksize_bits;
-#ifdef CONFIG_DM_DDSNAP_SWAP
-	struct socket *vm_sock;
-#endif
 
 	daemonize("%s/%x", "ddcli", info->snap);
 	while (down_interruptible(&info->exit2_sem))
@@ -571,22 +561,21 @@ connect:
 	trace(warn("got socket %p", info->sock);)
 	sock = info->sock;
 #ifdef CONFIG_DM_DDSNAP_SWAP
-	vm_sock = SOCKET_I(info->sock->f_dentry->d_inode);
 	warn("setup sk_vmio");
-	sk_set_vmio(vm_sock->sk);
+	sk_set_vmio(sock);
 #endif
 
 	while (running(info)) { // stop on module exit
 		int rw = READ, to_snap = 1, failed_io = 0;
 
 		trace(warn("wait message");)
-		if ((err = readpipe(sock, &message.head, sizeof(message.head))))
+		if ((err = readsocket(sock, &message.head, sizeof(message.head))))
 			goto socket_error;
 		length = message.head.length;
 		if (length > maxbody) //!!! FIXME: shouldn't limit message sizes
 			goto message_too_long;
 		trace(warn("%x/%u", message.head.code, length);)
-		if ((err = readpipe(sock, &message.body, length)))
+		if ((err = readsocket(sock, &message.body, length)))
 			goto socket_error;
 	
 		switch (message.head.code) {
@@ -650,11 +639,11 @@ connect:
 
 			message.head.code = CONNECT_SERVER_ERROR;
 			message.head.length = length + sizeof(err);
-			if (writepipe(info->control_socket, &message.head, sizeof(message.head)) < 0)
+			if (writesocket(info->control_socket, &message.head, sizeof(message.head)) < 0)
 				warn("can't send msg head");
-			if (writepipe(info->control_socket, &err, sizeof(err)) < 0) 
+			if (writesocket(info->control_socket, &err, sizeof(err)) < 0) 
 				warn("can't send out err");
-			if (writepipe(info->control_socket, err_msg, length) < 0)
+			if (writesocket(info->control_socket, err_msg, length) < 0)
 				warn("unable to send message CONNECT_SERVER_ERROR to agent");
 			up(&info->identify_sem);
 			continue;
@@ -673,9 +662,9 @@ connect:
 				       	message.head.code, message.head.length);
 			message.head.code = PROTOCOL_ERROR;
 			message.head.length = sizeof(struct protocol_error) + strlen(err_msg) + 1;
-			if (writepipe(sock, &message.head, sizeof(message.head)) < 0 || 
-				writepipe(sock, &pe, sizeof(struct protocol_error)) < 0 ||
-				writepipe(sock, err_msg, strlen(err_msg) + 1) < 0)
+			if (writesocket(sock, &message.head, sizeof(message.head)) < 0 || 
+				writesocket(sock, &pe, sizeof(struct protocol_error)) < 0 ||
+				writesocket(sock, err_msg, strlen(err_msg) + 1) < 0)
 				warn("unable to send protocol error message");
 			continue;
 		}
@@ -960,12 +949,6 @@ static void flush_pending_bio(struct devinfo *info)
 
 }
 
-static int shutdown_socket(struct file *socket)
-{
-	struct socket *sock = SOCKET_I(socket->f_dentry->d_inode);
-	return sock->ops->shutdown(sock, RCV_SHUTDOWN);
-}
-
 /*
  * Yikes, a third daemon, that makes four including the user space
  * monitor.  This daemon proliferation is due to not using poll, which
@@ -983,7 +966,7 @@ static int control(struct dm_target *target)
 	struct task_struct *task = current;
 	struct devinfo *info = target->private;
 	struct messagebuf message; // !!! have a buffer in the target->info
-	struct file *sock;
+	struct socket *sock;
 	int err, length;
 	char *err_msg;
 
@@ -996,14 +979,14 @@ static int control(struct dm_target *target)
 		;
 	while (running(info)) {
 		trace(warn("wait message");)
-		if ((err = readpipe(sock, &message.head, sizeof(message.head))))
+		if ((err = readsocket(sock, &message.head, sizeof(message.head))))
 			goto socket_error;
 		trace(warn("got message header code %x, length %u", message.head.code, message.head.length);)
 		length = message.head.length;
 		if (length > maxbody) //!!! FIXME: shouldn't limit message sizes
 			goto message_too_long;
 		trace(warn("%x/%u", message.head.code, length);)
-		if ((err = readpipe(sock, &message.body, length)))
+		if ((err = readsocket(sock, &message.body, length)))
 			goto socket_error;
 	
 		switch (message.head.code) {
@@ -1012,18 +995,11 @@ static int control(struct dm_target *target)
 			warn("id set: %Lu", info->id);
 			break;
 		case CONNECT_SERVER: {
-			unsigned len = 4;
-			char bogus[len];
-			int fd;
-
-			if ((fd = recv_fd(sock, bogus, &len)) < 0) {
-				warn("recv_fd failed, error %i", fd);
+			int result;
+			if ((result = recv_socket(sock, &info->sock)) < 0) {
+				warn("recv_socket failed, error %i", result);
 				break;
 			}
-			trace(warn("Received socket %i", fd);)
-			info->sock = fget(fd);
-			/* we have two counts on the file, one from recv_fd and the other from fget */
-			sys_close(fd); /* drop one count here */
 			up(&info->server_in_sem);
 			if (outbead(info->sock, IDENTIFY, struct identify, 
 						.id = info->id, .snap = info->snap, 
@@ -1047,9 +1023,9 @@ static int control(struct dm_target *target)
 				       	message.head.code, message.head.length);
 			message.head.code = PROTOCOL_ERROR;
 			message.head.length = sizeof(struct protocol_error) + strlen(err_msg) + 1;
-			if (writepipe(sock, &message.head, sizeof(message.head)) < 0 || 
-				writepipe(sock, &pe, sizeof(struct protocol_error)) < 0 ||
-				writepipe(sock, err_msg, strlen(err_msg) + 1) < 0)
+			if (writesocket(sock, &message.head, sizeof(message.head)) < 0 || 
+				writesocket(sock, &pe, sizeof(struct protocol_error)) < 0 ||
+				writesocket(sock, err_msg, strlen(err_msg) + 1) < 0)
 				warn("unable to send protocol error message");
 			continue;
 		}
@@ -1071,7 +1047,7 @@ socket_error:
 		flush_pending_bio(info);
 		// FIXME: send server a disconnect request, notifying it this is a explicit shutdown
 		if (info->sock)
-			shutdown_socket(info->sock);
+			info->sock->ops->shutdown(info->sock, RCV_SHUTDOWN);
 	}
 	goto out;
 }
@@ -1322,9 +1298,9 @@ static void ddsnap_destroy(struct dm_target *target)
 	up(&info->recover_sem); // unblock worker recovery
 	
 	warn("closing socket connections");
-	if (info->sock && (err = shutdown_socket(info->sock)))
+	if (info->sock && (err = info->sock->ops->shutdown(info->sock, RCV_SHUTDOWN)))
 		warn("server socket shutdown error %i", err);
-	if (info->control_socket && (err = shutdown_socket(info->control_socket)))
+	if (info->control_socket && (err = info->control_socket->ops->shutdown(info->control_socket, RCV_SHUTDOWN)))
 		warn("control socket shutdown error %i", err);
 
 	up(&info->more_work_sem);
@@ -1343,14 +1319,13 @@ static void ddsnap_destroy(struct dm_target *target)
 
 	if (info->sock) {
 #ifdef CONFIG_DM_DDSNAP_SWAP
-		struct socket *vm_sock = SOCKET_I(info->sock->f_dentry->d_inode);
 		warn("clear sk_vmio");
-		sk_clear_vmio(vm_sock->sk);
+		sk_clear_vmio(info->sock);
 #endif
-		fput(info->sock);
+		sock_release(info->sock);
 	}
 	if (info->control_socket)
-		fput(info->control_socket);
+		sock_release(info->control_socket);
 	if (info->inode)
 		iput(info->inode);
 	if (info->shared_bitmap)
@@ -1370,37 +1345,27 @@ static void ddsnap_destroy(struct dm_target *target)
  * Woohoo, we are going to instantiate a new cluster snapshot virtual
  * device, what fun.
  */
-static int get_control_socket(char *sockname, struct file **control_socket)
+static int get_control_socket(char *sockname, struct socket **control_socket)
 {
 	struct sockaddr_un addr = { .sun_family = AF_UNIX };
 	int addr_len = sizeof(addr) - sizeof(addr.sun_path) + strlen(sockname); // !!! check too long
 	struct socket *sock;
-	struct file *file;
 	int err = sock_create(AF_UNIX, SOCK_STREAM, 0, &sock);
 
 	trace(warn("Connect to control socket %s", sockname);)
 	if (err < 0)
 		return err;
-	err = sock_map_fd(sock);
-	if (err < 0)
-		goto out_release;
-	file = fget(err);
-        sys_close(err);
 	strncpy(addr.sun_path, sockname, sizeof(addr.sun_path));
 	if (sockname[0] == '@')
 		addr.sun_path[0] = 0;
-	while ((err = sock->ops->connect(sock, (struct sockaddr *)&addr,
-	                                 addr_len, sock->file->f_flags)) ==
-	       -ECONNREFUSED)
+	while ((err = kernel_connect(sock, (struct sockaddr *)&addr, addr_len, 0)) == -ECONNREFUSED)
 		break;
 //		yield();
 	if (err)
-		goto out_put;
-	*control_socket = file;
+		goto out_error;
+	*control_socket = sock;
 	return 0;
-out_put:
-	fput(file);
-out_release:
+out_error:
 	sock_release(sock);
 	return err;
 }
