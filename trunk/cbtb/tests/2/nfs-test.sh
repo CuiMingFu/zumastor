@@ -132,7 +132,7 @@ else
   echo ok 8 - rm on NFS client did show up on master
 fi
 /etc/init.d/nfs-kernel-server stop
-zumastor forget volume testvol || { sleep 5; zumastor forget volume testvol }
+zumastor forget volume testvol || true
 echo "ok 9 - cleanup"
 
 exit $rc
