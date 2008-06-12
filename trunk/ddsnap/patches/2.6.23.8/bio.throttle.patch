@@ -140,7 +140,11 @@ diff -urpN linux-2.6.23.8-clean/include/linux/blkdev.h linux-2.6.23.8-patched/in
 diff -urpN linux-2.6.23.8-clean/include/linux/device-mapper.h linux-2.6.23.8-patched/include/linux/device-mapper.h
 --- linux-2.6.23.8-clean/include/linux/device-mapper.h	2007-10-12 11:43:44.000000000 -0500
 +++ linux-2.6.23.8-patched/include/linux/device-mapper.h	2007-11-21 11:28:14.000000000 -0600
-@@ -191,6 +191,7 @@ const char *dm_device_name(struct mapped
+@@ -191,9 +191,11 @@ const char *dm_device_name(struct mapped
+  * Info functions.
+  */
+ const char *dm_device_name(struct mapped_device *md);
++int dm_copy_name_and_uuid(struct mapped_device *md, char *name, char *uuid);
  struct gendisk *dm_disk(struct mapped_device *md);
  int dm_suspended(struct mapped_device *md);
  int dm_noflush_suspending(struct dm_target *ti);
