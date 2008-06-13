@@ -1,0 +1,9 @@
+# test cluster
+Host *.localnet test1 test2 test3 test4 test5
+  ForwardAgent no
+  ForwardX11 no
+  ForwardX11Trusted no
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  IdentityFile /etc/localnet_ssh
+  User root

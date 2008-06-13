@@ -1,0 +1,8 @@
+To create undionly.kpxe.
+Pull git://git.etherboot.org/scm/gpxe.git
+Ensure you have included commits ac28d054c847e87ed6edb9549e04b86476d7ef72 and
+4c8501796877e66b0487d776431c92ee8141f6b6
+
+cd src
+make bin/undionly.kpxe
+

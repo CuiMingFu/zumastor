@@ -1,0 +1,4 @@
+Files in this directory should be named for ip addresses:
+eg: ./192.168.0.2 or ./192.168.0.41
+
+If a file exists here for an IP, that machine will not install on reboot.

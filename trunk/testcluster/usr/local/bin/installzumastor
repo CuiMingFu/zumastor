@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# Copyright 2008 Google Inc. All Rights Reserved.
+# Author: willn@google.com (Will Nowak)
+
+# Args needed:
+# Revision or latest
+# Release or trunk
+# kernel version
+
+
+release=${RELEASE:=trunk}
+revision=${REVISION:=latest}
+kernelver=${KERNELVER:=2.6.24.2}
+
+zumabuildurl=http://zumabuild
+testclusterurl=http://install/zb
+
+target=${1:?No target given. Run $0 machinename}
+
+wg() {
+  wget -q -O /dev/null $@
+}
+
+echo "Given release        : $release"
+echo "Given revision       : $revision"
+echo "Given kernelver      : $kernelver"
+echo "Given zumabuildurl   : $zumabuildurl"
+echo "Given testclusterurl : $testclusterurl"
+echo "Given target         : $target"
+echo "---------------------------------------"
+echo -n "Is this ok? (y/n): "
+read ok
+[ "x$ok" = "xy" ] || exit 1
+
+# make sure release exists:
+if wg $zumabuildurl/$release
+then
+  echo "Using release $release"
+else
+  echo "Release $release was not found at $zumabuildurl/$release"
+  echo "Check your input and try again"
+  exit 1
+fi
+
+# check for kernel
+if [ "x$revision" = "xlatest" ]
+then
+  kernel="$zumabuildurl/$release/kernel-image-build_i386.deb"
+else
+  kernel="$zumabuildurl/$release/r$revision/kernel-image-$kernelver-zumastor-r${revision}_1.0_i386.deb"
+fi
+
+if wg $kernel
+then
+  echo "Using kernel $kernel"
+else
+  echo "Kernel $kernel was not found. Please check your input and try again"
+  exit 1
+fi
+
+# check for zumastor package
+if [ "x$revision" = "xlatest" ]
+then
+  zumastor=$zumabuildurl/$release/zumastor_build_all.deb
+  ddsnap=$zumabuildurl/$release/ddsnap_build_i386.deb
+else
+  zumastor=$zumabuildurl/$release/r$revision/zumastor_${release}.0-r${revision}_all.deb
+  ddsnap=$zumabuildurl/$release/r$revision/ddsnap_${release}.0-r${revision}_i386.deb
+fi
+
+if wg $zumastor && wg $ddsnap
+then
+  echo "Using zumastor from: $zumastor"
+  echo "Using ddsnap from: $ddsnap"
+else
+  echo "Could not download zumastor or ddsnap"
+  echo "Tried zumastor from: $zumastor"
+  echo "Tried ddsnap from: $ddsnap"
+  exit 1
+fi
+
+run() {
+  cmd=$@
+  ssh $target $cmd
+}
+
+dir=`run mktemp -d`
+zumastorurl=`echo $zumastor|sed -e s,$zumabuildurl,$testclusterurl,`
+ddsnapurl=`echo $ddsnap|sed -e s,$zumabuildurl,$testclusterurl,`
+kernelurl=`echo $kernel|sed -e s,$zumabuildurl,$testclusterurl,`
+run "cd $dir; wget $zumastorurl $ddsnapurl $kernelurl"
+run ntpdate install
+run apt-get -qy install dmsetup
+run "cd $dir; dpkg -i *.deb"
+run update-grub
+run reboot
