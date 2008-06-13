@@ -1,0 +1,44 @@
+****Power Control*****
+
+Turn a single node off:
+# Turn off node 1
+$ webpowerswitch_ctl -o 1 -f off -i pdu
+
+Turn multiple nodes off:
+# Turn off nodes 1 and 3
+$ webpowerswitch_ctl -o 1 -o 3 -f off -i pdu
+
+Turn on a node:
+# Turn on node 2
+$ webpowerswitch_ctl -o 2 -f on -i pdu
+
+Power cycle a node:
+# Cycle power to node 5
+$ webpowerswitch_ctl -o 5 -f cycle -i pdu
+
+Power cycle all nodes:
+$ webpowerswitch_ctl -a -f cycle -i pdu
+
+Turn off all nodes
+$ webpowerswitch_ctl -a -f off -i pdu
+
+
+******Installations and Imaging**********
+
+# To reimage the machine test1
+$ reinstallmach test1
+
+# To install the latest zumastor packages from zumabuild on test4
+$ installzumastor test4
+
+# To install 0.9r1689 on test2
+$ RELEASE=0.9 REVISION=1689 installzumastor test2
+
+******Connecting to machines*************
+Sitewide ssh configs should use the private key in /etc/localnet_ssh, and set
+the known_hosts file to /dev/null. Strict host key checking is set to off.
+Use any of the following formates to get to machines:
+
+$ ssh test1
+$ ssh root@test1
+$ ssh root@test1.localnet

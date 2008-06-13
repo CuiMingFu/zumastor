@@ -1,0 +1,54 @@
+NameVirtualHost 192.168.0.1:80
+<VirtualHost 192.168.0.1:80>
+	ServerAdmin webmaster@localhost
+	ServerName install.localnet
+	ServerAlias install
+        DocumentRoot /var/www
+	ServerSignature Off
+	
+	## Proxy ACLs
+	<Proxy *>
+		Order deny,allow
+		Deny from all
+		Allow from 192.168.0.0/24
+	</Proxy>
+	####
+	
+	## Logging Configuration
+	ErrorLog /var/log/apache2/error.log
+	LogLevel warn
+	CustomLog /var/log/apache2/access.log combined
+	####
+
+	## /ubuntu/ Proxy
+	ProxyPass /ubuntu http://mirror.its.uidaho.edu/pub/ubuntu
+	ProxyPassReverse /ubuntu http://mirror.its.uidaho.edu/pub/ubuntu/
+	####
+
+	## /debian/ Proxy
+	ProxyPass /debian http://ftp.us.debian.org/debian
+	ProxyPassReverse /debian http://ftp.us.debian.org/debian
+	####
+
+	## /ppa/ Proxy
+	ProxyPass /ppa http://ppa.launchpad.net
+	ProxyPassReverse /ppa http://ppa.launchpad.net
+	####
+
+        ## Zumabuild Proxy
+	ProxyPass /zb http://zumabuild
+	ProxyPassReverse /zb http://zumabuild
+	####
+
+	# CGI Scripts for pxe booting and such
+	<Directory /var/www/x/>
+          Options ExecCGI Indexes MultiViews +SymLinksIfOwnerMatch
+          AllowOverride None
+          Order allow,deny
+          Allow from all
+          AddHandler cgi-script .py
+	</Directory>
+	####
+
+
+</VirtualHost>

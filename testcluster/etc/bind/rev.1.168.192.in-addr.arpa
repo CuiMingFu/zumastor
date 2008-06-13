@@ -1,0 +1,11 @@
+@ IN SOA ns1.localnet. admin.localnet. (
+                        2006081401;
+                        28800;
+                        604800;
+                        604800;
+                        86400
+)
+
+                     IN    NS     ns1.localnet.
+1                    IN    PTR    bastion.localnet.
+2                    IN    PTR    powerctl.localnet.

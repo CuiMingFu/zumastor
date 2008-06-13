@@ -1,0 +1,20 @@
+localnet.      IN      SOA     ns1.localnet. admin.localnet. (
+                                                        2008051401
+                                                        28800
+                                                        3600
+                                                        604800
+                                                        38400
+ )
+
+localnet.	 IN      NS	 ns1.localnet.
+
+bastion	         IN	 A	 192.168.0.1
+ns1	         IN	 CNAME	 bastion
+install	         IN	 CNAME	 bastion
+powerctl         IN	 A	 192.168.1.2
+pdu	         IN	 CNAME	 powerctl
+test1	         IN	 A	 192.168.0.51
+test2	         IN	 A	 192.168.0.52
+test3	         IN	 A	 192.168.0.53
+test4	         IN	 A	 192.168.0.54
+test5	         IN	 A	 192.168.0.55
