@@ -192,7 +192,7 @@ fi
 
 # cleanup
 zumastor forget volume testvol
-${SSH} root@${slave} zumastor forget volume testvol
+${SSH} root@${slave} zumastor forget volume testvol || true
 echo "ok 11 - cleanup"
 
 exit 0
