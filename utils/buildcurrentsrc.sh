@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# $Id$
+# $Id: buildcurrentsrc.sh 1611 2008-04-29 21:21:23Z williamanowak $
 #
 # based on buildcurrent.sh
 # builds whatever is in current working directory,
