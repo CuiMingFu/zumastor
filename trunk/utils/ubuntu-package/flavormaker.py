@@ -86,9 +86,15 @@ class KernelBuilder:
     return self._description_obj
 
   def _version(self):
+    ''' Return the original package version string ''' 
     return self._descriptionObj()['version']
 
+  def _buildVersion(self):
+    ''' Return the version string of the package we are building ''' 
+    return '%s~%s' % (self._version(), self._appendversion) 
+
   def _getFiles(self):
+    ''' Download the files needed to build the original package ''' 
     logging.debug('Downloading files from Dsc file')
     for file in self._descriptionObj()['files']:
       url = '%s/%s' % (self._descriptionFolder(), file['name'])
@@ -96,6 +102,7 @@ class KernelBuilder:
       self._quietRun('wget %s -q -O %s' % (url, local_path))
 
   def _buildDirectory(self):
+    ''' Create and return the name of the build directory ''' 
     if self._builddirectory is None:
       directory = None
       while directory is None:
@@ -109,6 +116,7 @@ class KernelBuilder:
     return self._builddirectory
 
   def _addFlavorToBuild(self, flavorname):
+    ''' Add a flavor name to the build ''' 
     logging.info('Adding flavor to build rules')
     rulesddir = ('%s/%s/debian/rules.d' %
                  (self._buildDirectory(), self._sourceDir()))
@@ -121,8 +129,8 @@ class KernelBuilder:
                    (flavorname, commonvarsfile))
 
   def _addFlavorRules(self, name, customrulesfile=None):
+    ''' Create a debian/rules file for the flavor ''' 
     logging.info('Adding flavor rules file')
-    # TODO: Do something with the custom file
     flavordir = ('%s/%s/debian/binary-custom.d/%s' %
                  (self._buildDirectory(), self._sourceDir(), name))
     fh = open('%s/rules' % flavordir,'w')
@@ -130,8 +138,8 @@ class KernelBuilder:
     fh.close()
 
   def _addFlavorVars(self, name, customvarsfile=None):
+    ''' Create a debian/vars file for the flavor ''' 
     logging.info('Adding flavor vars file')
-    # TODO: Do something with the custom file
     flavordir = ('%s/%s/debian/binary-custom.d/%s' %
                  (self._buildDirectory(), self._sourceDir(), name))
     content_dict = {'arch':' '.join(self._archlist),
@@ -149,6 +157,7 @@ class KernelBuilder:
     fh.close()
 
   def _addFlavorPatches(self, name):
+    ''' Add patches to the build flavor ''' 
     logging.info('Adding patches to flavor')
     flavordir = ('%s/%s/debian/binary-custom.d/%s' %
                  (self._buildDirectory(), self._sourceDir(), name))
@@ -164,15 +173,17 @@ class KernelBuilder:
         patchno += 1
   
   def _abiFixup(self):
+    ''' Workaround the requirement for a kernel abi directory ''' 
     logging.info('Fixing up abi bug')
     abidir = '%s/%s/debian/abi' % (self._buildDirectory(), self._sourceDir())
     current_abi_list = os.listdir(abidir)
     current_abi_list.sort()
     old_abi = current_abi_list[0]
     self._quietRun('cp -r %s/%s %s/%s' %
-                   (abidir, old_abi, abidir, self._version()))
+                   (abidir, old_abi, abidir, self._buildVersion()))
 
   def _addFlavorCustomConfigOpts(self, name, arch):
+    ''' Append custom kernel options to the kernel config ''' 
     flavordir = ('%s/%s/debian/binary-custom.d/%s' %
                  (self._buildDirectory(), self._sourceDir(), name))
     configfile = '%s/config.%s' % (flavordir, arch)
@@ -180,6 +191,7 @@ class KernelBuilder:
       self._quietRun('echo "%s" >> %s' % (opt, configfile))
 
   def _addFlavor(self, name, basekernelconfig='generic'):
+    ''' Create the base of a kernel flavor ''' 
     basekernelconfig = self._basekernelconfig
     logging.info('Adding kernel flavor')
     flavordir = ('%s/%s/debian/binary-custom.d/%s' %
@@ -202,6 +214,7 @@ class KernelBuilder:
     self._addFlavorPatches(name)
 
   def _updateChangeLog(self, maintainer, newversion, entry):
+    ''' Update the build changelog with maintainer and version ''' 
     logging.info('Updating changelog')
     changelogfile = ('%s/%s/debian/changelog' %
                      (self._buildDirectory(), self._sourceDir()))
@@ -215,8 +228,7 @@ class KernelBuilder:
     self._getFiles()
     self._addFlavor(self._name)
     self._abiFixup()
-    self._updateChangeLog(self._email, '%s~%s' % (self._version(), self._appendversion),
-                          self._label)
+    self._updateChangeLog(self._email, self._buildVersion(), self._label)
 
 if __name__ == '__main__':
   parser = OptionParser()
