@@ -1,0 +1,9 @@
+#!/bin/sh
+
+machine=${1?You need to supply a machine name}
+
+echo "Setting up root ssh key on $machine"
+
+scp /etc/localnet_ssh root@$machine:/root/.ssh/id_rsa
+scp /etc/localnet_ssh.config root@$machine:/etc/ssh/ssh_config
+ssh root@$machine chmod 600 /root/.ssh/id_rsa

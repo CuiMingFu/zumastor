@@ -1,0 +1,60 @@
+# The character '&' in logfile names are substituted with the console
+# name.
+#
+config * {
+	sslrequired no;
+}
+default full {
+	rw *;
+}
+default * {
+	logfile /var/log/conserver/&.log;
+	timestamp "";
+	include full;
+	sslrequired no;
+}
+##
+## list of consoles we serve
+##
+console test1 {
+	master localhost;
+	type device;
+	device /dev/ttyS0;
+	baud 9600;
+	parity none;
+}
+console test2 {
+	master localhost;
+	type device;
+	device /dev/ttyS1;
+	baud 9600;
+	parity none;
+}
+console test3 {
+	master localhost;
+	type device;
+	device /dev/ttyUSB2;
+	baud 9600;
+	parity none;
+}
+console test4 {
+	master localhost;
+	type device;
+	device /dev/ttyUSB0;
+	baud 9600;
+	parity none;
+}
+console test5 {
+	master localhost;
+	type device;
+	device /dev/ttyUSB1;
+	baud 9600;
+	parity none;
+}
+##
+## list of clients we allow
+##
+access * {
+	allowed 127.0.0.1;
+	trusted 127.0.0.1;
+}
