@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# Copyright 2008 Google Inc. All Rights Reserved.
+# Author: willn@google.com (Will Nowak)
+
+target=${1:?No target given. Run $0 machinename}
+
+if [ ! -d /usr/local/autotest/client ]
+then
+  echo "Autotest does not seem to be properly installed on the bastion"
+  echo "Check the bastion configuration and try again."
+  exit 1
+fi
+
+rsync -av --delete --delete-after --exclude '.svn' \
+ /usr/local/autotest/client/ $target:/usr/local/autotest/

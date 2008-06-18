@@ -10,11 +10,22 @@ machinenumber=`echo $1|tr '[A-Z]' '[a-z]'|sed -e 's/test//g' -e 's/\.localnet//g
 ipbase="192.168.0.5"
 noinstallbase=/usr/local/zumatest/machine_status/installed
 
+SSH_WAIT_LIMIT=${SSH_WAIT_LIMIT=300}
+
 wait_ssh() {
   ip=$1
   mach=$2
+  echo "Waiting for ssh to come alive"
+  count=0
   while true
   do
+    if [ $count -ge $SSH_WAIT_LIMIT ]
+    then
+      echo "Timing out. Install failed?"
+      exit 1
+    else
+      count=$(($count + 1))
+    fi
     if ssh test${mach} true 2>/dev/null
     then
       echo "MACH${mach}: Machine ready"

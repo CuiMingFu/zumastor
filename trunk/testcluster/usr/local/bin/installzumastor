@@ -95,3 +95,22 @@ run apt-get -qy install dmsetup
 run "cd $dir; dpkg -i *.deb"
 run update-grub
 run reboot
+sleep 10
+
+TIMEOUT=${TIMEOUT=120}
+count=0
+while true
+do
+  if [ $count -ge $TIMEOUT ]
+  then
+    echo "Failed. Machine isn't alive after install"
+    exit 1
+  fi
+  ssh $target true
+  if [ $? -eq 0 ]
+  then
+    break
+  fi
+  sleep 1
+  count=$(($count + 1))
+done
