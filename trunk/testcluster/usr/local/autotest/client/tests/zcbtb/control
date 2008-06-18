@@ -1,0 +1,3 @@
+# Zumastor snapshot test on multiple filsystems
+job.run_test('zumastor_cbtb', test='1/snapshot-ddsnap.sh',
+             tag='1-snapshot-ddsnap.sh')

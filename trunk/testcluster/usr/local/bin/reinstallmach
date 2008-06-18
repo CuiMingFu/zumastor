@@ -2,7 +2,7 @@
 
 if [ $# -ne 1 ]
 then
-  echo "You must supply a machine number to re-install"
+  echo "You must supply a machine name to re-install"
   exit 1
 fi
 

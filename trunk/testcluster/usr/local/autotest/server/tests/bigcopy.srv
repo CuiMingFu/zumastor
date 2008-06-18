@@ -1,0 +1,31 @@
+assert len(machines) == 2, "Need exactly two machines for this test"
+
+master = machines[0]
+slave  = machines[1]
+
+# Setup ssh access and zumastor on machines
+job.run_test('setupbigcopy', machines)
+
+# Setup zumastor volumes and raid/lvm on machines
+def base_setup(machine):
+  h  = hosts.SSHHost(machine)
+  at = autotest.Autotest(h)
+  at.run_test('zumastor_base_init')
+
+job.parallel_simple(base_setup, machines)
+
+# Setup Master and slave and do replication
+def masterslave(machine):
+  h  = hosts.SSHHost(machine)
+  at = autotest.Autotest(h)
+  if machine == master:
+    test = 'zumastor_master_init'
+    other = slave
+  else:
+    test = 'zumastor_slave_init'
+    other = master
+  at.run_test(test, other)
+job.parallel_simple(masterslave, machines)
+
+# reimage machines for the next job
+job.run_test('teardownbigcopy', machines)
