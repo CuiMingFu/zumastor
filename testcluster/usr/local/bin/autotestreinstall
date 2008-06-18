@@ -1,0 +1,10 @@
+#!/bin/sh
+
+if [ $# -ne 1 ]
+then
+  echo "You must supply a machine number to re-install"
+  exit 1
+fi
+
+yes | /usr/local/bin/reinstallmach $1
+/usr/local/bin/installautotest $1
