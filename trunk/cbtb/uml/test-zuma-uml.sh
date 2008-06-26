@@ -47,7 +47,9 @@ fi
 retval=0
 
 execfiles="$*"
-testname=`echo "$execfiles" | tr -s " " | sed -e "s: :+:g" -e "s:/:_:g"`
+firsttestname=`basename $1`
+firsttestpath=`basename $(echo $1 | sed -e s/$firsttestname//)`
+logname="${firsttestpath}_${firsttestname}"
 
 if [ "x$MACFILE" = "x" -o "x$MACADDR" = "x" -o "x$IFACE" = "x" \
      -o "x$IPADDR" = "x" ] ; then
@@ -145,7 +147,7 @@ if [ $largest_hddsize -gt 0 ] ; then
   fi
 fi
 
-exec 5>$build/r${SVNREV}/bootlog-$testname-1.log
+exec 5>$build/r${SVNREV}/$logname-kernlog-1.log
 $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
   ubd0=${tmpdir}/hda.img,$templateimg $hd \
   mem=512M \
@@ -157,7 +159,7 @@ exec 5>&-
 
 
 if [ "x$MACADDR2" != "x" ] ; then
-  exec 6>$build/r${SVNREV}/bootlog-$testname-2.log
+  exec 6>$build/r${SVNREV}/$logname-kernlog-2.log
   $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
     ubd0=${tmpdir}/hda2.img,$templateimg $hd2 \
     mem=512M \
@@ -169,7 +171,7 @@ if [ "x$MACADDR2" != "x" ] ; then
 fi
 
 if [ "x$MACADDR3" != "x" ] ; then
-  exec 7>$build/r${SVNREV}/bootlog-$testname-3.log
+  exec 7>$build/r${SVNREV}/$logname-kernlog-3.log
   $build/r${SVNREV}/linux-${ARCH}-r${SVNREV} \
     ubd0=${tmpdir}/hda3.img,$templateimg $hd3 \
     mem=512M \
@@ -227,7 +229,7 @@ if [ "x$MACADDR3" != "x" ] ; then
   if [ $count -ge 30 ] 
   then
     kill $uml3_pid
-    retval=64
+    retval=66
     unset uml3_pid
   fi
 fi
@@ -279,6 +281,23 @@ fi
 if [ "x$uml3_pid" != "x" ] ; then
   ( sleep 600 ; kill $uml3_pid ) & killer3=$!
 fi
+
+# 10 minutes is plenty of time to first go and fetch the logs
+if [ "x$uml_pid" != "x" ] ; then
+  mkdir -p $build/r${SVNREV}/$logname-zumastor-1-logs
+  ${CMDTIMEOUT} ${SCP} -r root@${IPADDR}:/var/log/zumastor/* $build/r${SVNREV}/$logname-zumastor-1-logs || true
+fi
+
+if [ "x$uml2_pid" != "x" ] ; then
+  mkdir -p $build/r${SVNREV}/$logname-zumastor-2-logs
+  ${CMDTIMEOUT} ${SCP} -r root@${IPADDR2}:/var/log/zumastor/* $build/r${SVNREV}/$logname-zumastor-2-logs || true
+fi
+
+if [ "x$uml3_pid" != "x" ] ; then
+  mkdir -p $build/r${SVNREV}/$logname-zumastor-3-logs
+  ${CMDTIMEOUT} ${SCP} -r root@${IPADDR3}:/var/log/zumastor/* $build/r${SVNREV}/$logname-zumastor-3-logs || true
+fi
+
 
 if [ "x$uml_pid" != "x" ] ; then
   ${CMDTIMEOUT} ${SSH} root@${IPADDR} poweroff

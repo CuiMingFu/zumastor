@@ -1,10 +1,10 @@
 ///////////////////
 This document is written in asciidoc format.
-To convert it to HTML (or pdf, or...), install asciidoc-8.2.5 as follows:
+To convert it to HTML (or pdf, or...), install asciidoc-8.2.6 as follows:
 
- wget http://www.methods.co.nz/asciidoc/asciidoc-8.2.5.tar.gz
- tar -xzvf asciidoc-8.2.5.tar.gz
- cd asciidoc-8.2.5
+ wget http://www.methods.co.nz/asciidoc/asciidoc-8.2.6.tar.gz
+ tar -xzvf asciidoc-8.2.6.tar.gz
+ cd asciidoc-8.2.6
  perl -p -i -e 's,BINDIR=/usr/local/bin,BINDIR=/usr/local/asciidoc/bin,;s,MANDIR=/usr/local/man,MANDIR=/usr/local/asciidoc/man,' install.sh
  sudo mkdir -p /usr/local/asciidoc/bin
  sudo sh install.sh 
@@ -809,10 +809,19 @@ the top of the tree, and ended up with a mismatched tree.  The
 script warns you about a split repository, but didn't say quite what
 to do about it.  (The script is clearer now.)
 
+- If the UML instance stops with a "Terminated" message, and the kernel
+log for the UML instance as an error like "Bus error - the host /dev/shm 
+or /tmp mount likely just ran out of space," then you probably need to 
+increase the size of /dev/shm on the host system. Run "mount | grep shm" 
+to see what the size option is currently set to. Then run "mount -o 
+remount,size=NEWSIZE /dev/shm" to set it to NEWSIZE.
+
+
 Other notes:
 
 - You may append --all to smoke-test.sh's command line if you wish to run all
-  cbtb tests instead of just the smoke tests.
+cbtb tests instead of just the smoke tests.  There is also a --no-fail flag
+to skip tests that are expected to fail.
 
 Troubleshooting
 ---------------
