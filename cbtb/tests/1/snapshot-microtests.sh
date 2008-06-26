@@ -12,6 +12,7 @@ TIMEOUT=300
 NUMDEVS=2
 DEV1SIZE=4
 DEV2SIZE=4
+EXPECT_FAIL=1
 
 set -e
 
@@ -68,6 +69,12 @@ checksnap () {
 	fi
 
 	echo "not ok $tnum - $volume differs from what's expected in test $test_desc"
+	ls -l /tmp/check /tmp/$volume
+	echo "/tmp/chunk | uniq -c:"
+	cat /tmp/check | uniq -c
+	echo "/tmp/$volume | uniq -c:"
+	cat /tmp/$volume | uniq -c
+
 	exit $tnum
 }
 
