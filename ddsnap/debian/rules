@@ -17,6 +17,10 @@ else
 	CFLAGS += -O2 -fno-strict-aliasing
 endif
 
+ifneq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	INSTALLFLAGS += -s
+endif
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
@@ -52,7 +56,7 @@ install: build
 	dh_installdirs
 
 	mkdir -p $(CURDIR)/debian/ddsnap/sbin
-	install -s ddsnap nblock_write ddsnap-sb $(CURDIR)/debian/ddsnap/sbin
+	install $(INSTALLFLAGS) ddsnap nblock_write ddsnap-sb $(CURDIR)/debian/ddsnap/sbin
 
 # Build architecture-independent files here.
 binary-indep: build install

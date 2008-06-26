@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<meta name="generator" content="AsciiDoc 8.2.5" />
+<meta name="generator" content="AsciiDoc 8.2.6" />
 <style type="text/css">
 /* Debug borders */
 p, li, dt, dd, div, pre, h1, h2, h3, h4, h5, h6 {
@@ -26,10 +26,12 @@ a:visited {
 
 em {
   font-style: italic;
+  color: navy;
 }
 
 strong {
   font-weight: bold;
+  color: #083194;
 }
 
 tt {
@@ -69,6 +71,10 @@ hr {
 p {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
 }
 
 pre {
@@ -123,6 +129,7 @@ div.content { /* Block element content. */
 
 /* Block element titles. */
 div.title, caption.title {
+  color: #527bbd;
   font-family: sans-serif;
   font-weight: bold;
   text-align: left;
@@ -202,16 +209,19 @@ dl {
 dt {
   margin-top: 0.5em;
   margin-bottom: 0;
-  font-style: italic;
+  font-style: normal;
 }
 dd > *:first-child {
-  margin-top: 0;
+  margin-top: 0.1em;
 }
 
 ul, ol {
     list-style-position: outside;
 }
-div.olist2 ol {
+div.olist > ol {
+  list-style-type: decimal;
+}
+div.olist2 > ol {
   list-style-type: lower-alpha;
 }
 
@@ -231,11 +241,11 @@ div.hlist {
   margin-bottom: 0.8em;
 }
 div.hlist td {
-  padding-bottom: 5px;
+  padding-bottom: 15px;
 }
 td.hlist1 {
   vertical-align: top;
-  font-style: italic;
+  font-style: normal;
   padding-right: 0.8em;
 }
 td.hlist2 {
@@ -279,6 +289,7 @@ div.sidebar-content {
   padding: 0.5em;
 }
 div.sidebar-title, div.image-title {
+  color: #527bbd;
   font-family: sans-serif;
   font-weight: bold;
   margin-top: 0.0em;
@@ -302,6 +313,14 @@ div.exampleblock-content {
 
 /* IE6 sets dynamically generated links as visited. */
 div#toc a:visited { color: blue; }
+
+/* Because IE6 child selector is broken. */
+div.olist2 ol {
+  list-style-type: lower-alpha;
+}
+div.olist2 div.olist ol {
+  list-style-type: decimal;
+}
 </style>
 <script type="text/javascript">
 /*<![CDATA[*/
@@ -372,6 +391,8 @@ function generateToc(toclevels) {
     div.className = "toclevel" + entry.toclevel;
     toc.appendChild(div);
   }
+  if (entries.length == 0)
+    document.getElementById("header").removeChild(toc);
 }
 /*]]>*/
 </script>
@@ -1052,7 +1073,7 @@ Zumastor kernel sources:</p></div>
 kernel sources. You'll need to build a kernel as per usual, with one
 exception: you need to ensure that you enable the CONFIG_DM_DDSNAP
 kernel option when you configure your kernel. It can be found in
-"Device Drivers" -&gt; "Multi-device support" -&gt; "Distributed Data
+"Device Drivers" &#8594; "Multi-device support" &#8594; "Distributed Data
 Snapshot target".</p></div>
 <div class="para"><p>The Zumastor project also recommends a few options be enabled to
 assist with debugging: CONFIG_IKCONFIG_PROC, CONFIG_MAGIC_SYSRQ, and
@@ -1253,13 +1274,24 @@ script warns you about a split repository, but didn't say quite what
 to do about it.  (The script is clearer now.)
 </p>
 </li>
+<li>
+<p>
+If the UML instance stops with a "Terminated" message, and the kernel
+log for the UML instance as an error like "Bus error - the host /dev/shm
+or /tmp mount likely just ran out of space," then you probably need to
+increase the size of /dev/shm on the host system. Run "mount | grep shm"
+to see what the size option is currently set to. Then run "mount -o
+remount,size=NEWSIZE /dev/shm" to set it to NEWSIZE.
+</p>
+</li>
 </ul></div>
 <div class="para"><p>Other notes:</p></div>
 <div class="ilist"><ul>
 <li>
 <p>
 You may append &#8212;all to smoke-test.sh's command line if you wish to run all
-  cbtb tests instead of just the smoke tests.
+cbtb tests instead of just the smoke tests.  There is also a &#8212;no-fail flag
+to skip tests that are expected to fail.
 </p>
 </li>
 </ul></div>
@@ -1307,8 +1339,7 @@ cron
 mount
 running
 servers
-snapshot
-</tt></pre>
+snapshot</tt></pre>
 </div></div>
 <div class="para"><p>Note: this doesn't yet complain properly if you forgot to reboot
 into a kernel that supports zumastor.  (It will later, when you try to
@@ -2297,7 +2328,7 @@ time optimizing Zumastor's write performance.)</p></div>
 <div id="footer">
 <div id="footer-text">
 Version 0.8<br />
-Last updated 2008-05-09 16:19:47 PDT
+Last updated 2008-06-26 09:55:25 PDT
 </div>
 </div>
 </body>
