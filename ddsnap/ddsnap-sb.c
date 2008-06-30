@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 	int metadev, err, release4 = 0;
 
 	if (argc < 2)
-		error("usage: %s upgrade <metadev> [0.4]", argv[0]);
+		error("usage: %s <metadev> [0.4]", argv[0]);
 	if ((metadev = open(argv[1], O_RDWR | O_SYNC)) < 0)
 		error("unable to open the metadata device, err %s\n", strerror(errno));
 	if ((err = diskread(metadev, magic, sizeof(magic), SB_SECTORS << SECTOR_BITS)) < 0) {
