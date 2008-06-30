@@ -4488,7 +4488,8 @@ int start_server(
 	int listenfd, getsigfd, agentfd, ret;
 
 	if (!valid_sb(sb))
-		error("Invalid superblock: please run 'ddsnap-sb' first to upgrade the superblock.\n");
+		error("Invalid superblock: If this is your first run, use --initialize to initialize the superblock.\n"
+		      "If you are upgrading from some older version, run 'ddsnap-sb' first to upgrade the superblock.\n");
 	sb->runflags = flags;
 
 	unsigned bufsize = 1 << sb->image.metadata.allocsize_bits;
