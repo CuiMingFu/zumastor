@@ -110,9 +110,8 @@ void write_pidfile(char const *pidfile, pid_t pid)
 	}
 }
 
-pid_t daemonize(char const *logfile, char const *pidfile, int *getsigfd)
+void setup_signals(int *getsigfd)
 {
-	pid_t pid;
 	int pipevec[2];
 
 	/*
@@ -131,10 +130,13 @@ pid_t daemonize(char const *logfile, char const *pidfile, int *getsigfd)
 	signal(SIGHUP, sighandler);
 	signal(SIGINT, sighandler);
 	signal(SIGTERM, sighandler);
+}
 
+pid_t daemonize(char const *logfile, char const *pidfile, int *getsigfd)
+{
+	setup_signals(getsigfd); // daemonize is trying to do too much!
 	fflush(stdout);
-
-	pid = fork();
+	pid_t pid = fork();
 
 	if (pid == 0) {
 		setpgid(0, 0);
