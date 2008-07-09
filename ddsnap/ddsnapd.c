@@ -4355,6 +4355,7 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 
 		/* Signal? */
 		if (pollvec[1].revents) {
+			assert(pollvec[1].revents & POLLIN);
 			u8 sig = 0;
 			/* it's stupid but this read also gets interrupted, so... */
 			do { } while (read(getsigfd, &sig, 1) == -1 && errno == EINTR);
@@ -4376,7 +4377,7 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 					re_open_logfile(logfile);
 					break;
 				default:
-					warn("I don't handle signal %i", sig);
+					warn("Unexpected signal %i", sig);
 					break;
 			}
 		}
@@ -4521,7 +4522,9 @@ int start_server(
 	if (snap_server_setup(agent_sockname, server_sockname, &listenfd, &agentfd) < 0)
 		error("Could not setup snapshot server\n");
 
-	if (!nobg) {
+	if (nobg) {
+		setup_signals(&getsigfd); // daemonize is trying to do too much!
+	} else {
 		pid_t pid;
 		
 		if (!logfile)
