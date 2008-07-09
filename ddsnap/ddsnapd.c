@@ -3794,14 +3794,12 @@ static int incoming(struct superblock *sb, struct client *client)
 
 	case CREATE_SNAPSHOT:
 	{
-		int err = create_snapshot(sb, ((struct create_snapshot *)message.body)->snap);
+		err = create_snapshot(sb, ((struct create_snapshot *)message.body)->snap);
 		if (err < 0) {
-			char *why =
-				-err == EFULL ? "too many snapshots" :
+			why = -err == EFULL ? "too many snapshots" :
 				-err == EEXIST ? "snapshot already exists" :
 				"unknown snapshot create error";
-			outerror(sock, -err, why);
-			break;
+			goto eek;
 		}
 		save_sb_check(sb);
 		if (outbead(sock, CREATE_SNAPSHOT_OK, struct { }) < 0)
@@ -3810,8 +3808,8 @@ static int incoming(struct superblock *sb, struct client *client)
 	}
 	case DELETE_SNAPSHOT:
 	{
-		int err = -EINVAL;
-		char *why = "snapshot doesn't exist";
+		err = -EINVAL;
+		why = "snapshot doesn't exist";
 		struct snapshot *snapshot = find_snap(sb, ((struct create_snapshot *)message.body)->snap);
 		if (!snapshot)
 			goto eek;
@@ -3967,7 +3965,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		u32 tag1 = ((struct stream_changelist *)message.body)->snap1;
 		u32 tag2 = ((struct stream_changelist *)message.body)->snap2;
 		int against_origin = (tag1 == (u32)~0UL);
-		char *why = "unable to generate changelist";
+		why = "unable to generate changelist";
 		err = EINVAL;
 
 		struct snapshot *snapshot1 = NULL;
