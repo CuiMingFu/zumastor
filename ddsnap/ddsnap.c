@@ -40,6 +40,7 @@
 // FIXME: Overloading *_MAX is bad
 #define INPUT_ERROR UINT32_MAX
 #define INPUT_ERROR_64 UINT64_MAX
+#define bogus 0 // suppress uninitialized variable warning, probably indicates of poor algorithm
 
 u64 strtobytes64(char const *string)
 {
@@ -741,7 +742,7 @@ static int generate_delta_extents(u32 mode, int level, struct change_list *cl, i
 
 	u64 dev2_gzip_size;
 	struct delta_extent_header deh = { .magic_num = MAGIC_NUM };
-	u64 extent_addr, chunk_num, num_of_chunks, source_volume_size, target_volume_size;
+	u64 extent_addr = bogus, chunk_num, num_of_chunks, source_volume_size = bogus, target_volume_size;
 	u64 extent_size, delta_size, gzip_size = MAX_MEM_SIZE, bytes_total = 0, bytes_sent = 0;
 	u32 chunk_size = 1 << cl->chunksize_bits;
 	struct delta_extent_header deh2 = { .magic_num = MAGIC_NUM, .mode = RAW };
@@ -1122,8 +1123,10 @@ out:
 static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, char const *dev1name, char const *dev2name, char const *progress_file, u32 tgt_snap)
 {
 	int fullvolume = !dev1name;
-	int snapdev1, snapdev2;
-	int err;
+	int snapdev1 = bogus, snapdev2;
+	int err = bogus;
+	unsigned char *updated=NULL, *extent_data=NULL, *delta_data=NULL, *comp_delta=NULL;
+	char *up_extent1=NULL, *up_extent2=NULL;
 
 	/* if an extent is being applied */
 	if (!fullvolume && ((snapdev1 = open(dev1name, O_RDONLY)) < 0)) {
@@ -1142,9 +1145,6 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	if (progress_file && (err = generate_progress_file(progress_file, &progress_tmpfile)))
 		goto out;
 
-	unsigned char *updated=NULL, *extent_data=NULL, *delta_data=NULL, *comp_delta=NULL;
-	char *up_extent1=NULL, *up_extent2=NULL;
-
 	if (!(updated = malloc(MAX_MEM_SIZE)) || !(extent_data = malloc(MAX_MEM_SIZE)) \
 		|| !(delta_data = malloc(MAX_MEM_SIZE)) || !(comp_delta = malloc(MAX_MEM_SIZE)) \
 		|| !(up_extent1 = malloc(MAX_MEM_SIZE)) || !(up_extent2 = malloc(MAX_MEM_SIZE))) {
@@ -1154,7 +1154,7 @@ static int apply_delta_extents(int deltafile, u32 chunk_size, u64 chunk_count, c
 	}
 
 	struct delta_extent_header deh;
-	u64 uncomp_size, extent_size, source_volume_size, target_volume_size;
+	u64 uncomp_size, extent_size, source_volume_size = bogus, target_volume_size;
 	u64 extent_addr = 0, chunk_num;
 	int current_time, last_update = 0;
 
