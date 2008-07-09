@@ -3237,7 +3237,7 @@ static int adjust_bitmap(struct superblock *sb, struct allocspace *as, u64 newch
 
 static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize, u64 metasize)
 {
-	u64 metachunks, snapchunks, orgchunks;
+	u64 metachunks, snapchunks, orgsectors;
 	u64 new_bitmap_basechunk = 0;
 	u64 new_metachunks = 0;
 
@@ -3278,10 +3278,16 @@ static int change_device_sizes(struct superblock *sb, u64 orgsize, u64 snapsize,
 		}
 	}
 
-	orgchunks = orgsize >> SECTOR_BITS;
-	if (orgchunks && sb->image.orgsectors != orgchunks) {
-		warn("orgdev size changes from %Lu to %Lu", sb->image.orgsectors, orgchunks);
-		sb->image.orgsectors = orgchunks;
+	/*
+	 * If we don't round this to a multiple of chunk size, we can cause
+	 * block device access in units smaller than pages.  It may also 
+	 * cause problems when accessing the last chunk.
+	 */
+	orgsectors = orgsize >> (SECTOR_BITS + sb->snapdata.chunk_sectors_bits);
+	orgsectors <<= sb->snapdata.chunk_sectors_bits;
+	if (orgsectors && sb->image.orgsectors != orgsectors) {
+		warn("orgdev size changes from %Lu to %Lu", sb->image.orgsectors, orgsectors);
+		sb->image.orgsectors = orgsectors;
 	}
 	return 0;
 }
