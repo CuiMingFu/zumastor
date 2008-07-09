@@ -3541,6 +3541,7 @@ static int incoming(struct superblock *sb, struct client *client)
 {
 	struct messagebuf message;
 	unsigned sock = client->sock;
+	char *why = "";
 	int i, j, err;
 
 	if ((err = readpipe(sock, &message.head, sizeof(message.head))))
@@ -3789,11 +3790,11 @@ static int incoming(struct superblock *sb, struct client *client)
 	{
 		int err = create_snapshot(sb, ((struct create_snapshot *)message.body)->snap);
 		if (err < 0) {
-			char *error =
+			char *why =
 				-err == EFULL ? "too many snapshots" :
 				-err == EEXIST ? "snapshot already exists" :
 				"unknown snapshot create error";
-			outerror(sock, -err, error);
+			outerror(sock, -err, why);
 			break;
 		}
 		save_sb_check(sb);
@@ -3803,18 +3804,20 @@ static int incoming(struct superblock *sb, struct client *client)
 	}
 	case DELETE_SNAPSHOT:
 	{
+		int err = -EINVAL;
+		char *why = "snapshot doesn't exist";
 		struct snapshot *snapshot = find_snap(sb, ((struct create_snapshot *)message.body)->snap);
 		if (!snapshot)
-			outerror(sock, EINVAL, "snapshot doesn't exist");
-		else if (usecount(sb, snapshot))
-			outerror(sock, EINVAL, "snapshot has non-zero usecount");
-		else if (delete_snap(sb, snapshot))
-			outerror(sock, EIO, "fail to delete snapshot");
-		else {
-			save_sb_check(sb);
-			if (outbead(sock, DELETE_SNAPSHOT_OK, struct { }) < 0)
-				warn("unable to reply to delete snapshot message"); // !!! return message
-		}
+			goto eek;
+		why = "snapshot has non-zero usecount";
+		if (usecount(sb, snapshot))
+			goto eek;
+		why = "failed to delete snapshot";
+		if ((err = delete_snap(sb, snapshot)))
+			goto eek;
+		save_sb_check(sb);
+		if (outbead(sock, DELETE_SNAPSHOT_OK, struct { }) < 0)
+			warn("unable to reply to delete snapshot message"); // !!! return message
 		break;
 	}
 	case INITIALIZE_SNAPSTORE: // this is a stupid feature
@@ -3884,14 +3887,14 @@ static int incoming(struct superblock *sb, struct client *client)
 		if (tag == (u32)~0UL) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Can not set priority for origin");
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_INVALID_SNAPSHOT;
+			err = -ERROR_INVALID_SNAPSHOT;
 			goto prio_error;
 		}
 		if (!(snapshot = find_snap(sb, tag))) {
 			warn("Snapshot tag %u is not valid", tag);
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Snapshot tag %u is not valid", tag);
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_INVALID_SNAPSHOT;
+			err = -ERROR_INVALID_SNAPSHOT;
 			goto prio_error;
 		}
 		snapshot->prio = prio;
@@ -3899,7 +3902,7 @@ static int incoming(struct superblock *sb, struct client *client)
 			warn("unable to reply to set priority message");
 		break;
 	prio_error:
-		outerror(sock, err, err_msg);
+		outerror(sock, -err, err_msg);
 		break;
 	}
 	case USECOUNT:
@@ -3919,28 +3922,28 @@ static int incoming(struct superblock *sb, struct client *client)
 		if (tag == (u32)~0UL) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Setting the usecount of the origin.");
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_INVALID_SNAPSHOT;
+			err = -ERROR_INVALID_SNAPSHOT;
 			goto usecnt_error; /* not really an error though */
 		}
 		if (!(snapshot = find_snap(sb, tag))) {
 			warn("Snapshot tag %u is not valid", tag);
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Snapshot tag %u is not valid", tag);
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_INVALID_SNAPSHOT;
+			err = -ERROR_INVALID_SNAPSHOT;
 			goto usecnt_error;
 		}
 		/* check for overflow against persistent + transient usecount */
 		if ((usecnt_dev >= 0) && (((usecount(sb, snapshot) + usecnt_dev) >> 16) != 0)) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Usecount overflow.");
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_USECOUNT;
+			err = -ERROR_USECOUNT;
 			goto usecnt_error;
 		}
 		/* check for usecount underflow against persistent usecount only */
 		if ((usecnt_dev < 0) && (((snapshot->usecount + usecnt_dev) >> 16) != 0)) {
 			snprintf(err_msg, MAX_ERRMSG_SIZE, "Usecount underflow.");
 			err_msg[MAX_ERRMSG_SIZE-1] = '\0';
-			err = ERROR_USECOUNT;
+			err = -ERROR_USECOUNT;
 			goto usecnt_error;
 		}
 
@@ -3950,7 +3953,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		break;
 
 	usecnt_error:
-		outerror(sock, err, err_msg);
+		outerror(sock, -err, err_msg);
 		break;
 	}
 	case STREAM_CHANGELIST:
@@ -3958,7 +3961,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		u32 tag1 = ((struct stream_changelist *)message.body)->snap1;
 		u32 tag2 = ((struct stream_changelist *)message.body)->snap2;
 		int against_origin = (tag1 == (u32)~0UL);
-		char *error = "unable to generate changelist";
+		char *why = "unable to generate changelist";
 		err = EINVAL;
 
 		struct snapshot *snapshot1 = NULL;
@@ -3966,12 +3969,12 @@ static int incoming(struct superblock *sb, struct client *client)
 
 		if (!against_origin) {
 			snapshot1 = find_snap(sb, tag1);
-			error = "source snapshot does not exist";
+			why = "source snapshot does not exist";
 			if (!snapshot1)
 				goto eek;
 		}
 		if (!snapshot2) {
-			error = "destination snapshot does not exist";
+			why = "destination snapshot does not exist";
 			goto eek;
 		}
 		/* Danger, Danger!!!  This is going to turn into a bug when tree walks go
@@ -3979,7 +3982,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		   to pass the tags instead.  Next round of cleanups. */
 
 		trace_on(printf("generating changelist from snapshot tags %u and %u\n", tag1, tag2););
-		error = "unable to generate changelist";
+		why = "unable to generate changelist";
 		struct gen_changelist gcl = {
 			.cl = init_change_list(sb->snapdata.asi->allocsize_bits, tag1, tag2),
 			.mask1 = against_origin ? ~0ULL : 1ULL << snapshot1->bit,
@@ -3990,7 +3993,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		if ((err = traverse_tree_range(sb, 0, -1, gen_changelist_leaf, &gcl)))
 			goto eek_free;
 		trace_on(printf("sending list of "U64FMT" changed chunks\n", gcl.cl->count););
-		error = "unable to send reply to stream change list message";
+		why = "unable to send reply to stream change list message";
 		if (outbead(sock, STREAM_CHANGELIST_OK, struct changelist_stream, gcl.cl->count, sb->snapdata.asi->allocsize_bits) < 0)
 			goto eek_free;
 		if (writepipe(sock, gcl.cl->chunks, gcl.cl->count * sizeof(gcl.cl->chunks[0])) < 0)
@@ -3999,10 +4002,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		break;
 	eek_free:
 		free_change_list(gcl.cl);
-	eek:
-		warn("%s", error);
-		outerror(sock, err, error);
-		break;
+		goto eek;
 	}
 	case STATUS:
 	{
@@ -4127,7 +4127,6 @@ static int incoming(struct superblock *sb, struct client *client)
 			writepipe(sock, err_msg, strlen(err_msg) + 1) < 0)
 				warn("unable to send unknown message error");
 	}
-
 	} /* end switch statement */
 	
 #ifdef SIMULATE_CRASH
@@ -4139,22 +4138,26 @@ static int incoming(struct superblock *sb, struct client *client)
 #endif
 	return 0;
 
- message_too_long:
+eek:
+	warn("%s", why);
+	outerror(sock, -err, why);
+	return 0;
+
+message_too_long:
 	warn("message %x too long (%u bytes) (disconnecting client)", message.head.code, message.head.length);
 #ifdef DEBUG_BAD_MESSAGES
 	for (;;) {
 		unsigned int byte;
-
 		if ((err = readpipe(sock, &byte, 1)))
 			return -1;
 		warn("%02x", byte);
 	}
 #endif
 	return -1;
- message_too_short:
+message_too_short:
 	warn("message %x too short (%u bytes) (disconnecting client)", message.head.code, message.head.length);
 	return -1;
- pipe_error:
+pipe_error:
 	return -1; /* we quietly drop the client if the connect breaks */
 }
 
