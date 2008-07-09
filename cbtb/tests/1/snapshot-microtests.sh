@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/bash -x
 #
 # Write some data to a ddsnap volume, create and delete various snapshots,
 # and ensure that the origin and the snapshot always contain the expected
@@ -12,7 +12,6 @@ TIMEOUT=300
 NUMDEVS=2
 DEV1SIZE=4
 DEV2SIZE=4
-EXPECT_FAIL=1
 
 set -e
 
@@ -20,26 +19,93 @@ rc=0
 tnum=1
 echo "1..29"
 
-. /lib/zumastor/common
-
 volname=testvol
 
 tmp="/tmp"
 chunksize="16k"
 maxchunks=16
 snaps=""
+agentsocket=$tmp/control-$$
+serversocket=$tmp/server-$$
+
+# Low level routines
+
+snapname () {
+	local snap=$1
+	if [ "$snap" = "origin" ] || [ "$snap" = "-1" ]; then
+		echo "$volname"
+	else
+		echo "$volname($snap)"
+	fi
+}
+
+createdevice () {
+	local snap=$1
+	# We don't do any resizing, so size of origin and snaps is always the same
+	local size=$(ddsnap status $serversocket --size)
+	echo 0 $size ddsnap $DEV2NAME $DEV1NAME $agentsocket $snap | dmsetup create `snapname $snap`
+}
+
+removedevice () {
+	dmsetup remove `snapname $1`
+}
+
+startddsnap () {
+	mkdir -p /var/log/zumastor/$volname
+	ddsnap agent $agentsocket
+	ddsnap server $DEV2NAME $DEV1NAME $agentsocket $serversocket --logfile /var/log/zumastor/$volname/server.log
+
+	for i in -1 $snaps; do
+		createdevice $i
+	done
+}
+
+stopddsnap () {
+	for i in $snaps -1; do
+		removedevice $i
+	done
+	pkill -f "ddsnap"
+}
+
+createsnapshot () {
+	local snap=$1
+
+	cp $tmp/$volname "$tmp/`snapname $snap`"
+
+	ddsnap create $serversocket $snap
+	blockdev --flushbufs /dev/mapper/$volname
+	createdevice $snap
+
+	# Keep a list of created snapshots
+	snaps="$snaps $snap"
+
+	check
+}
+
+delsnapshot () {
+    local snap=$1
+
+    checksnap $snap
+
+    rm "$tmp/`snapname $snap`"
+	sleep 1
+    removedevice $snap
+    ddsnap delete $serversocket $snap
+
+    # Keep a list of created snapshots
+    snaps=`echo $snaps | sed -e "s/$snap//"`
+
+	check
+}
+
+# Testing routines
 
 writedisk () {
 	local snap=$1
 	local offset=$2
 	local string=$3
+	local volume=`snapname $snap`
 	
-	if [ "$snap" = "origin" ]; then
-		volume=$volname
-	else
-		volume="$volname($snap)"
-	fi
-
 	if [ $offset -ge $maxchunks ]; then
 		echo "Trying to write more chunks than compared.  Increase maxchunks."
 		exit -1
@@ -56,12 +122,7 @@ writedisk () {
 checksnap () {
 	local snap=$1
 	local size
-
-	if [ "$snap" = "origin" ]; then
-		volume=$volname
-	else
-		volume="$volname($snap)"
-	fi
+	local volume=`snapname $snap`
 
 	dd if=/dev/mapper/$volume of=$tmp/check bs=$chunksize count=$maxchunks status=noxfer 2>&1 | grep -v "0 records" || true
 	if diff -q $tmp/check $tmp/$volume; then
@@ -69,12 +130,17 @@ checksnap () {
 	fi
 
 	echo "not ok $tnum - $volume differs from what's expected in test $test_desc"
+	# Give some detail about how they differ
 	ls -l /tmp/check /tmp/$volume
-	echo "/tmp/chunk | uniq -c:"
+	echo "/tmp/check | uniq -c:"
 	cat /tmp/check | uniq -c
 	echo "/tmp/$volume | uniq -c:"
 	cat /tmp/$volume | uniq -c
 
+	# Clean up the extra devices, but don't forget the volume to allow debugging
+	for i in $snaps; do
+		removedevice $i
+	done
 	exit $tnum
 }
 
@@ -89,50 +155,22 @@ pass () {
 	tnum=$((tnum+1))
 }
 
-createsnapshot () {
-	local snap=$1
 
-	volume="$volname($snap)"
+# Poison the raw devices...
+yes "DEADBEEF" | dd of=$DEV1NAME bs=8k 2>/dev/null || true
+yes "DEADBEEF" | dd of=$DEV2NAME bs=8k 2>/dev/null || true
 
-	cp $tmp/$volname "$tmp/$volume"
-
-	create_snapshot $volname $snap
-	create_device $volname $snap
-
-	# Keep a list of created snapshots
-	snaps="$snaps $snap"
-
-	check
-}
-
-function delsnapshot () {
-    local snap=$1
-
-    checksnap $snap
-
-    volume="$volname($snap)"
-
-    rm "$tmp/$volume"
-	sleep 1
-    remove_device $volname $snap
-    ddsnap delete ${SERVERS}/$volname $snap
-
-    # Keep a list of created snapshots
-    snaps=`echo $snaps | sed -e "s/$snap//"`
-
-	check
-}
-
-
+rm $tmp/$volname* || true
 
 test_desc="snapshot contains correct data"
 # Define the volume
-zumastor define volume $volname $DEV1NAME $DEV2NAME --initialize 
-zumastor define master $volname 
+ddsnap initialize -y $DEV2NAME $DEV1NAME 
+startddsnap 
 
-# Put the origin in a known state
-for i in `seq -f "%2g" 0 $((maxchunks-1))`; do
-	writedisk origin $i " $i" nocheck
+# Put the origin in a readable state
+for i in `seq  0 $((maxchunks-1))`; do 
+	str=`printf "%3d" $i`
+	writedisk origin $i "$str" nocheck
 done
 check
 
@@ -229,13 +267,10 @@ test_desc="Write origin, create 3rd snap, write 2nd snap"
 writedisk 2 12 "s12"
 pass
 
-# Restart zumastor/ddsnap to ensure everything got to disk
+# Restart ddsnap to ensure everything got to disk
 test_desc="disk image is consistent after a shutdown"
-/etc/init.d/zumastor stop
-/etc/init.d/zumastor start
-for i in $snaps; do
-	create_device $volname $i
-done
+stopddsnap
+startddsnap 
 check
 pass
 
@@ -289,7 +324,7 @@ writedisk 4 14 "u14"
 pass
 
 test_desc="cleanup"
-zumastor forget volume $volname
+stopddsnap
 pass
 
 exit $rc
