@@ -2249,7 +2249,7 @@ int main(int argc, char *argv[])
 
 		metadev_ = snapdev_;
 
-		if (metadev && (metadev_ = open(metadev, O_RDWR | O_DIRECT)) == -1)
+		if (metadev && !is_same_device(snapdev, metadev) && (metadev_ = open(metadev, O_RDWR | O_DIRECT)) == -1)
 			error("Could not open meta volume %s: %s", metadev, strerror(errno));
 
 		if (!yes && sniff_snapstore(metadev_) > 0) {
@@ -2447,7 +2447,7 @@ int main(int argc, char *argv[])
 			error("Could not open origin volume %s: %s", origdev, strerror(errno));
 
 		metadev_ = snapdev_;
-		if (metadev && (metadev_ = open(metadev, O_RDWR | O_DIRECT)) == -1)
+		if (metadev && !is_same_device(snapdev, metadev) && (metadev_ = open(metadev, O_RDWR | O_DIRECT)) == -1)
 			error("Could not open meta volume %s: %s", metadev, strerror(errno));
 
 		poptFreeContext(serverCon);
