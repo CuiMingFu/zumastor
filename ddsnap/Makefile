@@ -22,7 +22,7 @@ all: $(binaries) ddsnap.8.gz nblock_write.8.gz ddsnap-sb.8.gz
 
 clean:
 	$(MAKE) -C $(testdir) clean
-	rm -f build.h $(binaries) *.o xdelta/*.o a.out *.gz patches/*/AUTO.*
+	rm -f build.h $(binaries) *.o xdelta/*.o a.out *.gz patches/*/AUTO.* test-snapstore test-origin
 .PHONY: clean
 
 install:
@@ -121,28 +121,29 @@ data=/dev/$(data0) /dev/$(data1) /dev/$(data2) /dev/$(data3) /dev/$(data4)
 origindev=/dev/hdb1
 snapstoredev=/dev/hdb2
 
-dd-init: 
-	ln -s $(snapstoredev) /dev/test-snapstore || true
-	ln -s $(origindev) /dev/test-origin || true
+test-init:
+	killall ddsnap-agent || true
+	killall ddsnap-server || true
+#	/sbin/dmsetup remove_all || true
+	dd if=/dev/zero of=test-snapstore bs=1M count=10 2>/dev/null
+	dd if=/dev/zero of=test-origin bs=1M count=10 2>/dev/null
 #	insmod /src/2.6.17-rc6-dd/drivers/md/dm-ddsnap.ko || true
-	killall ddsnap || true
-	/sbin/dmsetup remove_all || true
-	./ddsnap initialize /dev/test-snapstore /dev/test-origin 
+	./ddsnap initialize test-snapstore test-origin
 
-dd-agent:
-	./ddsnap agent /tmp/control
+test-agent:
+	./ddsnap agent /tmp/control --logfile /tmp/agent-log
 
-dd-server:
-	./ddsnap server /dev/test-snapstore /dev/test-origin /tmp/control /tmp/server
+test-server:
+	./ddsnap server test-snapstore test-origin /tmp/control /tmp/server --logfile /tmp/agent-log --foreground
 
-dd-create:
+test-create:
 	./ddsnap create /tmp/server 0
  
-dd-delete:
+test-delete:
 	./ddsnap delete /tmp/server 0
 
-origin:
-	echo 0 $$(./ddsnap status /tmp/server --size | tail -n 1) ddsnap /dev/test-snapstore /dev/test-origin /tmp/control -1 | sudo /sbin/dmsetup create snapshot
+test-create-origin:
+	echo 0 $$(./ddsnap status /tmp/server --size) ddsnap test-snapstore test-origin /tmp/control -1 | sudo /sbin/dmsetup create snapshot
 .PHONY: origin
 
 snap0:
@@ -201,7 +202,7 @@ ddsnap-test3:
 #	sudo ./devpoke /dev/mapper/torigin read 2
 #	sleep 1
 #	killall ddsnap-server
-	sudo ./devspam /dev/mapper/torigin write 19 77
+	sudo ./devspam /dev/mapper/torigin write 1000 12
 
 ddsnap-test4:
 #	sudo ./devspam /dev/mapper/torigin write 1 77
