@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <netdb.h> // gethostbyname2_r
 #include <popt.h>
@@ -71,6 +72,7 @@
 #define PR_SET_MEMALLOC	24
 #define MAX_NEW_METACHUNKS 10
 #define MAX_DEFERRED_ALLOCS 500
+#define MAX_CLIENTS 100
 
 #ifndef trace
 #define trace trace_off
@@ -159,6 +161,8 @@ Cluster integration
   + Restart/Error recovery/reporting
 */
 
+#define fieldtype(structname, fieldname) typeof(((struct structname *)NULL)->fieldname)
+
 /*
  * Snapshot btree
  */
@@ -211,6 +215,8 @@ static inline struct exception *emap(struct eleaf *leaf, unsigned i)
 }
 
 enum sbflags { SB_BUSY = 2 };
+
+typedef uint32_t tag_t; // !!! use this everywhere for tags
 
 struct disksuper
 {
@@ -308,6 +314,14 @@ struct superblock
 	struct alloc_range deferred_alloc[MAX_DEFERRED_ALLOCS], defer;
 };
 
+struct client
+{
+	u64 id;
+	int sock;
+	int snaptag;
+	u32 flags;
+};
+
 static int valid_sb(struct superblock *sb)
 {
 	return !memcmp(sb->image.magic, (char[])SB_MAGIC, sizeof(sb->image.magic));
@@ -336,6 +350,19 @@ static inline unsigned chunk_sectors(struct allocspace *space)
 static int deferring(struct superblock *sb)
 {
 	return !!(sb->runflags & RUN_DEFER);
+}
+
+static inline int is_squashed(struct snapshot *snapshot)
+{
+	return snapshot->bit == SNAPSHOT_SQUASHED;
+}
+
+/* usecount() calculates and returns the usecount for a given snapshot.
+ * The persistent (on disk) usecount is added to the transient usecount
+ * (for devices using the snapshot). */
+static inline u16 usecount(struct superblock *sb, struct snapshot *snap)
+{
+	return (is_squashed(snap) ? 0 : sb->usecount[snap->bit]) + snap->usecount;
 }
 
 /*
@@ -745,13 +772,11 @@ static void _show_journal(struct superblock *sb)
 #define show_journal(sb) do { warn("Journal..."); _show_journal(sb); } while (0)
 #endif
 
-#define fieldtype(structname, fieldname) typeof(((struct structname *)NULL)->fieldname)
-
 static int replay_journal(struct superblock *sb)
 {
 	struct buffer *buffer;
 	int jblocks = sb->image.journal_size, commits = 0;;
-	char const *why = "";
+	char *why = "";
 
 	warn("Replaying journal");
 	fieldtype(commit_block, sequence) seq[jblocks];
@@ -1175,6 +1200,14 @@ static void save_sb(struct superblock *sb)
 			warn("Unable to write superblock to disk: %s", strerror(errno));
 		sb->runflags &= ~RUN_SB_DIRTY;
 	}
+}
+
+static void save_sb_check(struct superblock *sb)
+{
+	commit_deferred_allocs(sb);
+	if (dirty_buffer_count)
+		warn("%i dirty buffers when all should be clean!", dirty_buffer_count);
+	save_sb(sb);
 }
 
 /*
@@ -1847,6 +1880,45 @@ static void brelse_free(struct superblock *sb, struct buffer *buffer)
 }
 
 /*
+ * Find the given snapshot tag in the list of snapshots in the superblock.
+ * Return a pointer to that snapshot entry.
+ */
+static struct snapshot *find_snap(struct superblock *sb, u32 tag)
+{
+	struct snapshot *snapshot = sb->image.snaplist;
+	struct snapshot *end = snapshot + sb->image.snapshots;
+
+	for (; snapshot < end; snapshot++)
+		if (snapshot->tag == tag)
+			return snapshot;
+	return NULL;
+}
+
+/*
+ * Find the oldest snapshot with 0 usecnt and lowest priority.
+ * if no such snapshot exists, find the snapshot with lowest priority
+ */
+static struct snapshot *find_victim(struct superblock *sb)
+{
+	struct snapshot *snaplist = sb->image.snaplist;
+	u32 snapshots = sb->image.snapshots;
+
+	assert(snapshots);
+	struct snapshot *snap, *best = snaplist;
+
+	for (snap = snaplist + 1; snap < snaplist + snapshots; snap++) {
+		if (is_squashed(snap))
+			continue;
+		if (!is_squashed(best) && (usecount(sb, snap) && !usecount(sb, best)))
+			continue;
+		if (!is_squashed(best) && (!usecount(sb, snap) == !usecount(sb, best)) && (snap->prio >= best->prio))
+			continue;
+		best = snap;
+	}
+	return best;
+}
+
+/*
  * Delete all chunks in the B-tree for the snapshot(s) indicated by the
  * passed snapshot mask, beginning at the passed chunk.
  *
@@ -2023,57 +2095,6 @@ keep_prev_node:
 }
 
 /*
- * Find the given snapshot tag in the list of snapshots in the superblock.
- * Return a pointer to that snapshot entry.
- */
-static struct snapshot *find_snap(struct superblock *sb, u32 tag)
-{
-	struct snapshot *snapshot = sb->image.snaplist;
-	struct snapshot *end = snapshot + sb->image.snapshots;
-
-	for (; snapshot < end; snapshot++)
-		if (snapshot->tag == tag)
-			return snapshot;
-	return NULL;
-}
-
-static inline int is_squashed(const struct snapshot *snapshot)
-{
-	return snapshot->bit == SNAPSHOT_SQUASHED;
-}
-
-/* usecount() calculates and returns the usecount for a given snapshot.
- * The persistent (on disk) usecount is added to the transient usecount
- * (for devices using the snapshot). */
-static inline u16 usecount(struct superblock *sb, struct snapshot *snap)
-{
-	return (is_squashed(snap) ? 0 : sb->usecount[snap->bit]) + snap->usecount;
-}
-
-/* find the oldest snapshot with 0 usecnt and lowest priority.
- * if no such snapshot exists, find the snapshot with lowest priority
- */
-static struct snapshot *find_victim(struct superblock *sb)
-{
-	struct snapshot *snaplist = sb->image.snaplist;
-	u32 snapshots = sb->image.snapshots;
-
-	assert(snapshots);
-	struct snapshot *snap, *best = snaplist;
-
-	for (snap = snaplist + 1; snap < snaplist + snapshots; snap++) {
-		if (is_squashed(snap))
-			continue;
-		if (!is_squashed(best) && (usecount(sb, snap) && !usecount(sb, best)))
-			continue;
-		if (!is_squashed(best) && (!usecount(sb, snap) == !usecount(sb, best)) && (snap->prio >= best->prio))
-			continue;
-		best = snap;
-	}
-	return best;
-}
-
-/*
  * Delete the passed snapshot.
  */
 static int delete_snap(struct superblock *sb, struct snapshot *snap)
@@ -2207,7 +2228,7 @@ static void gen_changelist_leaf(struct superblock *sb, struct eleaf *leaf, void 
 	u64 newchunk;
 	int i;
 	u32 snap = cl->tgt_snap;
-	struct snapshot const *snaplist = sb->image.snaplist;
+	struct snapshot *snaplist = sb->image.snaplist;
 	u64 snap_sectors = 0;
 
 	for (i = 0; i < sb->image.snapshots; i++)
@@ -2629,7 +2650,7 @@ static int tag_snapbit(struct superblock *sb, unsigned tag)
 static unsigned int snapbit_tag(struct superblock *sb, unsigned bit)
 {
 	unsigned int i, n = sb->image.snapshots;
-	struct snapshot const *snap = sb->image.snaplist;
+	struct snapshot *snap = sb->image.snaplist;
 
 	for (i = 0; i < n; i++)
 		if (snap[i].bit == bit)
@@ -2719,14 +2740,6 @@ static void reply(int sock, struct messagebuf *message) // !!! bad name choice, 
 }
 
 #define SNAPCLIENT_BIT 1
-
-struct client
-{
-	u64 id;
-	int sock;
-	int snaptag;
-	u32 flags; 
-};
 
 /*
  * Cross-client Locking strategy
@@ -3318,16 +3331,8 @@ static int sb_get_device_sizes(struct superblock *sb)
 	return 0;
 }
 
-static void save_sb_check(struct superblock *sb)
-{
-	commit_deferred_allocs(sb);
-	if (dirty_buffer_count)
-		warn("%i dirty buffers when all should be clean!", dirty_buffer_count);
-	save_sb(sb);
-}
-
 static int init_journal(struct superblock *sb)
- {
+{
 	chunk_t metafree = sb->image.metadata.freechunks;
 	chunk_t snapfree = sb->image.snapdata.freechunks;
 	for (int i = 0; i < sb->image.journal_size; i++) {
@@ -3472,7 +3477,7 @@ void outerror(int sock, int err, char *text)
 
 void get_status(struct superblock *sb, unsigned sock)
 {
-	struct snapshot const *snaplist = sb->image.snaplist;
+	struct snapshot *snaplist = sb->image.snaplist;
 
 	unsigned snapshots = sb->image.snapshots;
 	size_t reply_len = snapshot_details_calc_size(snapshots, snapshots);
@@ -3737,7 +3742,9 @@ static int incoming(struct superblock *sb, struct client *client)
 		trace(warn("got identify request, setting id="U64FMT" snap=%i (tag=%u), sending chunksize_bits=%u\n",
 			client->id, client->snap, tag, sb->snapdata.asi->allocsize_bits););
 		warn("client id %Lx, snaptag %u", client->id, tag);
-
+		// !!! do not pollute the snapshot tag space !!!
+		// !!! there is no reason to make 0xffffffff an invalid tag !!!
+		// !!! make the identify tag field 64 bits and this works !!!
 		if (tag != (u32)~0UL) {
 			struct snapshot *snapshot = find_snap(sb, tag);
 
@@ -4029,7 +4036,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		}
 		memcpy(&request, message.body, sizeof(request));
 
-		struct snapshot const *snaplist = sb->image.snaplist;
+		struct snapshot *snaplist = sb->image.snaplist;
 		struct state_message reply;
 		unsigned int i;
 
@@ -4048,7 +4055,7 @@ static int incoming(struct superblock *sb, struct client *client)
 	case REQUEST_SNAPSHOT_SECTORS:
 	{
 		u32 snap = ((struct status_request *)message.body)->snap;
-		struct snapshot const *snaplist = sb->image.snaplist;
+		struct snapshot *snaplist = sb->image.snaplist;
 		struct snapshot_sectors reply;
 		char err_msg[MAX_ERRMSG_SIZE];
 		int i;
@@ -4120,7 +4127,7 @@ static int incoming(struct superblock *sb, struct client *client)
 		free(pe);
 		break;
 	}
-	default: 
+	default:
 	{
 		uint32_t proto_err  = ERROR_UNKNOWN_MESSAGE;
 		char *err_msg = "Server received unknown message";
