@@ -11,8 +11,8 @@ set -e
 EXPECT_FAIL=1
 
 NUMDEVS=2
-DEV1SIZE=8
-DEV2SIZE=4
+DEV1SIZE=32
+DEV2SIZE=32
 
 echo "1..5"  # Five checking steps in this test
 
