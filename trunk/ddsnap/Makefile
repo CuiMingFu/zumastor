@@ -196,14 +196,7 @@ deltafile1-2: changelist1-2
 
 
 ddsnap-test3: 
-#	sudo ./devpoke /dev/mapper/torigin write 2
-#	sudo ./devpoke /dev/mapper/torigin read 2
-#	sleep 1
-#	killall ddsnap-server
 	sudo ./devspam /dev/mapper/torigin write 1000 12
-
-ddsnap-test4:
-#	sudo ./devspam /dev/mapper/torigin write 1 77
 
 ddsnap-test9:
 	sudo /sbin/dmsetup remove torigin
