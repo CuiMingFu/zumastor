@@ -1,0 +1,570 @@
+#!/usr/bin/python
+# Zumastor Linux Storage Server
+# Copyright (c) 2006 Google Inc.
+# Written by Daniel Phillips <phillips@google.com>
+# and...
+# Licensed under the GNU GPL version 2
+
+import errno
+import sys
+import os
+import commands
+import signal
+import getopt
+import stat
+
+# Friendier mk/rm forms: for mk, return true if the name already
+# existed, for rm return true if the name did not exist, otherwise
+# throw an exception.  Note the assumption here that if a name
+# already exists, it must be the right type of thing, i.e., a
+# directory, i.e., it was us who made it.
+
+def mkdir(path):
+	try: os.mkdir(path)
+	except OSError, (err, str):
+		if err == errno.EEXIST:
+			return True
+		else: raise
+	return False
+
+def rmdir(path):
+	try: os.rmdir(path)
+	except OSError, (err, str):
+		if err == errno.ENOENT:
+			return True
+		else: raise
+	return False
+
+def rm(path):
+	try: os.remove(path)
+	except OSError, (err, str):
+		if err == errno.ENOENT:
+			return True
+		else: raise
+	return False
+
+def mkdirtree(path, tree):
+    path = path + '/' + tree[0]
+    os.system('mkdir ' + path)
+    for item in tree[1:]:
+        mkdirtree(path, item)
+	
+def rmdirtree(path, tree):
+    path = path + '/' + tree[0]
+    for item in tree[1:]:
+        rmdirtree(path, item)
+    os.system('rmdir ' + path)
+	
+def rmtree(path):
+	commands.getstatusoutput("rm -r '" + path + "'")
+
+def make(file):
+	open(file,'a')
+
+def listdir(path):
+	return [name for name in os.listdir(path) if name[0] != '.']
+
+def readfile(name):
+	try: return open(name, 'r').read()
+	except IOError, (err, str):
+		if err == errno.ENOENT:
+			return ""
+		else: raise
+
+def writefile(name, text):
+	open(name, 'w').write(text)
+
+def nint(string):
+	return len(string) and int(string) or 0 # lame
+
+def pkill(pattern): # lose me
+	print commands.getstatusoutput('pkill -f "' + pattern + '$"')
+
+# and without further ado... #
+
+def ints_to_string(list):
+	return ' '.join([`item` for item in list])
+
+def string_to_ints(string):
+	return [int(item) for item in string.split()]
+
+dbpath = '/var/lib/zumastor/volumes/'
+runpath = '/var/run/zumastor/'
+kinds = ['hourly', 'daily', 'weekly', 'monthly']
+
+rundirs = ['zumastor',
+	['agents'],
+	['cron'],
+	['mount'],
+	['pid', ['master'], ['target'], ['ddsnap']],
+	['servers'],
+	['trigger', ['master'], ['target']]]
+
+def ddsnap(args):
+	status, output = commands.getstatusoutput('echo ddsnap ' + ' '.join(args))
+	print output
+	return status
+
+def vol_path(vol):
+	return dbpath + vol + '/'
+
+def target_path(vol):
+	return vol_path(vol) + 'targets/'
+
+def master_path(vol):
+	return vol_path(vol) + 'master/'
+
+def snap_path(vol):
+	return master_path(vol) + 'snapshots/'
+
+def master_trigger(vol):
+	return runpath + 'trigger/master/' + vol
+
+def target_trigger_path(vol):
+	return runpath + 'trigger/target/' + vol + '/'
+
+def master_pidfile(vol):
+	return runpath + 'pid/master/' + vol
+
+def agent_sock(vol):
+	return runpath + 'pid/agents/' + vol
+
+def server_sock(vol):
+	return runpath + 'pid/server/' + vol
+
+def target_pidpath(vol):
+	return runpath + 'pid/target/' + vol + '/'
+
+def target_pidfile(vol, host):
+	return target_pidpath(vol) + host
+
+def running():
+	return os.path.exists(runpath + 'pid')
+
+def is_master(vol):
+	return os.path.exists(master_path(vol))
+
+def is_target(vol):
+	return os.path.exists(vol_path(vol) + 'source')
+
+def valid_kind(kind):
+	return kind in kinds
+
+def master_snaps(vol):
+	return string_to_ints(' '.join([readfile(snap_path(vol) + name)
+		for name in listdir(snap_path(vol))]))
+
+def snapdev(vol, snap):
+	return vol + '(' + `snap` + ')'
+
+def create_device(vol, snap):
+	print 'create device', snapdev(vol, snap)
+
+def mount_snap(vol, snap):
+	mkdir(runpath + 'mount/' + snapdev(vol, snap))
+	# create dm snap device
+	# mount dm snap device
+
+def unmount_snap(vol, snap):
+	rmdir(runpath + 'mount/' + snapdev(vol, snap))
+	# create dm snap device
+	# mount dm snap device
+
+def new_snapshot(vol, kind):
+	print 'new snapshot', vol, kind
+	if (not valid_kind(kind)): return
+	path = master_path(vol)
+	snap = nint(readfile(path + 'next'))
+	lim = nint(readfile(path + 'schedule/' + kind))
+	if not lim:
+		print 'no limit'
+		return
+	file = path + 'snapshots/' + kind
+	# this is wrong...
+	err = ddsnap(['snapshot', `snap`, agent_sock(vol), server_sock(vol)])
+	mkdir(runpath + 'mount/' + snapdev(vol, snap))
+	mount_snap(vol, snap)
+	if err:
+		print 'ddsnap error', err
+		return
+	snaps = string_to_ints(readfile(file))
+	snaps = snaps + [snap]
+	if len(snaps) > lim:
+		unmount_snap(vol, snaps[0])
+		snaps = snaps[1:]
+	print snaps
+	writefile(file, ints_to_string(snaps))
+	writefile(path + 'next', `snap + 1`)
+
+def start_master(vol):
+	if not running():
+		return
+	os.mkfifo(master_trigger(vol))
+	for snap in master_snaps(vol):
+		mount_snap(vol, snap)
+	pid = os.fork()
+	if pid:
+		writefile(master_pidfile(vol), `pid`)
+		return
+	print 'master daemon', vol
+	while 1:
+		pipe = open(master_trigger(vol), 'r')
+		kind = pipe.read(99).strip()
+		pipe.close
+		new_snapshot(vol, kind)
+
+def pidfile_kill(pidfile):
+	pid = 0
+	try:
+		pid = int(readfile(pidfile))
+		os.kill((pid), signal.SIGTERM)
+	except: print 'did not kill', pidfile, readfile(pidfile)
+	rm(pidfile)
+
+def start_target(vol, host):
+	if not running():
+		return
+	mkdir(target_pidpath(vol))
+	mkdir(target_trigger_path(vol))
+	mkdir(target_pidpath(vol))
+	os.mkfifo(target_trigger_path(vol) + host)
+	pid = os.fork()
+	if pid:
+		writefile(target_pidfile(vol, host), `pid`)
+		return
+	while 1:
+		pipe = open(target_trigger_path(vol) + host, 'r')
+		kind = pipe.read(99).strip()
+		pipe.close
+		print 'replicate', vol, host
+
+def stop_master(vol):
+	if not running():
+		return
+	pidfile_kill(master_pidfile(vol))
+	rm(master_trigger(vol))
+	for snap in master_snaps(vol):
+		unmount_snap(vol, snap)
+
+def start_source(vol):
+	if not running():
+		return
+	print 'start source', vol
+
+def start_volume(vol):
+	if not running():
+		return
+	mkdir(runpath + 'mount/' + vol)
+	# create dm org device
+	# mount dm org device
+	if is_target(vol):
+		start_source(vol)
+	if is_master(vol):
+		start_master(vol)
+	for host in listdir(target_path(vol)):
+		start_target(vol, host)
+
+def stop_source(vol):
+	if not running():
+		return
+	print 'stop source', vol
+
+def stop_target(vol, host):
+	if not running():
+		return
+	pidfile_kill(target_pidfile(vol, host))
+	rmdir(target_pidpath(vol))
+	rmtree(target_trigger_path(vol))
+
+def stop_volume(vol):
+	if not running():
+		return
+	for host in listdir(target_path(vol)):
+		stop_target(vol, host)
+	if is_master(vol):
+		stop_master(vol)
+	if is_target(vol):
+		stop_source(vol)
+	# unmount dm org device
+	# remove dm org device
+	rmdir(runpath + 'mount/' + vol)
+
+def forget_master(vol):
+	rmtree(master_path(vol))
+	rmdir(target_trigger_path(vol))
+
+def forget_target(vol, host):
+	print 'forget target', vol, hos
+	path = target_path(vol) + host + '/'
+	rmdir(path)
+
+def forget_source(vol):
+	path = vol_path(vol)
+	rm(path + 'source')
+
+def forget_volume(vol):
+	for host in listdir(target_path(vol)):
+		forget_target(vol, host)
+	if is_master(vol):
+		forget_master(vol)
+	if is_target(vol):
+		forget_source(vol)
+	rmtree(vol_path(vol))
+
+# shell commands #
+
+def bail(message):
+	print message
+	sys.exit(1)
+
+def must_be_running():	
+	if not running():
+		bail('Zumastor is not started')
+
+def try_help():
+	print "try", sys.argv[0], "help"
+
+def need_args(n, args):
+	if len(args) < n:
+		print 'too few args'
+		sys.exit()
+
+def define_volume_cmd(args):
+	need_args(1, args)
+	vol = args[0]
+	path = vol_path(vol)
+	if mkdir(path):
+		print vol, 'already exists'
+		return
+	mkdir(path + 'device')
+	mkdir(path + 'targets')
+	start_volume(vol)
+	create_device(vol, -1)
+
+def is_number(x):
+    import re 
+    num_re = re.compile(r'^[-+]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?$')
+    return str(re.match(num_re, x)) != 'None'
+
+def define_master_cmd(args):
+	opts, args = getopt.gnu_getopt(args, 'h:d:w:m',  ['hourly=', 'daily=', 'weekly=', 'monthly='])
+	need_args(1, args)
+	vol = args[0]
+	stop_source(vol)
+	forget_source(vol)
+	path = master_path(vol)
+	existing = mkdir(path)
+	if not existing:
+		mkdir(path + 'schedule')
+		mkdir(path + 'snapshots')
+	print opts
+	opts = [[{
+		'-h': 'hourly', '--hourly': 'hourly',
+		'-d': 'daily', '--daily': 'daily',
+		'-w': 'weekly', '--weekly': 'weekly',
+		'-m': 'monthly', '--monthly': 'monthly'
+	}[opt[0]], opt[1]] for opt in opts]
+	for opt in opts:
+		print 'kind:', opt[0], opt[1]
+		if not is_number(opt[1]):
+			bail(opt[0] + ' option requires a number')
+	for opt in opts:
+		kind = opt[0]
+		writefile(path + 'schedule/' + kind, opt[1])
+		make(path + 'snapshots/' + kind)
+	if not existing:
+		start_master(vol)
+
+def define_source_cmd(args):
+	need_args(2, args)
+	vol = args[0]
+	host = args[1]
+	stop_master(vol)
+	forget_master(vol)
+	path = vol_path(vol)
+	writefile(path + 'source', host)
+
+def define_target_cmd(args):
+	need_args(2, args)
+	vol = args[0]
+	host = args[1]
+	path = target_path(vol) + host + '/'
+	existing = mkdir(path)
+	if not existing:
+		start_target(vol, host)
+
+def forget_volume_cmd(args):
+	need_args(1, args)
+	vol = args[0]
+	stop_volume(vol)
+	forget_volume(vol)
+
+def forget_source_cmd(args):
+	need_args(1, args)
+	forget_source(args[0])
+
+def forget_target_cmd(args):
+	need_args(2, args)
+	forget_target(args[0], args[1])
+
+def start_master_cmd(args):
+	need_args(1, args)
+	start_master(args[0])
+
+def start_source_cmd(args):
+	need_args(1, args)
+	start_source(args[0])
+
+def start_target_cmd(args):
+	need_args(2, args)
+	start_target(args[0], args[1])
+
+def stop_master_cmd(args):
+	need_args(1, args)
+	stop_master(args[0])
+
+def stop_source_cmd(args):
+	need_args(1, args)
+	stop_source(args[0])
+
+def stop_target_cmd(args):
+	need_args(2, args)
+	stop_target(args[0], args[1])
+
+def snapshot_cmd(args):
+	need_args(2, args)
+	vol = args[0]
+	kind = args[1]
+	must_be_running()
+	if os.path.exists(master_trigger(vol)) and valid_kind(kind):
+		open(master_trigger(vol), 'w').write(kind)
+
+def replicate_cmd(args):
+	need_args(2, args)
+	vol = args[0]
+	host = args[1]
+	must_be_running()
+	trigger = target_trigger_path(vol) + host
+	if os.path.exists(trigger):
+		open(trigger, 'w').write('123')
+
+def receive_cmd(args):
+	print 'receive'
+
+def listdir(path):
+	return [name for name in os.listdir(path) if name[0] != '.']
+
+def treelist(root, flags):
+	showhidden, showfull = flags & 1, flags & 2
+	path, names, cursor, level = '', [[root]], [0], 0
+	while names:
+		while cursor[level] < len(names[level]):
+			name = names[level][cursor[level]]
+			cursor[level] += 1
+			fullname = os.path.join(path, name)
+			try: mode = (level == 0 and os.stat or os.lstat)(fullname).st_mode
+			except OSError, (err, str):
+				if err != errno.ENOENT: raise
+				print fullname, 'does not exist';
+				sys.exit(1)
+			prefix = ''
+			for i in range(1, level + 1):
+				prefix += [['|   ', '    '], ['|-- ', '`-- ']] \
+					[i == level][cursor[i] == len(names[i])]
+			if stat.S_ISDIR(mode):
+				path = fullname
+				if showhidden:
+					newnames = os.listdir(path)
+				else:
+					newnames = [crap for crap in os.listdir(path) if crap[0] != '.']
+				newnames.sort()
+				names += [newnames]
+				cursor += [0]
+				level += 1
+				print prefix + name
+			elif stat.S_ISLNK(mode):
+				print prefix + name, '->', os.readlink(fullname)
+			elif stat.S_ISREG(mode):
+				# limit size and translate bin to hex!!!
+				value = open(fullname, 'r').read()
+				print prefix + name + ' = ' + value
+			elif stat.S_ISFIFO(mode):
+				print prefix + name + '='
+			else:
+				print prefix + name + ' ??'
+		del names[level]
+		del cursor[level]
+		path = os.path.split(path)[0]
+		level -= 1
+
+def status_cmd(args):
+	opts, args = getopt.gnu_getopt(args, 'f')
+	o = ' '
+	if len(opts) and opts[0][0] == '-f':
+		o += '-f'
+	treelist('/var/lib/zumastor', 0)
+	treelist('/var/run/zumastor', 0)
+	#os.system('tree' + o + ' /var/lib/zumastor')
+	#os.system('tree' + o + ' /var/run/zumastor')
+	#print 'snaps', [[vol, master_snaps(vol)] for vol in listdir(dbpath) if is_master(vol)]
+
+def help_cmd(args):
+	print '(under construction)'
+
+def unknown_cmd(args):
+	print ' '.join(sys.argv[1:]), "is not a command"
+	try_help()
+
+def cmd(args, mapping):
+	need_args(1, args)
+	try: mapping.get(args[0], unknown_cmd)(args[1:])
+	except getopt.GetoptError, (err, str):
+		print str, "is not an option"
+		try_help()
+
+def define_cmd(args):
+	cmd(args, {
+	'volume': define_volume_cmd,
+	'master': define_master_cmd,
+	'source': define_source_cmd,
+	'target': define_target_cmd})
+
+def forget_cmd(args):
+	cmd(args, {
+	'volume': forget_volume_cmd,
+	'source': forget_source_cmd,
+	'target': forget_target_cmd})
+
+def start_cmd(args):
+	if not args:
+		mkdirtree('/var/run', rundirs)
+		for vol in listdir(dbpath):
+			start_volume(vol)
+		sys.exit(0)
+	cmd(args, {
+	'master': start_master_cmd,
+	'source': start_source_cmd,
+	'target': start_target_cmd})
+
+def stop_cmd(args):
+	if not args:
+		for vol in listdir(dbpath):
+			stop_volume(vol)
+		rmdirtree('/var/run', rundirs)
+		sys.exit(0)
+	cmd(args,{
+	'master': stop_master_cmd,
+	'source': stop_source_cmd,
+	'target': stop_target_cmd})
+
+cmd(sys.argv[1:], {
+	'define': define_cmd,
+	'forget': forget_cmd,
+	'start': start_cmd,
+	'stop': stop_cmd,
+	'snapshot': snapshot_cmd,
+	'replicate': replicate_cmd,
+	'receive': receive_cmd,
+	'status': status_cmd,
+	'--help': help_cmd,
+	'help': help_cmd})
