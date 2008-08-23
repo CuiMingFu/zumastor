@@ -8,8 +8,8 @@ INCLUDES +=-I$(kernel)
 CPPFLAGS +=-D_FILE_OFFSET_BITS=64 -DDSNAP_MEM_MONITOR=30 $(INCLUDES)
 CFLAGS +=-g -Wall -std=gnu99 -O2 -fno-strict-aliasing
 
-deps = Makefile trace.h diskio.h buffer.h list.h sock.h event.h
-ddsnap_agent_deps = $(deps) ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
+deps = Makefile trace.h diskio.h buffer.h list.h sock.h
+ddsnap_agent_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h daemonize.h
 ddsnapd_deps = $(deps) $(kernel)/dm-ddsnap.h daemonize.h ddsnap.h
 ddsnap_deps = $(deps) ddsnap.h ddsnap.agent.h $(kernel)/dm-ddsnap.h
 testdir = tests
@@ -56,15 +56,13 @@ diskio.o: diskio.c Makefile trace.h diskio.h
 
 buffer.o: buffer.c $(deps)
 
-event.o: event.c $(kernel)/dm-ddsnap.h event.h trace.h Makefile
-
 daemonize.o: daemonize.c $(deps)
 
 nblock_write: nblock_write.c
 	$(CC) nblock_write.c -o nblock_write
 
-ddsnap: ddsnap.c ddsnapd.o buffer.o event.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
-	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o event.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
+ddsnap: ddsnap.c ddsnapd.o buffer.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o $(ddsnap_deps) build.h
+	$(CC) ddsnap.c $(CFLAGS) $(CPPFLAGS) buffer.o ddsnapd.o ddsnap.agent.o xdelta/xdelta3.o delta.o diskio.o daemonize.o -o ddsnap -lpopt -lz
 
 devspam: tests/devspam.c trace.h
 	$(CC) $< $(CFLAGS) $(CPPFLAGS) -o $@

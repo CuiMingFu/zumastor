@@ -16,7 +16,6 @@
 #include "trace.h"
 #include "sock.h" // send_fd, read/writepipe, connect_socket
 #include "daemonize.h"
-#include "event.h"
 
 #define trace trace_off
 
