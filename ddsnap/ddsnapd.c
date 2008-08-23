@@ -41,7 +41,6 @@
 #include "list.h"
 #include "sock.h"
 #include "trace.h"
-#include "event.h"
 
 #define SECTORS_PER_BLOCK 7
 #define CHUNK_SIZE 4096
@@ -4167,7 +4166,6 @@ pipe_error:
 
 static int cleanup(struct superblock *sb)
 {
-	event_hook(0, SHUTDOWN_SERVER); /* event hook for abort action */
 	commit_deferred_allocs(sb);
 	sb->image.flags &= ~SB_BUSY;
 	set_sb_dirty(sb);
@@ -4210,7 +4208,6 @@ int snap_server_setup(const char *agent_sockname, const char *server_sockname, i
 
 	struct server_head server_head = { .type = AF_UNIX, .length = (strlen(server_sockname) + 1) };
 	trace(warn("server socket name is %s and length is %d", server_sockname, server_head.length););
-	event_hook(*agentfd, SERVER_READY);
 	if (writepipe(*agentfd, &(struct head){ SERVER_READY, sizeof(struct server_head) }, sizeof(struct head)) < 0 ||
 	    writepipe(*agentfd, &server_head, sizeof(server_head)) < 0 ||
 	    writepipe(*agentfd, server_sockname, server_head.length) < 0)
@@ -4234,7 +4231,6 @@ int snap_server(struct superblock *sb, int listenfd, int getsigfd, int agentfd, 
 		warn("can not set process to throttle less (error %i, %s)", errno, strerror(errno));
 	if ((err = prctl(PR_SET_MEMALLOC, 0, 0, 0, 0)))
 		warn("failed to enter memalloc mode (may deadlock) (error %i, %s)", errno, strerror(errno));
-	event_parse_options();
 
 	while (1) {
 		trace(warn("Waiting for activity"););
